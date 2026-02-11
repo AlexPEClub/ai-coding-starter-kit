@@ -31,7 +31,11 @@ export function LocationCard({
     <div
       className={`hsf-card ${isSelected ? 'hsf-card-selected' : ''}`}
       style={isSelected ? { borderColor: primaryColor } : {}}
-      onClick={onClick}
+      onClick={(e) => {
+        // Don't trigger card selection when clicking on links
+        if ((e.target as HTMLElement).closest('a')) return
+        onClick()
+      }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       role="button"
