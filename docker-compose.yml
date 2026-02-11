@@ -12,10 +12,6 @@ services:
     environment:
       - NODE_ENV=development
       - WATCHPACK_POLLING=true
-    env_file:
-      - path: .env.local
-        required: false
-
   # Production Build
   prod:
     build:
@@ -25,9 +21,6 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-    env_file:
-      - path: .env.local
-        required: false
 
 volumes:
   node_modules:
