@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "vite build --config vite.widget.config.ts && next build",
     "build:widget": "vite build --config vite.widget.config.ts",
     "start": "next start",
     "lint": "next lint"
