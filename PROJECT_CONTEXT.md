@@ -26,22 +26,29 @@ Template ready - Start by defining your first feature!
 - **Data Fetching:** React Server Components / fetch
 
 ### Deployment
-- **Hosting:** Vercel (oder Netlify)
+- **Hosting:** Vercel
 
 ---
 
 ## Features Roadmap
 
-### Your Features Will Appear Here
+### Storefinder (Heizmann)
 
-Start by defining your first feature using the Requirements Engineer agent:
-```
-Read .claude/agents/requirements-engineer.md and create a feature spec for [your feature idea]
-```
+**Architektur-Übersicht:** [ARCHITECTURE-OVERVIEW.md](/features/ARCHITECTURE-OVERVIEW.md)
 
-Example roadmap structure:
-- [PROJ-1] Your First Feature → 🔵 Planned → [Spec](/features/PROJ-1-feature-name.md)
-- [PROJ-2] Your Second Feature → ⚪ Backlog
+#### Phase 1: Backend Grundlagen
+- [PROJ-1] Admin-Authentifizierung → 🔵 Planned → [Spec](/features/PROJ-1-admin-authentifizierung.md)
+- [PROJ-3] Service-Typen Verwaltung → 🔵 Planned → [Spec](/features/PROJ-3-service-typen-verwaltung.md)
+- [PROJ-2] Stützpunkt-Verwaltung → 🔵 Planned → [Spec](/features/PROJ-2-stuetzpunkt-verwaltung.md)
+
+#### Phase 2: Widget-Konfiguration
+- [PROJ-4] Widget-Konfiguration & Snippet → 🔵 Planned → [Spec](/features/PROJ-4-widget-konfiguration-snippet.md)
+
+#### Phase 3: Frontend Widget
+- [PROJ-8] Mehrsprachigkeit (i18n) → 🔵 Planned → [Spec](/features/PROJ-8-storefinder-mehrsprachigkeit.md)
+- [PROJ-5] Kartenansicht (OSM/Google Maps) → 🔵 Planned → [Spec](/features/PROJ-5-storefinder-kartenansicht.md)
+- [PROJ-7] Stützpunkt-Liste & Cards → 🔵 Planned → [Spec](/features/PROJ-7-storefinder-liste-cards.md)
+- [PROJ-6] Suche & Filter → 🔵 Planned → [Spec](/features/PROJ-6-storefinder-suche-filter.md)
 
 ---
 
@@ -69,8 +76,8 @@ Example roadmap structure:
 
 For projects using Supabase:
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+NEXT_PUBLIC_SUPABASE_URL=https://eoajwzcqhdxufsnardom.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_BTJ3FmanNRs4Axp5YKtphw_GNJWA-uX
 ```
 
 See `.env.local.example` for full list.
@@ -122,12 +129,20 @@ All guides are practical and include code examples ready to copy-paste.
 
 ## Design Decisions
 
-Document your architectural decisions here as your project evolves.
+- **Warum separates Vite Widget-Bundle statt Next.js Page?**
+  → Widget läuft auf fremden Websites per `<script>`-Tag. Next.js kann keine isolierten standalone JS-Bundles erzeugen.
 
-**Template:**
-- **Why did we choose X over Y?**
-  → Reason 1
-  → Reason 2
+- **Warum Leaflet.js als Standard Map-Provider?**
+  → Open Source, kostenlos, kein API Key nötig. Google Maps als Option bei vorhandenem Key.
+
+- **Warum Nominatim für Geocoding?**
+  → Kostenloser OpenStreetMap-Service. Kein Account oder API Key nötig.
+
+- **Warum eigene Mini-i18n statt Framework?**
+  → Widget ist standalone. 3 Sprachen mit ~20 Schlüsseln brauchen kein 30KB+ Framework.
+
+- **Warum Widget-Konfiguration in DB statt .env?**
+  → Admins können Einstellungen live ändern ohne Re-Deploy.
 
 ---
 

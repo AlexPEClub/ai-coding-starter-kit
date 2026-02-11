@@ -1,0 +1,487 @@
+/* Heizmann Storefinder Widget Styles */
+/* Isolated styles with hsf- prefix to avoid conflicts */
+
+@import 'leaflet/dist/leaflet.css';
+
+.hsf-root {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #1a1a1a;
+  line-height: 1.5;
+  box-sizing: border-box;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.hsf-root *, .hsf-root *::before, .hsf-root *::after {
+  box-sizing: border-box;
+}
+
+/* Loading */
+.hsf-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 0;
+}
+
+.hsf-spinner {
+  animation: hsf-spin 1s linear infinite;
+}
+
+@keyframes hsf-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Header */
+.hsf-header {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 0;
+}
+
+/* Language Switcher */
+.hsf-lang-switcher {
+  display: flex;
+  gap: 2px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.hsf-lang-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.15s;
+}
+
+.hsf-lang-btn:hover {
+  background: #f3f4f6;
+}
+
+.hsf-lang-active {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+
+/* Toolbar */
+.hsf-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 0 8px;
+}
+
+.hsf-toolbar-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Search */
+.hsf-search {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+
+.hsf-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.hsf-search-input {
+  width: 100%;
+  padding: 8px 32px 8px 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.hsf-search-input:focus {
+  border-color: var(--hsf-primary, #E30613);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hsf-primary, #E30613) 15%, transparent);
+}
+
+.hsf-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 4px;
+  display: flex;
+}
+
+.hsf-search-clear:hover {
+  color: #374151;
+}
+
+/* Buttons */
+.hsf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.hsf-btn-outline {
+  background: white;
+  border: 1px solid #d1d5db;
+  color: #374151;
+}
+
+.hsf-btn-outline:hover {
+  background: #f3f4f6;
+}
+
+.hsf-btn-outline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Geolocation */
+.hsf-geolocation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hsf-error-text {
+  font-size: 12px;
+  color: #dc2626;
+}
+
+/* Radius */
+.hsf-radius {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hsf-radius-label {
+  font-size: 13px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.hsf-select {
+  padding: 7px 28px 7px 10px;
+  font-size: 13px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  outline: none;
+  appearance: auto;
+}
+
+/* Service Filters */
+.hsf-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hsf-filter-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hsf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid #d1d5db;
+  border-radius: 20px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #374151;
+}
+
+.hsf-chip:hover {
+  background: #f3f4f6;
+}
+
+.hsf-chip-active {
+  border-color: var(--hsf-primary) !important;
+}
+
+.hsf-reset-btn {
+  font-size: 12px;
+  color: #6b7280;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 4px;
+}
+
+.hsf-reset-btn:hover {
+  color: #374151;
+}
+
+/* Result Count */
+.hsf-result-count {
+  font-size: 13px;
+  color: #6b7280;
+  padding: 4px 0 8px;
+}
+
+/* Main Content: Split View */
+.hsf-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  height: 600px;
+}
+
+.hsf-map-container {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.hsf-list-container {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 4px;
+}
+
+/* Location Cards */
+.hsf-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: white;
+}
+
+.hsf-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.hsf-card-selected {
+  border-width: 2px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+}
+
+.hsf-card-image {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+
+.hsf-card-image-placeholder {
+  width: 100%;
+  height: 80px;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hsf-card-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hsf-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hsf-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.hsf-badge-closed {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fef3c7;
+  color: #92400e;
+  white-space: nowrap;
+}
+
+.hsf-card-address {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.hsf-card-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hsf-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+
+.hsf-card-link:hover {
+  opacity: 0.8;
+}
+
+.hsf-card-services {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.hsf-service-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  font-size: 11px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  color: #374151;
+}
+
+.hsf-service-name {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hsf-card-hours {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Load More */
+.hsf-load-more {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  background: none;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.hsf-load-more:hover {
+  background: #f9fafb;
+}
+
+/* Empty State */
+.hsf-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+  text-align: center;
+  gap: 8px;
+}
+
+.hsf-empty-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #374151;
+  margin: 8px 0 0;
+}
+
+.hsf-empty-hint {
+  font-size: 13px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+/* Leaflet overrides */
+.hsf-root .leaflet-popup-content-wrapper {
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.hsf-root .leaflet-popup-content {
+  margin: 12px;
+}
+
+.hsf-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hsf-content {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .hsf-map-container {
+    height: 50vh;
+    min-height: 300px;
+  }
+
+  .hsf-list-container {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .hsf-toolbar-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hsf-toolbar-row .hsf-geolocation,
+  .hsf-toolbar-row .hsf-radius {
+    justify-content: flex-start;
+  }
+}
