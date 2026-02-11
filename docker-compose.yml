@@ -1,0 +1,33 @@
+services:
+  # Entwicklungsserver mit Hot-Reload
+  dev:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+    env_file:
+      - path: .env.local
+        required: false
+
+  # Production Build
+  prod:
+    build:
+      context: .
+      target: prod
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - path: .env.local
+        required: false
+
+volumes:
+  node_modules:
