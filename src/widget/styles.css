@@ -301,22 +301,25 @@
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: box-shadow 0.2s, border-color 0.2s;
   background: white;
+  border-top: 3px solid var(--hsf-primary, var(--hsf-primary-fallback));
 }
 
 .hsf-card:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
 }
 
 .hsf-card-selected {
-  border-width: 2px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  border-color: var(--hsf-primary, var(--hsf-primary-fallback));
+  border-width: 1px;
+  border-top-width: 3px;
+  box-shadow: 0 4px 20px rgba(235, 94, 18, 0.15);
 }
 
 .hsf-card-image {
   width: 100%;
-  height: 120px;
+  height: 140px;
   object-fit: cover;
 }
 
@@ -330,10 +333,10 @@
 }
 
 .hsf-card-body {
-  padding: 12px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .hsf-card-header {
@@ -344,8 +347,8 @@
 }
 
 .hsf-card-name {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   margin: 0;
   line-height: 1.3;
   color: var(--hsf-neutral-700);
@@ -353,24 +356,27 @@
 
 .hsf-badge-closed {
   font-size: 11px;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: #fef3c7;
-  color: #92400e;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(241, 133, 0, 0.12);
+  color: var(--hsf-warning);
   white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
 .hsf-card-address {
   font-size: 13px;
   color: var(--hsf-neutral-500);
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 .hsf-card-contact {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--hsf-neutral-100);
 }
 
 .hsf-card-link {
@@ -379,30 +385,32 @@
   gap: 6px;
   font-size: 13px;
   text-decoration: none;
-  transition: opacity 0.15s;
+  transition: color 0.15s;
   width: fit-content;
 }
 
 .hsf-card-link:hover {
-  opacity: 0.8;
+  color: var(--hsf-primary-dark) !important;
 }
 
 .hsf-card-services {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 2px;
+  gap: 5px;
+  padding-top: 6px;
+  border-top: 1px solid var(--hsf-neutral-100);
 }
 
 .hsf-service-badge {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 2px 6px;
+  gap: 4px;
+  padding: 3px 8px;
   font-size: 11px;
-  background: var(--hsf-neutral-100);
-  border-radius: 4px;
-  color: var(--hsf-neutral-600);
+  font-weight: 500;
+  background: rgba(235, 94, 18, 0.08);
+  border-radius: 12px;
+  color: var(--hsf-primary, var(--hsf-primary-fallback));
 }
 
 .hsf-service-name {
@@ -413,11 +421,16 @@
 }
 
 .hsf-card-hours {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--hsf-neutral-500);
+  font-weight: 500;
+  color: var(--hsf-success);
+  background: rgba(13, 110, 34, 0.06);
+  padding: 3px 8px;
+  border-radius: 12px;
+  width: fit-content;
 }
 
 /* Load More */
