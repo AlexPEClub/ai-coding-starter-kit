@@ -7,8 +7,8 @@ Build web applications faster with AI agents handling Requirements, Architecture
 
 ---
 
-## Aktueller Status
-Template ready - Start by defining your first feature!
+## Current Status
+Template ready - Dependencies installed, environment configured, ready for first feature development!
 
 ---
 
@@ -32,16 +32,19 @@ Template ready - Start by defining your first feature!
 
 ## Features Roadmap
 
-### Your Features Will Appear Here
+### Planned Features
+
+- [PROJ-1] User Authentication System → 🔵 Planned → [Spec](/features/PROJ-1-user-auth.md)
+- [PROJ-2] Dashboard with Analytics → ⚪ Backlog
+- [PROJ-3] Real-time Notifications → ⚪ Backlog
+- [PROJ-4] User Profile Management → ⚪ Backlog
+
+### How to Add Features
 
 Start by defining your first feature using the Requirements Engineer agent:
 ```
 Read .claude/agents/requirements-engineer.md and create a feature spec for [your feature idea]
 ```
-
-Example roadmap structure:
-- [PROJ-1] Your First Feature → 🔵 Planned → [Spec](/features/PROJ-1-feature-name.md)
-- [PROJ-2] Your Second Feature → ⚪ Backlog
 
 ---
 
