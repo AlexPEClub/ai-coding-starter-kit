@@ -23,7 +23,7 @@ export function RoutePanel({ route, userLocation, primaryColor, onClose }: Route
     <div className="hsf-route-panel">
       <div className="hsf-route-panel-header">
         <div className="hsf-route-panel-title">
-          {t('route.nearest', { name: route.target.name })}
+          {t('route.target', { name: route.target.name })}
         </div>
         <button type="button" className="hsf-route-close-btn" onClick={onClose}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">

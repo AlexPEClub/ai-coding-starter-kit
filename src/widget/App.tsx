@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { WidgetConfig, ServiceTyp, Stuetzpunkt, RouteData } from './types'
 import { I18nContext, detectLanguage, saveLanguage, translate, type Language } from './i18n'
 import { LeafletMap } from './components/LeafletMap'
@@ -44,8 +44,10 @@ export function App({ apiBase }: AppProps) {
   const [hoveredStuetzpunkt, setHoveredStuetzpunkt] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(20)
   const [routeData, setRouteData] = useState<RouteData | null>(null)
+  const [routeActive, setRouteActive] = useState(false)
   const [routeLoading, setRouteLoading] = useState(false)
   const [routeError, setRouteError] = useState<string | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const setLang = useCallback((l: Language) => {
     setLangState(l)
@@ -165,7 +167,7 @@ export function App({ apiBase }: AppProps) {
     if (selectedRadius === 0) setSelectedRadius(config?.default_radius_km || 50)
   }
 
-  // Route: find nearest active stuetzpunkt and fetch OSRM route
+  // Route: find nearest active stuetzpunkt (fallback when none selected)
   const findNearestActive = useCallback((lat: number, lng: number): Stuetzpunkt | null => {
     const active = stuetzpunkte.filter((sp) => sp.status === 'aktiv')
     if (active.length === 0) return null
@@ -183,69 +185,98 @@ export function App({ apiBase }: AppProps) {
     return nearest
   }, [stuetzpunkte])
 
+  // Fetch OSRM route with AbortController support
   const fetchRoute = useCallback(async (
     fromLat: number, fromLng: number,
-    toLat: number, toLng: number
+    toLat: number, toLng: number,
+    signal?: AbortSignal
   ) => {
     const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`
-    const res = await fetch(url)
+    const res = await fetch(url, { signal })
     if (!res.ok) throw new Error('OSRM request failed')
     const data = await res.json()
     if (!data.routes || data.routes.length === 0) throw new Error('No route found')
     const route = data.routes[0]
-    // GeoJSON coordinates are [lng, lat], convert to [lat, lng] for Leaflet
     const geometry: [number, number][] = route.geometry.coordinates.map(
       (c: [number, number]) => [c[1], c[0]]
     )
     return {
       geometry,
-      distance: route.distance / 1000, // meters to km
-      duration: route.duration / 60, // seconds to minutes
+      distance: route.distance / 1000,
+      duration: route.duration / 60,
     }
   }, [])
 
+  // Calculate route to a specific target
+  const calculateRoute = useCallback(async (fromLat: number, fromLng: number, target: Stuetzpunkt) => {
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
+    setRouteLoading(true)
+    setRouteError(null)
+
+    try {
+      const result = await fetchRoute(fromLat, fromLng, target.latitude, target.longitude, controller.signal)
+      if (!controller.signal.aborted) {
+        setRouteData({ ...result, target })
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      if (!controller.signal.aborted) {
+        setRouteError(t('route.error'))
+      }
+    }
+    if (!controller.signal.aborted) {
+      setRouteLoading(false)
+    }
+  }, [fetchRoute, t])
+
+  // Route button click: toggle route mode
   const handleRouteClick = useCallback(async () => {
     // If route is active, close it
-    if (routeData) {
+    if (routeActive) {
+      if (abortControllerRef.current) abortControllerRef.current.abort()
+      setRouteActive(false)
       setRouteData(null)
       setRouteError(null)
       return
     }
 
-    setRouteLoading(true)
-    setRouteError(null)
+    // Determine target: selected stützpunkt or fallback to nearest
+    const resolveTargetAndRoute = async (loc: { lat: number; lng: number }) => {
+      let target: Stuetzpunkt | null = null
 
-    const doRoute = async (lat: number, lng: number) => {
-      const nearest = findNearestActive(lat, lng)
-      if (!nearest) {
+      if (selectedStuetzpunkt) {
+        target = stuetzpunkte.find((sp) => sp.id === selectedStuetzpunkt) ?? null
+      }
+      if (!target) {
+        target = findNearestActive(loc.lat, loc.lng)
+        if (target) setSelectedStuetzpunkt(target.id)
+      }
+      if (!target) {
         setRouteError(t('route.noTarget'))
-        setRouteLoading(false)
         return
       }
 
-      try {
-        const result = await fetchRoute(lat, lng, nearest.latitude, nearest.longitude)
-        setRouteData({
-          ...result,
-          target: nearest,
-        })
-        setSelectedStuetzpunkt(nearest.id)
-      } catch {
-        setRouteError(t('route.error'))
-      }
-      setRouteLoading(false)
+      setRouteActive(true)
+      await calculateRoute(loc.lat, loc.lng, target)
     }
 
     // Use existing userLocation or request geolocation
     if (userLocation) {
-      await doRoute(userLocation.lat, userLocation.lng)
+      await resolveTargetAndRoute(userLocation)
     } else if (navigator.geolocation) {
+      setRouteLoading(true)
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
           const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
           setUserLocation(loc)
           if (selectedRadius === 0) setSelectedRadius(config?.default_radius_km || 50)
-          await doRoute(loc.lat, loc.lng)
+          await resolveTargetAndRoute(loc)
         },
         () => {
           setRouteError(t('route.noLocation'))
@@ -255,11 +286,24 @@ export function App({ apiBase }: AppProps) {
       )
     } else {
       setRouteError(t('route.noLocation'))
-      setRouteLoading(false)
     }
-  }, [routeData, userLocation, findNearestActive, fetchRoute, t, selectedRadius, config?.default_radius_km])
+  }, [routeActive, userLocation, selectedStuetzpunkt, stuetzpunkte, findNearestActive, calculateRoute, t, selectedRadius, config?.default_radius_km])
+
+  // Auto-recalculate route when selected stützpunkt changes while route is active
+  useEffect(() => {
+    if (!routeActive || !userLocation || !selectedStuetzpunkt) return
+    // Skip if already showing route for this target
+    if (routeData?.target.id === selectedStuetzpunkt) return
+
+    const target = stuetzpunkte.find((sp) => sp.id === selectedStuetzpunkt)
+    if (!target) return
+
+    calculateRoute(userLocation.lat, userLocation.lng, target)
+  }, [selectedStuetzpunkt, routeActive, userLocation, stuetzpunkte, calculateRoute, routeData?.target.id])
 
   const handleCloseRoute = useCallback(() => {
+    if (abortControllerRef.current) abortControllerRef.current.abort()
+    setRouteActive(false)
     setRouteData(null)
     setRouteError(null)
   }, [])
@@ -306,7 +350,7 @@ export function App({ apiBase }: AppProps) {
           <div className="hsf-toolbar-row">
             <SearchBar value={searchText} onChange={setSearchText} primaryColor={primaryColor} />
             <GeolocationButton onLocation={handleUserGeolocation} />
-            <RouteButton isLoading={routeLoading} isActive={!!routeData} onClick={handleRouteClick} />
+            <RouteButton isLoading={routeLoading} isActive={routeActive} onClick={handleRouteClick} />
             <RadiusSelector value={selectedRadius} onChange={setSelectedRadius} />
           </div>
           <ServiceFilterBar

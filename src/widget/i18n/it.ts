@@ -28,4 +28,6 @@ export const it = {
   'route.error': 'Impossibile calcolare il percorso.',
   'route.farAway': 'Il punto di servizio più vicino è a oltre {distance} km.',
   'route.nearest': 'Punto di servizio più vicino: {name}',
+  'route.target': 'Percorso verso: {name}',
+  'route.calculating': 'Calcolo del percorso...',
 }

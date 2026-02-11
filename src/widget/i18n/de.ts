@@ -28,4 +28,6 @@ export const de = {
   'route.error': 'Route konnte nicht berechnet werden.',
   'route.farAway': 'Der nächste Stützpunkt ist über {distance} km entfernt.',
   'route.nearest': 'Nächster Stützpunkt: {name}',
+  'route.target': 'Route zu: {name}',
+  'route.calculating': 'Route wird berechnet...',
 }
