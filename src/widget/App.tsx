@@ -59,34 +59,70 @@ export function App({ apiBase }: AppProps) {
     [lang]
   )
 
-  // Load config + data
+  // Load config + data (detect language first, then fetch with lang param)
+  const initialLoadDone = useRef(false)
+
   useEffect(() => {
     async function load() {
       try {
-        const [configRes, dataRes] = await Promise.all([
-          fetch(`${apiBase}/api/widget/config`),
-          fetch(`${apiBase}/api/widget/stuetzpunkte?limit=500`),
+        // First: get config to detect language
+        const configRes = await fetch(`${apiBase}/api/widget/config`)
+        if (!configRes.ok) return
+
+        const configData = await configRes.json()
+        setConfig(configData.config)
+        setSelectedRadius(configData.config.default_radius_km || 0)
+        const detectedLang = detectLanguage(configData.config.default_language)
+        setLangState(detectedLang)
+
+        // Then: fetch with correct language for translated content
+        const [configLangRes, dataRes] = await Promise.all([
+          fetch(`${apiBase}/api/widget/config?lang=${detectedLang}`),
+          fetch(`${apiBase}/api/widget/stuetzpunkte?limit=500&lang=${detectedLang}`),
         ])
 
-        if (configRes.ok) {
-          const configData = await configRes.json()
-          setConfig(configData.config)
-          setServices(configData.services || [])
-          setSelectedRadius(configData.config.default_radius_km || 0)
-          setLangState(detectLanguage(configData.config.default_language))
+        if (configLangRes.ok) {
+          const d = await configLangRes.json()
+          setServices(d.services || [])
         }
-
         if (dataRes.ok) {
-          const stData = await dataRes.json()
-          setStuetzpunkte(stData.stuetzpunkte || [])
+          const d = await dataRes.json()
+          setStuetzpunkte(d.stuetzpunkte || [])
         }
       } catch (err) {
         console.error('[Heizmann Storefinder] Failed to load data:', err)
       }
       setIsLoading(false)
+      initialLoadDone.current = true
     }
     load()
   }, [apiBase])
+
+  // Re-fetch translated data when language changes after initial load
+  useEffect(() => {
+    if (!initialLoadDone.current) return
+
+    async function refetch() {
+      try {
+        const [configRes, dataRes] = await Promise.all([
+          fetch(`${apiBase}/api/widget/config?lang=${lang}`),
+          fetch(`${apiBase}/api/widget/stuetzpunkte?limit=500&lang=${lang}`),
+        ])
+
+        if (configRes.ok) {
+          const d = await configRes.json()
+          setServices(d.services || [])
+        }
+        if (dataRes.ok) {
+          const d = await dataRes.json()
+          setStuetzpunkte(d.stuetzpunkte || [])
+        }
+      } catch (err) {
+        console.error('[Heizmann Storefinder] Failed to reload translations:', err)
+      }
+    }
+    refetch()
+  }, [lang, apiBase])
 
   // Filter logic
   const filteredStuetzpunkte = useMemo(() => {

@@ -12,6 +12,7 @@ import {
   Settings,
   Users,
   LayoutDashboard,
+  Languages,
   LogOut,
   Menu,
   X,
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/stuetzpunkte', label: 'Stützpunkte', icon: MapPin },
   { href: '/admin/services', label: 'Services', icon: Wrench },
+  { href: '/admin/uebersetzungen', label: 'Übersetzungen', icon: Languages },
   { href: '/admin/einstellungen', label: 'Einstellungen', icon: Settings },
   { href: '/admin/admins', label: 'Admins', icon: Users },
 ]

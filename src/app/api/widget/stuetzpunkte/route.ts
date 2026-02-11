@@ -1,8 +1,10 @@
 import { createClient } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 
+const SUPPORTED_LANGS = ['de', 'fr', 'it']
+
 // GET /api/widget/stuetzpunkte - Öffentlicher Endpoint für Widget
-// Unterstützt: Suche, Service-Filter, Umkreissuche, Pagination
+// Unterstützt: Suche, Service-Filter, Umkreissuche, Pagination, Sprache
 export async function GET(request: Request) {
   const supabase = await createClient()
   const { searchParams } = new URL(request.url)
@@ -15,6 +17,9 @@ export async function GET(request: Request) {
   const page = parseInt(searchParams.get('page') || '1')
   const limit = parseInt(searchParams.get('limit') || '20')
   const offset = (page - 1) * limit
+
+  const langParam = searchParams.get('lang') || 'de'
+  const lang = SUPPORTED_LANGS.includes(langParam) ? langParam : 'de'
 
   // Basis-Query: Nur aktive + temporär geschlossene Stützpunkte mit Services
   let query = supabase
@@ -75,6 +80,45 @@ export async function GET(request: Request) {
       const distB = haversineDistance(userLat, userLng, b.latitude!, b.longitude!)
       return distA - distB
     })
+  }
+
+  // Übersetzungen für Service-Typ-Namen anwenden
+  if (lang !== 'de' && results.length > 0) {
+    const allServiceIds = new Set<string>()
+    for (const sp of results) {
+      for (const ss of sp.stuetzpunkt_services || []) {
+        if (ss.service_typen?.id) {
+          allServiceIds.add(ss.service_typen.id)
+        }
+      }
+    }
+
+    if (allServiceIds.size > 0) {
+      const { data: translations } = await supabase
+        .from('translations')
+        .select('row_id, value')
+        .eq('table_name', 'service_typen')
+        .eq('field_name', 'name')
+        .eq('language', lang)
+        .in('row_id', Array.from(allServiceIds))
+
+      if (translations && translations.length > 0) {
+        const translationMap = new Map(translations.map((t) => [t.row_id, t.value]))
+
+        results = results.map((sp) => ({
+          ...sp,
+          stuetzpunkt_services: (sp.stuetzpunkt_services || []).map(
+            (ss: { service_typ_id: string; service_typen: { id: string; name: string; icon: string } | null }) => ({
+              ...ss,
+              service_typen: ss.service_typen ? {
+                ...ss.service_typen,
+                name: translationMap.get(ss.service_typen.id) || ss.service_typen.name,
+              } : ss.service_typen,
+            })
+          ),
+        }))
+      }
+    }
   }
 
   // CORS Header für Cross-Origin Widget-Embedding
