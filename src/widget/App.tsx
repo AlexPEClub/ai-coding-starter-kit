@@ -59,50 +59,31 @@ export function App({ apiBase }: AppProps) {
     [lang]
   )
 
-  // Load config + data (detect language first, then fetch with lang param)
-  const initialLoadDone = useRef(false)
+  // Step 1: Load config once to detect default language
+  const [configLoaded, setConfigLoaded] = useState(false)
 
   useEffect(() => {
-    async function load() {
+    async function loadConfig() {
       try {
-        // First: get config to detect language
-        const configRes = await fetch(`${apiBase}/api/widget/config`)
-        if (!configRes.ok) return
-
-        const configData = await configRes.json()
-        setConfig(configData.config)
-        setSelectedRadius(configData.config.default_radius_km || 0)
-        const detectedLang = detectLanguage(configData.config.default_language)
-        setLangState(detectedLang)
-
-        // Then: fetch with correct language for translated content
-        const [configLangRes, dataRes] = await Promise.all([
-          fetch(`${apiBase}/api/widget/config?lang=${detectedLang}`),
-          fetch(`${apiBase}/api/widget/stuetzpunkte?limit=500&lang=${detectedLang}`),
-        ])
-
-        if (configLangRes.ok) {
-          const d = await configLangRes.json()
-          setServices(d.services || [])
-        }
-        if (dataRes.ok) {
-          const d = await dataRes.json()
-          setStuetzpunkte(d.stuetzpunkte || [])
-        }
+        const res = await fetch(`${apiBase}/api/widget/config`)
+        if (!res.ok) return
+        const data = await res.json()
+        setConfig(data.config)
+        setSelectedRadius(data.config.default_radius_km || 0)
+        setLangState(detectLanguage(data.config.default_language))
       } catch (err) {
-        console.error('[Heizmann Storefinder] Failed to load data:', err)
+        console.error('[Heizmann Storefinder] Failed to load config:', err)
       }
-      setIsLoading(false)
-      initialLoadDone.current = true
+      setConfigLoaded(true)
     }
-    load()
+    loadConfig()
   }, [apiBase])
 
-  // Re-fetch translated data when language changes after initial load
+  // Step 2: Load translated data whenever lang changes (after config is loaded)
   useEffect(() => {
-    if (!initialLoadDone.current) return
+    if (!configLoaded) return
 
-    async function refetch() {
+    async function loadData() {
       try {
         const [configRes, dataRes] = await Promise.all([
           fetch(`${apiBase}/api/widget/config?lang=${lang}`),
@@ -118,11 +99,12 @@ export function App({ apiBase }: AppProps) {
           setStuetzpunkte(d.stuetzpunkte || [])
         }
       } catch (err) {
-        console.error('[Heizmann Storefinder] Failed to reload translations:', err)
+        console.error('[Heizmann Storefinder] Failed to load data:', err)
       }
+      setIsLoading(false)
     }
-    refetch()
-  }, [lang, apiBase])
+    loadData()
+  }, [lang, apiBase, configLoaded])
 
   // Filter logic
   const filteredStuetzpunkte = useMemo(() => {
