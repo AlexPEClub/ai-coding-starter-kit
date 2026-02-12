@@ -323,13 +323,12 @@ export function StuetzpunktForm({ initialData, isEdit = false }: StuetzpunktForm
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">E-Mail *</Label>
+              <Label htmlFor="email">E-Mail</Label>
               <Input
                 id="email"
                 type="email"
                 value={data.email}
                 onChange={(e) => update('email', e.target.value)}
-                required
               />
             </div>
           </div>

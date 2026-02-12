@@ -78,13 +78,15 @@ export function LocationCard({
             </svg>
             {sp.telefon}
           </a>
-          <a href={`mailto:${sp.email}`} className="hsf-card-link" style={{ color: primaryColor }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
-              <rect width="20" height="16" x="2" y="4" rx="2" />
-              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-            </svg>
-            {sp.email}
-          </a>
+          {sp.email && (
+            <a href={`mailto:${sp.email}`} className="hsf-card-link" style={{ color: primaryColor }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                <rect width="20" height="16" x="2" y="4" rx="2" />
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+              </svg>
+              {sp.email}
+            </a>
+          )}
           {sp.website && (
             <a
               href={sp.website}

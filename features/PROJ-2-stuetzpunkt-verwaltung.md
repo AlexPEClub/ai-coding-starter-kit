@@ -28,7 +28,7 @@ CRUD-Verwaltung der Stützpunkte (Standorte/Filialen) im Backend mit automatisch
 | ort | String | Ja | Stadt/Ort |
 | land | String | Ja | Land (CH, DE, etc.) |
 | telefon | String | Ja | Telefonnummer |
-| email | String | Ja | Email-Adresse |
+| email | String | Nein | Email-Adresse |
 | website | String | Nein | URL zur Website |
 | bild_url | String | Nein | URL zum hochgeladenen Bild |
 | latitude | Float | Auto | Breitengrad (via Geocoding) |

@@ -10,7 +10,7 @@ const UpdateStuetzpunktSchema = z.object({
   ort: z.string().min(1).optional(),
   land: z.string().min(1).optional(),
   telefon: z.string().min(1).optional(),
-  email: z.string().email().optional(),
+  email: z.string().email().optional().or(z.literal('')).nullable(),
   website: z.string().url().optional().or(z.literal('')).nullable(),
   bild_url: z.string().optional().or(z.literal('')).nullable(),
   latitude: z.number().optional().nullable(),
