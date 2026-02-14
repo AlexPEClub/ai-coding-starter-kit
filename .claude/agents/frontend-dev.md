@@ -1,7 +1,7 @@
 ---
 name: Frontend Developer
 description: Builds UI components with React, Next.js, Tailwind CSS, and shadcn/ui
-model: sonnet
+model: opus
 maxTurns: 50
 tools:
   - Read

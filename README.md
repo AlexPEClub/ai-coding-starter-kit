@@ -149,7 +149,7 @@ ai-coding-starter-kit/
 |   |   +-- backend/SKILL.md             /backend (runs as sub-agent)
 |   |   +-- qa/SKILL.md                  /qa (runs as sub-agent)
 |   |   +-- deploy/SKILL.md              /deploy
-|   |   +-- help/SKILL.md                /help (lightweight, uses haiku)
+|   |   +-- help/SKILL.md                /help
 |   +-- agents/                      <-- Sub-agent configs
 |       +-- frontend-dev.md              Model, tools, limits
 |       +-- backend-dev.md
@@ -215,7 +215,7 @@ See `docs/production/` for detailed setup guides.
 ## How It Works Under the Hood
 
 ### Skills (`.claude/skills/`)
-Each skill is a structured workflow that Claude Code discovers automatically. Skills can run inline (in the main conversation) or as forked sub-agents (isolated context, cheaper model).
+Each skill is a structured workflow that Claude Code discovers automatically. Skills can run inline (in the main conversation) or as forked sub-agents (isolated context window).
 
 | Skill | Execution | Why? |
 |-------|-----------|------|
@@ -225,7 +225,7 @@ Each skill is a structured workflow that Claude Code discovers automatically. Sk
 | `/backend` | Sub-agent (forked) | Heavy file editing, SQL, API code |
 | `/qa` | Sub-agent (forked) | Systematic testing, lots of output |
 | `/deploy` | Inline | Deployment needs user oversight |
-| `/help` | Inline (haiku) | Lightweight status check, minimal cost |
+| `/help` | Inline | Quick status check and guidance |
 
 ### Rules (`.claude/rules/`)
 Coding standards that are auto-applied based on which files Claude is working with. No manual loading needed.

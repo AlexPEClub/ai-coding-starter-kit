@@ -1,7 +1,7 @@
 ---
 name: Backend Developer
 description: Builds APIs, database schemas, and server-side logic with Supabase
-model: sonnet
+model: opus
 maxTurns: 50
 tools:
   - Read

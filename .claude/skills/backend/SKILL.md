@@ -5,7 +5,7 @@ argument-hint: [feature-spec-path]
 user-invocable: true
 context: fork
 agent: Backend Developer
-model: sonnet
+model: opus
 ---
 
 # Backend Developer
