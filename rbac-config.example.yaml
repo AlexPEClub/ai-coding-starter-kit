@@ -6,76 +6,114 @@
 actions:
   # Basic internal records
   - id: ReadProtectedRecords
-    resource: organization/records/**
-    access:
-      - severity: Protected
-        permissions: [read]
-        visibility: ClearText
+    resources:
+      - id: organization/records
+        access:
+          - sensitivity: Protected
+            permissions: [read]
+            visibility: ClearText
 
   # Complex finance action with multi-level access
   - id: ManageFinance
-    resource: organization/finance/{payroll, invoices}
+    resources:
+      - id: organization/finance/payroll
+        access:
+          - sensitivity: Confidential
+            permissions: [all]
+            visibility: ClearText
+      - id: organization/finance/invoices
+        access:
+          - sensitivity: Restricted
+            permissions: [read, update]
+            visibility: PartialMasking
+        approvals:
+          - permissions: [update]
+            required_approvers: 2
+            valid_duration: 1h
     access:
-      - severity: Confidential
-        permissions: [all]
-        visibility: ClearText
-      - severity: Restricted
-        permissions: [read, update]
-        visibility: PartialMasking
-      - severity: Protected
+      - sensitivity: Protected
         permissions: [read]
         visibility: Redaction
 
   # PII data visibility mapping
   - id: ReadEmployeePII
-    resource: organization/hr/employees/*/pii
+    resources:
+      - id: organization/hr/employees/*/pii
     access:
-      - severity: Confidential
+      - sensitivity: Confidential
         permissions: [read]
         visibility: ClearText
-      - severity: Restricted
+      - sensitivity: Restricted
         permissions: [read]
         visibility: PartialMasking
-      - severity: Protected
-        permissions: [none]
+      - sensitivity: Protected
+        permissions: [read]
         visibility: Redaction
 
   # Password handling (Mandatory Anonymization for non-owners)
   - id: ManagePasswords
-    resource: **/passwords
+    resources:
+      - id: "**/passwords"
     access:
-      - severity: Restricted
+      - sensitivity: Restricted
         permissions: [update]
         visibility: Anonymization
-      - severity: Protected
+      - sensitivity: Protected
         permissions: [none]
         visibility: Redaction
 
   # Personal profile with ownership
   - id: ManageOwnProfile
-    resource: organization/users/:owner/profile
+    resources:
+      - id: organization/users/:owner/profile
     # Ownership logic automatically grants 'all' and ClearText
 
-  # Global Admin
-  - id: GlobalAdmin
-    resource: organization/**
+  - id: ManageProjects
+    resources:
+      - id: organization/engineering/projects
     access:
-      - severity: Secret
+      - sensitivity: Restricted
+        permissions: [all]
+
+  # System-wide Admin Action
+  - id: AdminAccess
+    resources:
+      - id: organization
+    access:
+      - sensitivity: Confidential
+        permissions: [read, update]
+        visibility: ClearText
+      - sensitivity: Restricted
+        permissions: [read]
+        visibility: Redaction
+
+  # Global SuperAdmin Action
+  - id: GlobalAdmin
+    resources:
+      - id: organization
+    access:
+      - sensitivity: Secret
         permissions: [all]
         visibility: ClearText
 
   # Backup Action Example
   - id: SystemBackup
-    resource: organization/**
+    resources:
+      - id: organization
     access:
-      - severity: Secret
-        permissions: [backup]
-      - severity: Confidential
-        permissions: [backup]
-      - severity: Restricted
-        permissions: [backup]
-      - severity: Protected
-        permissions: [backup]
+      - sensitivity: Secret
+        permissions: [backup, restore]
+      - sensitivity: Confidential
+        permissions: [backup, restore]
+      - sensitivity: Restricted
+        permissions: [backup, restore]
+      - sensitivity: Protected
+        permissions: [backup, restore]
+    approvals:
+      - permissions: [restore]
+        required_approvers: 1
+        valid_duration: 2h
+        max_operations: 1
 
 # --- ROLES ---
 # Roles aggregate actions and support single inheritance (enhancement).
@@ -84,19 +122,42 @@ roles:
     actions:
       - ReadProtectedRecords
 
+  - id: Developer
+    parent: Employee
+    actions:
+      - ManageProjects
+
   - id: Accountant
     parent: Employee
     actions:
       - ManageFinance
+
+  - id: FinanceAuditor
+    parent: Accountant
+    approvable_actions:
+      - action: ManageFinance
+        permissions: [update]
 
   - id: HRManager
     parent: Employee
     actions:
       - ReadEmployeePII
 
+  - id: Admin
+    parent: Employee
+    actions:
+      - AdminAccess
+      - SystemBackup
+
   - id: SuperAdmin
+    parent: Admin
     actions:
       - GlobalAdmin
+    approvable_actions:
+      - action: SystemBackup
+        permissions: [restore]
+      - action: ManageFinance
+        permissions: [update]
 
 # --- SCOPES ---
 # Scopes provide a limiting intersection mask (only one active at a time).
@@ -109,10 +170,18 @@ scopes:
   # Regional restriction for developers
   - id: ProjectAlphaScope
     resources:
-      - id: organization/engineering/projects/alpha/**
+      - id: organization/engineering/projects/alpha
         permissions: [all]
-      - id: organization/engineering/projects/**
+      - id: organization/engineering/projects
         permissions: [none]
+
+  # Audit-specific restriction: Read-only for finance, no access elsewhere
+  - id: AuditorScope
+    resources:
+      - id: organization/finance
+        permissions: [read]
+      - id: organization/engineering
+        permissions: [none] # Explicitly denies access
 
 # --- USERS ---
 # User assignments map users to roles, clearance levels, and optional scopes.
@@ -120,36 +189,71 @@ users:
   - id: "USR-001"
     name: "Alice Admin"
     clearance: Secret
-    roles: [SuperAdmin]
+    roles:
+      - id: SuperAdmin
+
+  - id: "USR-008"
+    name: "Ian Admin"
+    clearance: Confidential
+    roles:
+      - id: Admin
 
   - id: "USR-002"
     name: "Bob Accountant"
     clearance: Confidential
-    roles: [Accountant]
+    roles:
+      - id: Accountant
 
   - id: "USR-003"
     name: "Charlie Developer"
-    clearance: Protected
-    roles: [Developer]
+    clearance: Restricted
+    roles:
+      - id: Developer
 
   - id: "USR-004"
     name: "Dave HR"
     clearance: Confidential
-    roles: [HRManager]
+    roles:
+      - id: HRManager
 
   - id: "USR-005"
     name: "Eve Junior"
-    clearance: Public
-    roles: [Employee]
+    clearance: Protected
+    roles:
+      - id: Employee
 
   - id: "USR-006"
     name: "Frank External"
     clearance: Public
-    roles: [Employee]
+    roles:
+      - id: Employee
     scope: GuestScope
 
   - id: "USR-007"
     name: "Grace Alpha"
-    clearance: Protected
-    roles: [Developer]
+    clearance: Restricted
+    roles:
+      - id: Developer
     scope: ProjectAlphaScope
+
+  - id: "USR-009"
+    name: "Heidi MultiRole"
+    clearance: Confidential
+    roles:
+      - id: Developer
+        clearance: Restricted
+      - id: HRManager
+        clearance: Confidential
+
+  - id: "USR-010"
+    name: "Jack Auditor"
+    clearance: Protected
+    roles:
+      - id: FinanceAuditor
+    scope: AuditorScope
+
+  - id: "USR-011"
+    name: "Kelly Finance"
+    clearance: Restricted
+    roles:
+      - id: FinanceAuditor
