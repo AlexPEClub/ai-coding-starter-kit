@@ -1,0 +1,142 @@
+# RBAC & LBAC Configuration Example
+# This file demonstrates the hierarchical RBAC system with Biba Integrity Model and LoDV.
+
+# --- ACTIONS ---
+# Actions map hierarchical resources to permissions and severity-based visibility.
+actions:
+  # Basic internal records
+  - id: ReadProtectedRecords
+    resource: organization/records/**
+    access:
+      - severity: Protected
+        permissions: [read]
+        visibility: ClearText
+
+  # Complex finance action with multi-level access
+  - id: ManageFinance
+    resource: organization/finance/{payroll, invoices}
+    access:
+      - severity: Confidential
+        permissions: [all]
+        visibility: ClearText
+      - severity: Restricted
+        permissions: [read, update]
+        visibility: PartialMasking
+      - severity: Protected
+        permissions: [read]
+        visibility: Redaction
+
+  # PII data visibility mapping
+  - id: ReadEmployeePII
+    resource: organization/hr/employees/*/pii
+    access:
+      - severity: Confidential
+        permissions: [read]
+        visibility: ClearText
+      - severity: Restricted
+        permissions: [read]
+        visibility: PartialMasking
+      - severity: Protected
+        permissions: [none]
+        visibility: Redaction
+
+  # Password handling (Mandatory Anonymization for non-owners)
+  - id: ManagePasswords
+    resource: **/passwords
+    access:
+      - severity: Restricted
+        permissions: [update]
+        visibility: Anonymization
+      - severity: Protected
+        permissions: [none]
+        visibility: Redaction
+
+  # Personal profile with ownership
+  - id: ManageOwnProfile
+    resource: organization/users/:owner/profile
+    # Ownership logic automatically grants 'all' and ClearText
+
+  # Global Admin
+  - id: GlobalAdmin
+    resource: organization/**
+    access:
+      - severity: Secret
+        permissions: [all]
+        visibility: ClearText
+
+# --- ROLES ---
+# Roles aggregate actions and support single inheritance (enhancement).
+roles:
+  - id: Employee
+    actions:
+      - ReadProtectedRecords
+
+  - id: Accountant
+    parent: Employee
+    actions:
+      - ManageFinance
+
+  - id: HRManager
+    parent: Employee
+    actions:
+      - ReadEmployeePII
+
+  - id: SuperAdmin
+    actions:
+      - GlobalAdmin
+
+# --- SCOPES ---
+# Scopes provide a limiting intersection mask (only one active at a time).
+scopes:
+  # Limits user to 'read' only, regardless of role permissions
+  - id: GuestScope
+    permissions: [read]
+    resources: ["**"]
+
+  # Regional restriction for developers
+  - id: ProjectAlphaScope
+    resources:
+      - id: organization/engineering/projects/alpha/**
+        permissions: [all]
+      - id: organization/engineering/projects/**
+        permissions: [none]
+
+# --- USERS ---
+# User assignments map users to roles, clearance levels, and optional scopes.
+users:
+  - id: "USR-001"
+    name: "Alice Admin"
+    clearance: Secret
+    roles: [SuperAdmin]
+
+  - id: "USR-002"
+    name: "Bob Accountant"
+    clearance: Confidential
+    roles: [Accountant]
+
+  - id: "USR-003"
+    name: "Charlie Developer"
+    clearance: Protected
+    roles: [Developer]
+
+  - id: "USR-004"
+    name: "Dave HR"
+    clearance: Confidential
+    roles: [HRManager]
+
+  - id: "USR-005"
+    name: "Eve Junior"
+    clearance: Public
+    roles: [Employee]
+
+  - id: "USR-006"
+    name: "Frank External"
+    clearance: Public
+    roles: [Employee]
+    scope: GuestScope
+
+  - id: "USR-007"
+    name: "Grace Alpha"
+    clearance: Protected
+    roles: [Developer]
+    scope: ProjectAlphaScope
