@@ -16,7 +16,10 @@
 | PROJ-4 | Sensitive Resource Handling (Passwords) | Deployed | SPEC.md | 2026-02-15 |
 | PROJ-5 | Specification Restructuring | Deployed | SPEC.md | 2026-02-15 |
 | PROJ-6 | User Assignment Specification | Deployed | SPEC.md | 2026-02-15 |
+| PROJ-7 | Resource Path Evaluation Logic | Deployed | SPEC.md | 2026-02-15 |
+| PROJ-8 | Create/Delete Clearance Rules | Deployed | SPEC.md | 2026-02-15 |
+| PROJ-9 | Backup & Recovery Security | Deployed | SPEC.md | 2026-02-15 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-7
+## Next Available ID: PROJ-10

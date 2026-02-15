@@ -14,6 +14,7 @@ The RBAC (Role-Based Access Control) system is enhanced with LBAC (Lattice-Based
 ### Standard Permissions
 - `create` (Synonyms: `add`, `post`)
 - `read` (Synonyms: `view`, `get`, `print`, `share`, `export`, `backup`)
+- `restore` (Synonyms: `recover`, `import`)
 - `update` (Synonyms: `edit`, `put`, `patch`)
 - `delete` (Synonyms: `remove`, `destroy`)
 
@@ -22,7 +23,7 @@ The RBAC (Role-Based Access Control) system is enhanced with LBAC (Lattice-Based
 - `none`: Explicitly denies all permissions (used in scopes to override role permissions).
 
 ## 4. Sensitivity & Clearance
-### Severity Levels (Resources)
+### 4.1 Severity Levels (Resources)
 Resources are assigned a severity level that defines their sensitivity:
 1. `Public`: Accessible to everyone.
 2. `Protected`: Internal data, requires standard authentication.
@@ -30,10 +31,22 @@ Resources are assigned a severity level that defines their sensitivity:
 4. `Confidential`: Highly sensitive data, restricted to specific roles.
 5. `Secret`: Critical data, maximum restriction.
 
-### Clearance Levels (Users)
-A user's clearance level determines their ability to interact with resources:
-- **Read Operations:** User Clearance ≥ Resource Severity.
-- **Write Operations:** User Clearance == Resource Severity.
+### 4.2 Clearance Levels (Users)
+A user's clearance level determines their ability to interact with resources based on the Biba Integrity Model:
+- **Read Operations:** User Clearance ≥ Resource Severity (No Read Down).
+- **Write Operations:** User Clearance == Resource Severity (No Write Up).
+
+### 4.3 Permission-Specific & Backup Rules
+To maintain integrity and security, specific rules apply to different permission types:
+
+- **Read Operations:** (`read`, `view`, `get`, `print`, `share`, `export`, `backup`).
+  - **Rule:** User Clearance ≥ Resource Severity (No Read Down).
+  - **Backup:** A user can only backup data where they meet the read clearance requirement. Authorization engines must evaluate this at the individual resource level during batch processes. Resources lacking clearance must be excluded or encrypted.
+
+- **Write Operations:** (`create`, `add`, `update`, `edit`, `delete`, `remove`, `restore`, `recover`, `import`).
+  - **Rule:** User Clearance == Resource Severity (No Write Up).
+  - **Create/Delete:** Strict equality ensures only authorized users at a specific integrity level can perform constructive or destructive actions.
+  - **Restore:** Treated as a unified high-integrity Write Operation. Even though it's a composite of other actions, it requires strict clearance equality to prevent integrity pollution.
 
 ## 5. Level of Data Visibility (LoDV)
 When a user has `read` access, the following visibility states apply:
@@ -107,6 +120,32 @@ Assignments of users to roles, clearance levels, and optional scopes. User confi
       roles: [Role1, Role2]
       scope: ScopeName # Optional
   ```
+
+## 8. Resource Path Evaluation Logic
+To ensure consistent authorization, resource paths are evaluated following these rules:
+
+### 8.1 Path Normalization
+Before evaluation, all paths (from Actions, Scopes, and incoming requests) are normalized:
+- Trailing slashes are removed.
+- Redundant separators (e.g., `//`) are collapsed.
+
+### 8.2 Evaluation Order (Precedence)
+When multiple Actions or Scope entries match a requested resource path, the following precedence rules apply:
+
+1. **Exact Match:** The most specific path without wildcards takes the highest priority.
+2. **Wildcard Specificity:**
+   - Single-level wildcards (`*`) are evaluated before multi-level wildcards (`**`).
+   - Longer paths (more segments) are evaluated before shorter paths.
+3. **Placeholder Resolution:** Paths containing `:owner` are treated as exact matches if the owner ID matches the current user.
+
+### 8.3 Matching Algorithm
+1. **Direct Match:** `path/to/res` matches `path/to/res`.
+2. **Brace Expansion:** `path/{a,b}` is expanded to `path/a` and `path/b` before matching.
+3. **Single Wildcard (`*`):** `org/*/repo` matches `org/project-a/repo` but NOT `org/project-a/sub/repo`.
+4. **Recursive Wildcard (`**`):** `org/**` matches `org/any/depth/resource`.
+
+### 8.4 Conflicts
+If multiple actions of the same precedence match (e.g., two different actions both defining `org/**`), their permissions and visibility levels are **aggregated** for roles (Enhancement Rule) and **intersected** for scopes.
 
 ### Ownership
 - Users are granted `all` permissions on resources where their ID matches the `:owner` placeholder.

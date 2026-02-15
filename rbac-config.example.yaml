@@ -64,6 +64,19 @@ actions:
         permissions: [all]
         visibility: ClearText
 
+  # Backup Action Example
+  - id: SystemBackup
+    resource: organization/**
+    access:
+      - severity: Secret
+        permissions: [backup]
+      - severity: Confidential
+        permissions: [backup]
+      - severity: Restricted
+        permissions: [backup]
+      - severity: Protected
+        permissions: [backup]
+
 # --- ROLES ---
 # Roles aggregate actions and support single inheritance (enhancement).
 roles:
