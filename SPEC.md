@@ -7,56 +7,43 @@ The RBAC (Role-Based Access Control) system is enhanced with LBAC (Lattice-Based
 - **Least Privilege:** Users are granted the minimum level of access required to perform their functions.
 - **Need to Know:** Access is restricted to data necessary for a specific task, even if a user has a high clearance level.
 - **Biba Integrity Model:**
-  - **No Read Down:** A user can only read data at or above their clearance level (ensuring they don't rely on low-integrity data). *Note: In this implementation, this is adapted to ensure users don't access data beyond their sensitivity clearance.*
-  - **No Write Up:** A user can only write data at their own clearance level to prevent "polluting" higher-integrity levels with lower-integrity data.
+  - **No Read Down:** A user can only read data at or above their clearance level. *In this implementation: User Clearance ≥ Resource Sensitivity.*
+  - **No Write Up:** A user can only write data at their own clearance level to prevent integrity pollution. *In this implementation: User Clearance == Resource Sensitivity.*
 
 ## 3. Permission Model
 ### Standard Permissions
 - `create` (Synonyms: `add`, `post`)
-- `read` (Synonyms: `view`, `get`, `print`, `share`, `export`, `backup`)
-- `restore` (Synonyms: `recover`, `import`)
+- `read` (Synonyms: `view`, `get`, `print`, `share`, `export`)
 - `update` (Synonyms: `edit`, `put`, `patch`)
 - `delete` (Synonyms: `remove`, `destroy`)
 
 ### Special Permissions
-- `all`: Grants all standard permissions.
-- `none`: Explicitly denies all permissions (used in scopes to override role permissions).
+- `all`: Grants all standard permissions (`create`, `read`, `update`, `delete`).
+- `none`: Explicitly denies all permissions. Takes precedence in scopes.
 
 ## 4. Sensitivity & Clearance
 ### 4.1 Sensitivity Levels (Resources)
-Resources within actions are assigned a sensitivity level:
+Resources are assigned a sensitivity level (defaulting to `Protected`):
 1. `Public`: Accessible to everyone.
 2. `Protected`: Internal data, requires standard authentication.
 3. `Restricted`: Sensitive data, requires specific authorization.
 4. `Confidential`: Highly sensitive data, restricted to specific roles.
 5. `Secret`: Critical data, maximum restriction.
 
-Protected is the default level if not specified in the configuration.
-
 ### 4.2 Clearance Levels (Users)
-A user's clearance level determines their ability to interact with resources based on the Biba Integrity Model:
-- **Read Operations:** User Clearance ≥ Resource Severity (No Read Down).
-- **Write Operations:** User Clearance == Resource Severity (No Write Up).
+A user's clearance level determines their ability to interact with resources:
+
+- **Read Operations:** (`read`, `view`, `get`, `print`, `share`, `export`)
+  - **Rule:** User Clearance ≥ Resource Sensitivity.
+- **Write Operations:** (`create`, `add`, `update`, `edit`, `delete`, `remove`)
+  - **Rule:** User Clearance == Resource Sensitivity.
+  - **Note:** Strict equality prevents users from "polluting" higher integrity levels or accidentally modifying lower levels.
 
 #### Clearance Assignment Rules
-To prevent unauthorized escalation and maintain integrity, the following rules apply when assigning clearance levels to users or resources:
-1. **Self-Assignment:** A user cannot assign a clearance level to another user or a sensitivity level to a resource that exceeds their own clearance level.
-2. **Approval Process:** If a user needs to assign a level higher than their own clearance (e.g., an Admin with `Confidential` clearance setting up a `Secret` resource), an approval process must be initiated as defined in Section 9.
-3. **Lower-Level Assignment:** A user can assign a clearance level to another user or a sensitivity level to a resource that is lower than their own current clearance, as this does not violate the Biba Integrity Model (it is an integrity downgrade, not an escalation).
-4. **Audit Logging:** All assignments where the target level differs from the assignor's level must be explicitly logged with the assignor's ID and the justification.
-
-### 4.3 Permission-Specific & Backup Rules
-To maintain integrity and security, specific rules apply to different permission types:
-
-- **Read Operations:** (`read`, `view`, `get`, `print`, `share`, `export`, `backup`).
-  - **Rule:** User Clearance ≥ Resource Severity (No Read Down).
-  - **Backup:** A user can only backup data where they meet the read clearance requirement. Authorization engines must evaluate this at the individual resource level during batch processes. Resources lacking clearance must be excluded or encrypted.
-
-
-- **Write Operations:** (`create`, `add`, `update`, `edit`, `delete`, `remove`, `restore`, `recover`, `import`).
-  - **Rule:** User Clearance == Resource Severity (No Write Up).
-  - **Create/Delete:** Strict equality ensures only authorized users at a specific integrity level can perform constructive or destructive actions.
-  - **Restore:** Treated as a unified high-integrity Write Operation. Even though it's a composite of other actions, it requires strict clearance equality to prevent integrity pollution.
+1. **Self-Assignment:** A user cannot assign a clearance/sensitivity level higher than their own.
+2. **Approval Process:** Assigning a level higher than one's own requires multi-party approval (Section 9).
+3. **Lower-Level Assignment:** A user can assign levels lower than their own (integrity downgrade).
+4. **Audit Logging:** All level changes must be logged with justification.
 
 ## 5. Level of Data Visibility (LoDV)
 When a user has `read` access, the following visibility states apply:
@@ -99,7 +86,7 @@ Reusable-named entities that map one or multiple resources to permission-sensiti
           permissions: [perm1, perm2]
           visibility: VisibilityState
       approvals: # Shared approvals for all resources in this action
-        - permissions: [delete, restore]
+        - permissions: [delete]
           required_approvers: 2
           valid_duration: 4h
           max_operations: 1
@@ -119,7 +106,7 @@ Aggregations of Actions.
         - ActionName
       approvable_actions: # Optional: Actions this role can approve
         - action: ActionName
-          permissions: [restore] # Optional: Specific permissions
+          permissions: [delete] # Optional: Specific permissions
   ```
 
 ### 7.3 Scopes
@@ -178,7 +165,12 @@ When multiple Actions or Scope entries match a requested resource path, the foll
 3. **Explicit Depth Control:** To prevent revealing deeper resources when using implicit matching, an explicit `none` permission can be defined for the sub-path in a subsequent or more specific action/scope entry. Evaluation precedence (Section 8.2) ensures the more specific restriction takes priority.
 4. **Brace Expansion:** `path/{a,b}` is expanded to `path/a` and `path/b` before matching.
 5. **Single Wildcard (`*`):** `org/*/repo` matches `org/project-a/repo` but NOT `org/project-a/sub/repo`.
-6. **Recursive Wildcard (`**`):** `org/**` matches `org/any/depth/resource`. Using `/**` at the end of a path is redundant but supported for clarity.
+6. **Recursive Wildcard (`**`):**
+   - **Evaluation Order:** Recursive wildcards are evaluated **after** exact matches and single-level wildcards.
+   - `org/**` matches `org/any/depth/resource`.
+   - `/**/resource` matches any path that ends with `/resource` (e.g., `org/project/resource` and `org/dept/project/resource`).
+   - `**/resource` at the beginning of a path is treated as `/**/resource` (anchored to any depth from root).
+   - Using `/**` at the end of a path is redundant due to implicit recursion (Section 8.3.2) but supported for clarity.
 
 ### 8.4 Conflicts
 If multiple actions of the same precedence match (e.g., two different actions both defining `org/**`), their permissions and visibility levels are **aggregated** for roles (Enhancement Rule) and **intersected** for scopes.
@@ -187,19 +179,15 @@ If multiple actions of the same precedence match (e.g., two different actions bo
 To maintain high integrity and prevent unauthorized high-sensitivity modifications, the system implements a Separation of Duties (SoD) through an approval workflow.
 
 ### 9.1 Approval Principle
-Every permission within an action can be explicitly assigned a multi-party approval process, independent of the user's sensitivity or clearance levels. This is implemented via `approvals` configuration within Actions.
-
-A permission that requires approval must be explicitly listed in at least one of the `access` permissions for that action. If a permission is marked for approval but is not granted in any `access` block, it cannot be exercised even with approval.
-
-To maintain strict Separation of Duties, the initiator of an action cannot also be an approver for that same request, even if they possess an authorized approver role. The initiator is excluded from the quorum.
-
-The authority to grant approvals is defined within roles via the `approvable_actions` property, establishing which roles can act as approvers for specific actions and permissions. The role needs also the ability to process the action itself. This ensures that the approver has the necessary permissions to approve the action. Actions are inherited from parent roles.
+Permissions can require multi-party approval, independent of clearance levels.
+- **Visibility:** A permission requiring approval must also be granted in an `access` block.
+- **SoD:** The initiator of an action cannot be an approver for that same request.
+- **Authority:** Approver authority is defined via `approvable_actions` in roles.
 
 ### 9.2 Approval Workflow
-1. **Initiation:** A user initiates an operation (Read or Write). If the operation is marked as requiring approval, the workflow is triggered.
-2. **Quorum:** The action is held in a "Pending" state until the required number of unique approvers (defined by role authority) validate the request. The initiator is excluded from the quorum.
-3. **Constraints:** Approvals are time-bound (e.g., valid for 4 hours) or bound to a specific number of operations (e.g., valid for 1 execution).
-4. **Execution:** Once the quorum is met, constraints are satisfied, and any required authorizations are provided, the operation is executed. For read operations of higher sensitivity, LoDV (Level of Data Visibility) masks are applied by the application layer based on the initiator's actual clearance, even if the operation is approved.
+1. **Initiation:** Operation is held in "Pending" status if approval is required.
+2. **Quorum:** Required number of unique authorized approvers must validate the request.
+3. **Execution:** Once quorum is met and constraints (time/operation limits) are satisfied, the operation executes.
 
 ### 9.3 YAML Structure for Action-Based Approvals
 Actions can define an `approvals` block to enforce these rules. Approvals can be triggered for specific permissions within that action:
@@ -207,25 +195,17 @@ Actions can define an `approvals` block to enforce these rules. Approvals can be
 actions:
   - id: ActionName
     approvals:
-      - permissions: [delete, restore] # Specific permissions requiring approval
+      - permissions: [delete] # Specific permissions requiring approval
         required_approvers: 2
         valid_duration: 4h    # Optional: Time-bound approval
         max_operations: 1     # Optional: Bound to number of operations
 ```
 
-## 10. Data Protection (Backup & Restore)
-To ensure security during data protection operations and prevent unauthorized access to sensitive archives.
-
-### 10.1 Backup/Restore Passwords & Secrets
-Before a backup can be started for any sensitivity level, a password or secret must be set to protect the archive.
-- **Identical Clearance Requirement:** The password/secret for a specific sensitivity level can only be configured or setup by users who have a clearance level exactly matching that sensitivity level.
-- **Encryption/Salting:** The secret is used to encrypt/decrypt or salt the data during the backup and restore processes.
-
-### 10.2 Operational Rules
-- **`backup`:** Categorized as a **Read Operation**. A user can only backup data where their Clearance ≥ Resource Severity.
-- **`restore`:** Categorized as a **Write Operation**. A user can only restore data where their Clearance == Resource Severity.
-  - **Approval Override:** If a user does not have the required clearance for a `restore` operation (i.e., User Clearance != Resource Severity), an approval process must be initiated as defined in Section 9.
-- **Enforcement:** Authorization engines must evaluate permissions at the individual resource level. If a backup job encounters a resource for which the initiator lacks clearance, that resource must be excluded from the archive or protected with a secret the initiator does not possess.
+## 10. Implementation Considerations (Future Extensions)
+While this specification focuses on the core RBAC & LBAC framework, specialized operations such as Backup & Restore should be treated as extensions of the base Read and Write models:
+- **Backup as a Read Extension:** Operations that export data for preservation should follow Read Operation rules (Clearance ≥ Severity) and may require additional encryption layers.
+- **Restore as a Write Extension:** Operations that re-inject data into the system should follow Write Operation rules (Clearance == Severity) and may require elevated approval workflows to prevent integrity pollution from stale or external data sources.
+- **Security for Archives:** Protective secrets or passwords for data protection should be managed by users whose clearance exactly matches the sensitivity level of the data being protected.
 
 ## 11. Ownership
 - Users are granted `all` permissions on resources where their ID matches the `:owner` placeholder.

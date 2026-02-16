@@ -96,21 +96,21 @@ actions:
         permissions: [all]
         visibility: ClearText
 
-  # Backup Action Example
-  - id: SystemBackup
+  # System Administration Action
+  - id: SystemMaintenance
     resources:
       - id: organization
     access:
       - sensitivity: Secret
-        permissions: [backup, restore]
+        permissions: [read, update]
       - sensitivity: Confidential
-        permissions: [backup, restore]
+        permissions: [read, update]
       - sensitivity: Restricted
-        permissions: [backup, restore]
+        permissions: [read, update]
       - sensitivity: Protected
-        permissions: [backup, restore]
+        permissions: [read, update]
     approvals:
-      - permissions: [restore]
+      - permissions: [update]
         required_approvers: 1
         valid_duration: 2h
         max_operations: 1
@@ -147,15 +147,15 @@ roles:
     parent: Employee
     actions:
       - AdminAccess
-      - SystemBackup
+      - SystemMaintenance
 
   - id: SuperAdmin
     parent: Admin
     actions:
       - GlobalAdmin
     approvable_actions:
-      - action: SystemBackup
-        permissions: [restore]
+      - action: SystemMaintenance
+        permissions: [update]
       - action: ManageFinance
         permissions: [update]
 
