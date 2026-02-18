@@ -51,7 +51,80 @@ A visual calendar interface showing all scheduled appointments across the team. 
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Pages & Routes
+```
+app/(app)/
+  kalender/
+    page.tsx    ← Client Component wrapper (FullCalendar requires browser)
+                  Fetches appointments for the visible date range via Server Action or API
+```
+
+### Component Structure
+```
+Kalender Page
++-- Filter bar (Admin only)
+|   +-- Trainer Select (all trainers dropdown)
+|   +-- Region Select (OÖ / Salzburg / Tirol / Vorarlberg / Alle)
++-- View Toggle (Tabs: "Woche" / "Monat")
++-- Navigation row
+|   +-- ← Vorherige button
+|   +-- "Heute" button
+|   +-- Nächste → button
+|   +-- Current period label (e.g. "17.–23. Feb 2026")
++-- FullCalendar component (Client Component)
+|   +-- Week view (timeGridWeek): hourly rows, events as colored blocks
+|   +-- Month view (dayGridMonth): event pills per day cell
+|   +-- Event block: [Pharmacy name] [Start time] [Status color]
+|       Color map:
+|         geplant        → blue
+|         fixiert        → amber/orange
+|         durchgefuehrt  → green
+|         abgesagt       → grey (muted)
+|   +-- Click event → Appointment Detail Sheet opens (slide-over)
+|   +-- Drag & drop → date/time updates (Admin only; disabled for Trainer)
++-- Appointment Detail Sheet (shadcn Sheet, right side)
+|   +-- Pharmacy name + address
+|   +-- Date + Start/End time
+|   +-- Status badge + quick status change (Admin)
+|   +-- Assigned trainer
+|   +-- Notes
+|   +-- "Zur Detailseite" link (→ /termine/[id])
+|   +-- Close button (X)
+```
+
+### Data Model (no new tables)
+The calendar reads from the existing `termine` table (PROJ-3). No additional data storage is needed.
+
+```
+Data fetched for calendar:
+  SELECT id, apotheke_id → name, trainer_id → name, datum,
+         zeit_start, zeit_ende, status, notiz
+  WHERE datum BETWEEN [range_start] AND [range_end]
+  AND (trainer_id = filter OR no filter)
+  AND (apotheke.region = filter OR no filter)
+```
+
+### How Data Flows
+1. Page mounts → FullCalendar renders with the current week/month as initial range
+2. On date range change (navigate prev/next or switch view) → Client Component calls a Server Action with the new date range + active filters → returns appointment array
+3. Appointments are transformed into FullCalendar event objects: `{ id, title: pharmacyName, start: datetime, end: datetime, color: statusColor, extendedProps: { ... } }`
+4. User clicks an event → `eventClick` callback sets `selectedAppointment` state → Sheet opens with appointment data (already loaded, no extra fetch)
+5. Admin drags event to new time slot → `eventDrop` / `eventResize` callback → Server Action updates `datum`, `zeit_start`, `zeit_ende` in `termine` → calendar re-fetches to confirm
+
+### Key Technical Decisions
+- **FullCalendar**: Chosen over react-big-calendar because it supports both week time-grid and month grid views, drag-and-drop, and event resizing in one package. MIT-licensed for non-commercial use.
+- **Client Component with Server Action data fetching**: The calendar itself must be a Client Component (FullCalendar uses DOM APIs). Data is fetched on range changes via a Server Action to keep Supabase credentials server-side.
+- **Sheet instead of modal for appointment detail**: A slide-over sheet keeps the calendar visible in the background, providing context while reading/editing appointment details.
+- **Admin drag-drop only**: FullCalendar's `editable` prop is set to `true` only when the current user's role is `admin`. Trainers get a read-only view.
+- **Colour-coded status**: A simple mapping of status enum → Tailwind color class. The legend is shown at the top of the calendar for clarity.
+
+### Dependencies (new packages to install)
+- `@fullcalendar/react` — React integration
+- `@fullcalendar/core` — Core engine
+- `@fullcalendar/daygrid` — Month grid view (dayGridMonth)
+- `@fullcalendar/timegrid` — Week time view (timeGridWeek)
+- `@fullcalendar/interaction` — Drag-drop, click, resize
 
 ## QA Test Results
 _To be added by /qa_

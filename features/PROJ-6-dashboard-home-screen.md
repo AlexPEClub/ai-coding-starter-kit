@@ -64,7 +64,113 @@ The landing page after login. Gives each user role a role-appropriate overview o
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Pages & Routes
+```
+app/(app)/
+  dashboard/
+    page.tsx    ← Server Component: fetches role-appropriate data,
+                  renders the correct dashboard layout
+                  Redirect target after login (/ → /dashboard)
+```
+
+### Component Structure
+
+**Admin Dashboard:**
+```
+Admin Dashboard Page
++-- Page header: "Guten Morgen, [Name]" + Today's date
++-- Stat Cards row (4 cards)
+|   +-- Termine heute (count)
+|   +-- Termine diese Woche (count)
+|   +-- Fehlende Berichte (count, red if > 0)
+|   +-- Aktive Trainer (count)
++-- "Heute" Appointments Section
+|   +-- Today's Termine Table
+|       +-- Columns: Zeit, Apotheke, Trainer, Status Badge, Quick Status Change
+|       +-- Empty state: "Keine Termine heute"
++-- Missing Reports Alert Section (only if count > 0)
+|   +-- Alert banner: "X abgeschlossene Termine ohne Bericht"
+|   +-- List: Date, Pharmacy, Trainer, Days overdue → Link to report form
+|   +-- "Alle anzeigen" link (→ /berichte with filter)
++-- Quick Actions row
+    +-- "Termin erstellen" button
+    +-- "Kalender öffnen" button
+    +-- "Berichte anzeigen" button
+```
+
+**Trainer Dashboard:**
+```
+Trainer Dashboard Page
++-- Page header: "Meine Übersicht" + Trainer's name
++-- "Meine nächsten Termine" section
+|   +-- Up to 5 upcoming appointment cards
+|       +-- Card: Pharmacy name, Date, Start-End time, Status badge
+|       +-- Link: "Alle meine Termine"
+|   +-- Empty state: "Keine bevorstehenden Termine"
++-- "Fehlende Berichte" section (if any)
+|   +-- List of completed appointments without a submitted Bericht
+|       +-- Pharmacy name, Date → Link to report form
+|   +-- Empty state: "Alle Berichte vollständig ✓"
++-- "Meine Stats diesen Monat" section
+    +-- TN count this month
+    +-- Avg. Verständlichkeit / Nutzbarkeit / Kompetenz ratings
+    +-- Sessions completed this month
+```
+
+**Management Dashboard:**
+```
+Management Dashboard Page
++-- Page header: "Übersicht [current month name]"
++-- KPI Cards row (4 cards)
+|   +-- Gesamt TN (this month)
+|   +-- Durchschn. Verständlichkeit
+|   +-- Durchschn. Nutzbarkeit
+|   +-- Durchschn. Kompetenz
++-- "Letzte Aktivität" section
+|   +-- Last 10 completed sessions (all trainers)
+|       +-- Date, Pharmacy, Trainer, TN, Avg Rating
++-- "Vollständige Berichte öffnen" button → /berichte
+```
+
+### Data Model (no new tables)
+The dashboard reads from existing tables. All data is fetched via efficient aggregation queries:
+
+```
+For Admin:
+  — Count of termine where datum = today
+  — Count of termine where datum in current week
+  — Count of termine where status = 'durchgefuehrt' AND no matching bericht
+  — Count of distinct active trainers
+
+For Trainer (own data only, filtered by trainer_id):
+  — Next 5 termine where datum >= today, ordered by datum ASC
+  — Termine where status = 'durchgefuehrt' AND no Bericht (or is_draft = true)
+  — Sum of TN + avg ratings from berichte this calendar month
+
+For Management:
+  — Sum of TN from berichte this calendar month
+  — Avg of each rating field from berichte this calendar month
+  — Last 10 berichte with joined termin + apotheke + trainer data
+```
+
+### How Data Flows
+1. User logs in → redirected to `/dashboard`
+2. Server Component reads user's role from `user_profiles` (from the layout's UserContext, or directly)
+3. Based on role, the server runs the appropriate aggregation queries against Supabase
+4. KPI aggregations are cached with `unstable_cache` (revalidated every 5 minutes)
+5. "Missing reports" list and today's appointments are NOT cached (must be fresh)
+6. The page renders with all data populated before HTML is sent to the browser (no loading spinners)
+7. Quick action buttons are regular links (no JavaScript needed for navigation)
+
+### Key Technical Decisions
+- **Server-rendered**: The entire dashboard is a Server Component. No client-side data fetching, no loading skeletons for the main content — data is ready on first paint.
+- **Cached aggregations**: Expensive queries (monthly KPI totals) use `unstable_cache`. Action-required sections (missing reports, today's appointments) bypass the cache to always be current.
+- **Role-based rendering**: One page file, three different layouts based on the `role` field. No separate routes per role — simpler to maintain.
+- **shadcn Card components**: KPI stat cards and appointment cards are built from the existing `Card`, `CardHeader`, `CardContent` components. No new UI library needed.
+
+### Dependencies
+No new packages required.
 
 ## QA Test Results
 _To be added by /qa_

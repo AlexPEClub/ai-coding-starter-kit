@@ -55,7 +55,83 @@ Secure login and signup system with three distinct roles: Admin, Trainer, and Ma
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Pages & Routes
+```
+app/
+  (auth)/
+    login/          ← Login form (public, redirects to /dashboard if already logged in)
+    reset-password/ ← Password reset form (public)
+  (app)/
+    layout.tsx      ← Auth guard: reads session, redirects to /login if unauthenticated
+                       Also provides UserContext (current user + role) to all child pages
+    dashboard/      ← First page after login
+    admin/
+      users/        ← Admin-only: list of all users + invite + deactivate
+```
+
+### Component Structure
+```
+Login Page
++-- Logo / brand heading
++-- Email input
++-- Password input
++-- "Anmelden" button (with loading state)
++-- "Passwort vergessen?" link → /reset-password
++-- Error alert (wrong credentials)
+
+Admin: User Management Page (/admin/users)
++-- Page header + "Benutzer einladen" button
++-- Users Table
+|   +-- Name, Email, Role badge, Status (Active/Deactivated), Last login
+|   +-- Per-row: Change Role dropdown, Deactivate/Reactivate button
++-- Invite User Dialog
+|   +-- Email input
+|   +-- Role selector (Admin / Trainer / Management)
+|   +-- "Einladung senden" button
++-- Deactivate Confirmation Dialog
+
+App Layout (shared across all protected pages)
++-- Sidebar
+|   +-- Platform logo
+|   +-- Nav links (filtered by role — see below)
+|   +-- Current user name + role badge (from UserContext)
+|   +-- Logout button
++-- Main content slot
++-- Sonner toast container
+
+Sidebar Nav Links by Role:
+  Admin:      Dashboard, Apotheken, Touren, Termine, Kalender, Berichte, Admin (Users)
+  Trainer:    Dashboard, Meine Termine, Kalender, Berichte
+  Management: Dashboard, Berichte
+```
+
+### Data Model
+```
+Supabase Auth (built-in):
+  Stores email, password hash, session tokens, invite flow
+
+user_profiles table (custom):
+  id           — same UUID as auth.users.id (foreign key)
+  full_name    — display name
+  role         — enum: 'admin' | 'trainer' | 'management'
+  is_active    — boolean (false = deactivated, cannot log in)
+  created_at   — auto-timestamp
+```
+
+### How Roles Are Enforced
+- **Middleware** (`middleware.ts`): Checks if a valid Supabase session exists on every request. If not, redirects to `/login`.
+- **UserContext**: After login, the layout fetches the user's `user_profiles` row and makes `role` available throughout the app via React Context.
+- **UI**: Nav links, buttons, and sections render conditionally based on role from UserContext.
+- **Database (RLS)**: Every table has RLS policies that use `auth.uid()` and the role from `user_profiles` to enforce data access — the last line of defense even if the UI is bypassed.
+
+### Key Technical Decisions
+- **Invite-only flow**: Supabase `auth.admin.inviteUserByEmail()` sends a magic-link invite. Users cannot self-register.
+- **Role in separate table**: Roles are stored in `user_profiles`, not in JWT metadata. This allows role changes to take effect immediately without requiring the user to log out and back in (the layout re-fetches the profile on each navigation).
+- **Deactivation**: Setting `is_active = false` in `user_profiles` prevents the user from being shown data, even if their Supabase Auth session is still technically valid. RLS policies check `is_active`.
+
+### Dependencies
+No new packages required — Supabase Auth is already in the project via `@supabase/supabase-js`.
 
 ## QA Test Results
 _To be added by /qa_

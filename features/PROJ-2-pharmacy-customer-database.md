@@ -59,7 +59,87 @@ Centralized database of pharmacy customers (Apotheken) that replaces the regiona
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Pages & Routes
+```
+app/(app)/
+  apotheken/
+    page.tsx      ← Pharmacy list (server-rendered, paginated)
+    [id]/
+      page.tsx    ← Pharmacy detail + appointment history
+```
+
+### Component Structure
+```
+Apotheken Page (List View)
++-- Page header: "Apotheken" + "Neue Apotheke" Button (Admin only)
++-- Filter bar
+|   +-- Search input (name, PLZ, Ort — real-time)
+|   +-- Region Select (OÖ / Salzburg / Tirol / Vorarlberg / Alle)
+|   +-- Priority Select (Alle / Normal / Top-Kunde)
++-- Apotheken Table (shadcn Table, 25 rows/page)
+|   +-- Columns: Name, Region, PLZ, Ort, Priority Badge, # Termine, Actions
+|   +-- Actions (Admin only): Edit icon, Delete icon
+|   +-- Row click → Pharmacy Detail Sheet or navigate to [id] page
++-- Pagination controls (shadcn Pagination)
++-- Empty state (when no results match filters)
+
+Add / Edit Apotheke Dialog (Admin only)
++-- Name input (required)
++-- Address input
++-- PLZ input
++-- Ort input (required)
++-- Region Select (required)
++-- Priority Select (required)
++-- Notes Textarea
++-- "Speichern" + "Abbrechen" buttons
++-- Duplicate warning banner (same name + PLZ already exists)
+
+Delete Confirmation Dialog (Admin only)
++-- Warning: "Diese Apotheke hat X bevorstehende Termine"
++-- Affected appointments list (up to 5 shown)
++-- "Trotzdem löschen" (confirm) + "Abbrechen" buttons
+
+Pharmacy Detail Page ([id])
++-- Back breadcrumb → Apotheken list
++-- Info Card: all fields + Edit button (Admin only)
++-- Appointment History Table
+|   +-- Columns: Date, Trainer, Status Badge, TN (if Bericht exists)
+|   +-- Sorted: upcoming first, then past
++-- Empty state for appointments
+```
+
+### Data Model
+```
+apotheken table:
+  id          — UUID (primary key, auto-generated)
+  name        — text, required
+  address     — text
+  plz         — text, required
+  ort         — text, required
+  region      — enum: 'OÖ' | 'Salzburg' | 'Tirol' | 'Vorarlberg'
+  priority    — enum: 'normal' | 'top_kunde'
+  notes       — text
+  deleted_at  — timestamp (null = active; non-null = soft-deleted)
+  created_at  — auto-timestamp
+  created_by  — UUID (FK to auth.users)
+
+Indexes: region, plz, name (for fast filtering)
+```
+
+### How Data Flows
+1. Page loads → Server Component fetches filtered pharmacy list from Supabase (server-side, respects RLS)
+2. User types in search → client-side debounced filter updates URL params → page re-fetches (or client-side filter for small datasets)
+3. Admin clicks "Add" → Dialog opens → form submits via Server Action → table revalidates
+4. Admin clicks "Delete" → check for upcoming termine → show warning dialog → Server Action marks `deleted_at` → row disappears from list
+
+### Key Technical Decisions
+- **Soft delete**: `deleted_at` timestamp instead of removing the row. This preserves historical appointment links and allows accidental deletions to be recovered by an Admin directly in the database if needed.
+- **Server-side pagination**: For lists that could grow to 1000+ entries, the query uses `LIMIT` + `OFFSET` with filters applied in Supabase (not in JavaScript).
+- **No custom search API**: Supabase's `.ilike()` filter on `name`, `ort`, and `plz` is sufficient for MVP without needing a full-text search engine.
+
+### Dependencies
+No new packages required.
 
 ## QA Test Results
 _To be added by /qa_
