@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
-import { Plus, Search, Pencil, Trash2 } from "lucide-react"
+import { Plus, Search, Pencil, Trash2, Upload } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,15 +23,20 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 
-import { mockApotheken } from "@/lib/mock-data"
+import { getApotheken } from "@/lib/actions/apotheken"
 import { REGIONS, PRIORITIES } from "@/lib/types"
-import type { Region, Priority } from "@/lib/types"
+import type { Region, Priority, Apotheke } from "@/lib/types"
 import { ApothekeDialog } from "@/components/apotheke-dialog"
 import { ApothekeDeleteDialog } from "@/components/apotheke-delete-dialog"
+import { ApothekenCsvImport } from "@/components/apotheken-csv-import"
+import { useUser } from "@/lib/user-context"
 
 const PAGE_SIZE = 25
 
 export default function ApothekenPage() {
+  const [apotheken, setApotheken] = useState<Apotheke[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [regionFilter, setRegionFilter] = useState<Region | "alle">("alle")
   const [priorityFilter, setPriorityFilter] = useState<Priority | "alle">("alle")
@@ -41,45 +46,48 @@ export default function ApothekenPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [csvImportOpen, setCsvImportOpen] = useState(false)
 
-  const filtered = useMemo(() => {
-    return mockApotheken
-      .filter((a) => a.deleted_at === null)
-      .filter((a) => {
-        if (regionFilter !== "alle" && a.region !== regionFilter) return false
-        if (priorityFilter !== "alle" && a.priority !== priorityFilter) return false
-        if (search) {
-          const q = search.toLowerCase()
-          return (
-            a.name.toLowerCase().includes(q) ||
-            a.ort.toLowerCase().includes(q) ||
-            a.plz.includes(q)
-          )
-        }
-        return true
-      })
-  }, [search, regionFilter, priorityFilter])
+  const { user } = useUser()
+  const isAdmin = user?.role === "admin"
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const load = useCallback(async () => {
+    setLoading(true)
+    const result = await getApotheken({
+      search: search || undefined,
+      region: regionFilter !== "alle" ? regionFilter : undefined,
+      priority: priorityFilter !== "alle" ? priorityFilter : undefined,
+      page: page + 1,
+      pageSize: PAGE_SIZE,
+    })
+    setApotheken(result.data)
+    setTotal(result.count)
+    setLoading(false)
+  }, [search, regionFilter, priorityFilter, page])
 
-  const editApotheke = editId
-    ? mockApotheken.find((a) => a.id === editId)
-    : undefined
+  useEffect(() => { load() }, [load])
 
-  const deleteApotheke = deleteId
-    ? mockApotheken.find((a) => a.id === deleteId)
-    : undefined
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const editApotheke = editId ? apotheken.find((a) => a.id === editId) : undefined
+  const deleteApotheke = deleteId ? apotheken.find((a) => a.id === deleteId) : undefined
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Apotheken</h1>
-        <Button onClick={() => { setEditId(null); setDialogOpen(true) }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Neue Apotheke
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button variant="outline" onClick={() => setCsvImportOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              CSV importieren
+            </Button>
+          )}
+          <Button onClick={() => { setEditId(null); setDialogOpen(true) }}>
+            <Plus className="mr-2 h-4 w-4" />
+            Neue Apotheke
+          </Button>
+        </div>
       </div>
 
       {/* Filter bar */}
@@ -137,7 +145,7 @@ export default function ApothekenPage() {
 
       {/* Results count */}
       <p className="text-sm text-muted-foreground">
-        {filtered.length} {filtered.length === 1 ? "Apotheke" : "Apotheken"} gefunden
+        {loading ? "Laden…" : `${total} ${total === 1 ? "Apotheke" : "Apotheken"} gefunden`}
       </p>
 
       {/* Table */}
@@ -155,14 +163,20 @@ export default function ApothekenPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginated.length === 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                  Laden…
+                </TableCell>
+              </TableRow>
+            ) : apotheken.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                   Keine Apotheken gefunden.
                 </TableCell>
               </TableRow>
             ) : (
-              paginated.map((apotheke) => (
+              apotheken.map((apotheke) => (
                 <TableRow key={apotheke.id} className="cursor-pointer hover:bg-muted/50">
                   <TableCell>
                     <Link
@@ -187,7 +201,7 @@ export default function ApothekenPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {apotheke.termin_count ?? 0}
+                    {(apotheke as any).termin_count ?? 0}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
@@ -248,15 +262,27 @@ export default function ApothekenPage() {
       {/* Add/Edit Dialog */}
       <ApothekeDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open)
+          if (!open) { setEditId(null); load() }
+        }}
         apotheke={editApotheke}
       />
 
       {/* Delete Confirmation Dialog */}
       <ApothekeDeleteDialog
         open={!!deleteId}
-        onOpenChange={(open) => { if (!open) setDeleteId(null) }}
+        onOpenChange={(open) => {
+          if (!open) { setDeleteId(null); load() }
+        }}
         apotheke={deleteApotheke}
+      />
+
+      {/* CSV Import Dialog */}
+      <ApothekenCsvImport
+        open={csvImportOpen}
+        onOpenChange={setCsvImportOpen}
+        onImported={load}
       />
     </div>
   )

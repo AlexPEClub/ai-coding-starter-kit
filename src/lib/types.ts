@@ -15,6 +15,7 @@ export interface UserProfile {
   role: UserRole
   is_active: boolean
   created_at: string
+  calendar_token: string
 }
 
 export interface Apotheke {

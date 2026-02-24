@@ -7,6 +7,7 @@ import {
   Building2,
   Route,
   CalendarDays,
+  Calendar,
   FileText,
   Users,
   LogOut,
@@ -26,7 +27,10 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import { Badge } from "@/components/ui/badge"
-import { mockCurrentUser } from "@/lib/mock-data"
+import { useUser } from "@/lib/user-context"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 import type { UserRole } from "@/lib/types"
 
 interface NavItem {
@@ -40,7 +44,8 @@ const navItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["admin", "trainer", "management"] },
   { title: "Apotheken", href: "/apotheken", icon: Building2, roles: ["admin", "trainer", "management"] },
   { title: "Touren", href: "/touren", icon: Route, roles: ["admin"] },
-  { title: "Kalender", href: "/kalender", icon: CalendarDays, roles: ["admin", "trainer"] },
+  { title: "Termine", href: "/termine", icon: CalendarDays, roles: ["admin", "trainer"] },
+  { title: "Kalender", href: "/kalender", icon: Calendar, roles: ["admin", "trainer"] },
   { title: "Berichte", href: "/berichte", icon: FileText, roles: ["admin", "trainer", "management"] },
 ]
 
@@ -56,7 +61,11 @@ const roleLabels: Record<string, string> = {
 
 export function AppSidebar() {
   const pathname = usePathname()
-  const user = mockCurrentUser
+  const { user } = useUser()
+  const router = useRouter()
+  const supabase = createClient()
+
+  if (!user) return null
 
   const visibleNav = navItems.filter((item) =>
     item.roles.includes(user.role)
@@ -64,6 +73,15 @@ export function AppSidebar() {
   const visibleAdmin = adminItems.filter((item) =>
     item.roles.includes(user.role)
   )
+
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut()
+    if (error) {
+      toast.error("Abmelden fehlgeschlagen")
+    } else {
+      router.push("/login")
+    }
+  }
 
   return (
     <Sidebar>
@@ -146,6 +164,7 @@ export function AppSidebar() {
             </Badge>
           </div>
           <button
+            onClick={handleSignOut}
             className="text-muted-foreground hover:text-foreground transition-colors"
             title="Abmelden"
           >

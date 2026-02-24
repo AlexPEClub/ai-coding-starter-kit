@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
+import { Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -26,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea"
 
 import { REGIONS, PRIORITIES } from "@/lib/types"
 import type { Apotheke, Region, Priority } from "@/lib/types"
+import { createApotheke, updateApotheke } from "@/lib/actions/apotheken"
 
 interface ApothekeFormValues {
   name: string
@@ -45,6 +47,7 @@ interface ApothekeDialogProps {
 
 export function ApothekeDialog({ open, onOpenChange, apotheke }: ApothekeDialogProps) {
   const isEdit = !!apotheke
+  const [loading, setLoading] = useState(false)
   const {
     register,
     handleSubmit,
@@ -88,14 +91,22 @@ export function ApothekeDialog({ open, onOpenChange, apotheke }: ApothekeDialogP
     }
   }, [open, apotheke, reset])
 
-  const onSubmit = (data: ApothekeFormValues) => {
-    // TODO: Replace with Server Action / Supabase call
-    if (isEdit) {
-      toast.success(`"${data.name}" wurde aktualisiert.`)
+  const onSubmit = async (data: ApothekeFormValues) => {
+    setLoading(true)
+    let result
+    if (isEdit && apotheke) {
+      result = await updateApotheke(apotheke.id, data)
     } else {
-      toast.success(`"${data.name}" wurde erstellt.`)
+      result = await createApotheke(data)
     }
-    onOpenChange(false)
+    setLoading(false)
+
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success(isEdit ? `"${data.name}" wurde aktualisiert.` : `"${data.name}" wurde erstellt.`)
+      onOpenChange(false)
+    }
   }
 
   const region = watch("region")
@@ -210,10 +221,11 @@ export function ApothekeDialog({ open, onOpenChange, apotheke }: ApothekeDialogP
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
               Abbrechen
             </Button>
-            <Button type="submit">
+            <Button type="submit" disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isEdit ? "Speichern" : "Erstellen"}
             </Button>
           </DialogFooter>

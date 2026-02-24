@@ -1,8 +1,10 @@
 "use client"
 
-import { use, useState } from "react"
+import { use, useState, useEffect } from "react"
 import Link from "next/link"
-import { ArrowLeft, Pencil, MapPin } from "lucide-react"
+import { ArrowLeft, Pencil, MapPin, Loader2 } from "lucide-react"
+import { format } from "date-fns"
+import { de } from "date-fns/locale"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -25,9 +27,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-import { mockApotheken, mockTermine, mockTrainers } from "@/lib/mock-data"
+import { getApotheke } from "@/lib/actions/apotheken"
 import { TERMIN_STATUS_CONFIG } from "@/lib/types"
 import { ApothekeDialog } from "@/components/apotheke-dialog"
+import type { Apotheke, Termin } from "@/lib/types"
 
 export default function ApothekeDetailPage({
   params,
@@ -35,9 +38,33 @@ export default function ApothekeDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = use(params)
+  const [apotheke, setApotheke] = useState<Apotheke | null>(null)
+  const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
 
-  const apotheke = mockApotheken.find((a) => a.id === id)
+  useEffect(() => {
+    load()
+  }, [id])
+
+  async function load() {
+    setLoading(true)
+    try {
+      const data = await getApotheke(id)
+      setApotheke(data)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   if (!apotheke) {
     return (
@@ -54,17 +81,19 @@ export default function ApothekeDetailPage({
     )
   }
 
-  // Get appointments for this pharmacy
-  const termine = mockTermine
-    .filter((t) => t.apotheke_id === apotheke.id)
-    .sort((a, b) => {
-      // Upcoming first, then past
-      const today = new Date().toISOString().split("T")[0]
-      const aUpcoming = a.datum >= today ? 0 : 1
-      const bUpcoming = b.datum >= today ? 0 : 1
-      if (aUpcoming !== bUpcoming) return aUpcoming - bUpcoming
-      return a.datum.localeCompare(b.datum)
-    })
+  // Get appointments for this pharmacy from the joined query
+  // getApotheke returns *, termine(*)
+  // The type might need assertion if not fully typed in Supabase
+  const termine = ((apotheke as any).termine as any[]) || []
+
+  // Sort detailed logic: upcoming first, then past
+  termine.sort((a, b) => {
+    const today = new Date().toISOString().split("T")[0]
+    const aUpcoming = a.datum >= today ? 0 : 1
+    const bUpcoming = b.datum >= today ? 0 : 1
+    if (aUpcoming !== bUpcoming) return aUpcoming - bUpcoming
+    return b.datum.localeCompare(a.datum) // Descending for same group
+  })
 
   return (
     <div className="space-y-6">
@@ -121,7 +150,7 @@ export default function ApothekeDetailPage({
             <div>
               <p className="text-sm font-medium text-muted-foreground">Erstellt am</p>
               <p className="mt-1">
-                {new Date(apotheke.created_at).toLocaleDateString("de-AT")}
+                {format(new Date(apotheke.created_at), "dd.MM.yyyy", { locale: de })}
               </p>
             </div>
           </div>
@@ -152,32 +181,27 @@ export default function ApothekeDetailPage({
                 <TableRow>
                   <TableHead>Datum</TableHead>
                   <TableHead>Uhrzeit</TableHead>
-                  <TableHead>Trainer</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Notiz</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {termine.map((termin) => {
-                  const trainer = mockTrainers.find(
-                    (t) => t.id === termin.trainer_id
-                  )
-                  const statusConfig = TERMIN_STATUS_CONFIG[termin.status]
+                  const statusConfig = TERMIN_STATUS_CONFIG[termin.status as keyof typeof TERMIN_STATUS_CONFIG]
                   return (
                     <TableRow key={termin.id}>
                       <TableCell>
-                        {new Date(termin.datum).toLocaleDateString("de-AT")}
+                        {format(new Date(termin.datum), "dd.MM.yyyy", { locale: de })}
                       </TableCell>
                       <TableCell>
                         {termin.zeit_start}–{termin.zeit_ende}
                       </TableCell>
-                      <TableCell>{trainer?.full_name ?? "–"}</TableCell>
                       <TableCell>
                         <Badge
                           variant="secondary"
-                          className={statusConfig.color}
+                          className={statusConfig?.color}
                         >
-                          {statusConfig.label}
+                          {statusConfig?.label}
                         </Badge>
                       </TableCell>
                       <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
@@ -195,7 +219,10 @@ export default function ApothekeDetailPage({
       {/* Edit Dialog */}
       <ApothekeDialog
         open={editOpen}
-        onOpenChange={setEditOpen}
+        onOpenChange={(open) => {
+          setEditOpen(open)
+          if (!open) load()
+        }}
         apotheke={apotheke}
       />
     </div>
