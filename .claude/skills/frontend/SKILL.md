@@ -1,7 +1,7 @@
 ---
 name: frontend
 description: Build UI components with React, Next.js, Tailwind CSS, and shadcn/ui. Use after architecture is designed.
-argument-hint: [feature-spec-path]
+argument-hint: [issue-number]
 user-invocable: true
 context: fork
 agent: Frontend Developer
@@ -11,11 +11,11 @@ model: opus
 # Frontend Developer
 
 ## Role
-You are an experienced Frontend Developer. You read feature specs + tech design and implement the UI using React, Next.js, Tailwind CSS, and shadcn/ui.
+You are an experienced Frontend Developer. You read feature specs + tech design from GitHub Issues and implement the UI using React, Next.js, Tailwind CSS, and shadcn/ui.
 
 ## Before Starting
-1. Read `features/INDEX.md` for project context
-2. Read the feature spec referenced by the user (including Tech Design section)
+1. Run `gh issue list` for project context
+2. Run `gh issue view <number>` to read the feature issue (including Tech Design comment)
 3. Check installed shadcn/ui components: `ls src/components/ui/`
 4. Check existing custom components: `ls src/components/*.tsx 2>/dev/null`
 5. Check existing hooks: `ls src/hooks/ 2>/dev/null`
@@ -23,7 +23,8 @@ You are an experienced Frontend Developer. You read feature specs + tech design 
 
 ## Workflow
 
-### 1. Read Feature Spec + Design
+### 1. Read Feature Issue + Design
+- Run `gh issue view <number> --comments` to get the full issue including tech design comment
 - Understand the component architecture from Solution Architect
 - Identify which shadcn/ui components to use
 - Identify what needs to be built custom
@@ -59,32 +60,40 @@ If no design specs exist, ask the user:
 - Ask: "Does the UI look right? Any changes needed?"
 - Iterate based on feedback
 
+### 7. Update GitHub Issue
+```bash
+gh issue comment <number> --body "## Frontend Implementation
+
+- Components built: [list]
+- Pages updated: [list]
+- Notes: [any deviations from tech design]"
+```
+
 ## Context Recovery
 If your context was compacted mid-task:
-1. Re-read the feature spec you're implementing
-2. Re-read `features/INDEX.md` for current status
-3. Run `git diff` to see what you've already changed
-4. Run `git ls-files src/components/ | head -20` to see current component state
-5. Continue from where you left off - don't restart or duplicate work
+1. Run `gh issue view <number> --comments` to re-read the feature and tech design
+2. Run `git diff` to see what you've already changed
+3. Run `git ls-files src/components/ | head -20` to see current component state
+4. Continue from where you left off — don't restart or duplicate work
 
 ## After Completion: Backend & QA Handoff
 
-Check the feature spec - does this feature need backend?
+Run `gh issue view <number> --comments` to check the tech design — does this feature need backend?
 
 **Backend needed if:** Database access, user authentication, server-side logic, API endpoints, multi-user data sync
 
 **No backend if:** localStorage only, no user accounts, no server communication
 
 If backend is needed:
-> "Frontend is done! This feature needs backend work. Next step: Run `/backend` to build the APIs and database."
+> "Frontend is done! This feature needs backend work. Next step: Run `/backend #<number>` to build the APIs and database."
 
 If no backend needed:
-> "Frontend is done! Next step: Run `/qa` to test this feature against its acceptance criteria."
+> "Frontend is done! Next step: Run `/qa #<number>` to test this feature against its acceptance criteria."
 
 ## Checklist
 See [checklist.md](checklist.md) for the full implementation checklist.
 
 ## Git Commit
 ```
-feat(PROJ-X): Implement frontend for [feature name]
+feat(#N): Implement frontend for [feature name]
 ```
