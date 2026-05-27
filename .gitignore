@@ -33,6 +33,7 @@ yarn-error.log*
 
 # claude code personal settings
 .claude/settings.local.json
+.mcp.json
 
 # typescript
 *.tsbuildinfo
