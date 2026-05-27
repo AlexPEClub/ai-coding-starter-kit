@@ -29,12 +29,15 @@ docs/
 
 ## Development Workflow
 
-1. `/requirements` - Create feature spec from idea
-2. `/architecture` - Design tech architecture (PM-friendly, no code)
-3. `/frontend` - Build UI components (shadcn/ui first!)
-4. `/backend` - Build APIs, database, RLS policies
-5. `/qa` - Test against acceptance criteria + security audit
-6. `/deploy` - Deploy to Vercel + production-ready checks
+1. `/init` - Initialize the project: PRD + feature map (run once at the start)
+2. `/write-spec` - Create a full feature spec for one feature
+3. `/architecture` - Design tech architecture (PM-friendly, no code)
+4. `/frontend` - Build UI components (shadcn/ui first!)
+5. `/backend` - Build APIs, database, RLS policies
+6. `/qa` - Test against acceptance criteria + security audit
+7. `/deploy` - Deploy to Vercel + production-ready checks
+
+Use `/refine PROJ-X` at any point to revisit and improve an existing feature spec.
 
 ## Feature Tracking
 

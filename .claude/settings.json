@@ -1,8 +1,27 @@
 {
   "permissions": {
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Read(**/.env*)",
+      "Read(**/.dev.vars*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/secrets/**)",
+      "Read(**/credentials/**)",
+      "Read(**/.aws/**)",
+      "Read(**/.ssh/**)",
+      "Read(**/config/database.yml)",
+      "Read(**/config/credentials.json)",
+      "Read(**/.npmrc)",
+      "Read(**/.pypirc)",
+      "Edit(**/.env*)",
+      "Edit(**/secrets/**)",
+      "Edit(**/.ssh/**)"
+    ],
     "allow": [
       "Bash(npm install)",
-      "Bash(npm install:*)",
       "Bash(npm run dev:*)",
       "Bash(npm run build:*)",
       "Bash(npm run lint:*)",
@@ -15,8 +34,7 @@
       "Bash(lsof:*)",
       "Bash(kill:*)",
       "Bash(npx shadcn@latest add:*)",
-      "Bash(ls:*)",
-      "Bash(cat:*)"
+      "Bash(ls:*)"
     ]
   }
 }

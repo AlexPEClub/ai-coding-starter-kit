@@ -39,12 +39,12 @@ Based on the state analysis, determine what the user should do next:
 
 **If PRD is empty template:**
 > Your project hasn't been initialized yet.
-> Run `/requirements` with a description of what you want to build.
-> Example: `/requirements I want to build a task management app for small teams`
+> Run `/init` with a description of what you want to build.
+> Example: `/init I want to build a task management app for small teams`
 
 **If PRD exists but no features:**
 > Your PRD is set up but no features have been created yet.
-> Run `/requirements` to create your first feature specification.
+> Run `/write-spec` to create your first feature specification.
 
 **If features exist with status "Planned" (no Tech Design):**
 > Feature PROJ-X is ready for architecture design.
@@ -65,15 +65,15 @@ Based on the state analysis, determine what the user should do next:
 
 **If all features are deployed:**
 > All current features are deployed! You can:
-> - Run `/requirements` to add a new feature
+> - Run `/write-spec` to spec out a new feature
 > - Check `docs/PRD.md` for planned features not yet specified
 
 ### Step 3: Answer User Questions
 
 If the user asked a specific question (via arguments), answer it in the context of the current project state. Common questions:
 
-- "What skills are available?" → List all 6 skills with brief descriptions
-- "How do I add a new feature?" → Explain `/requirements` workflow
+- "What skills are available?" → List all available skills with brief descriptions
+- "How do I add a new feature?" → Explain `/write-spec` workflow (or `/init` if the project isn't set up yet)
 - "How do I customize this template?" → Point to CLAUDE.md, rules/, skills/
 - "What's the project structure?" → Explain the directory layout
 - "How do I deploy?" → Explain `/deploy` workflow and prerequisites

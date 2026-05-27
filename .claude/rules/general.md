@@ -8,11 +8,11 @@ Before starting ANY work, check if the project has been initialized:
 **If the project is not initialized:**
 - Do NOT write any code or create any components
 - Do NOT skip ahead to implementation
-- Instead, tell the user: "This project hasn't been set up yet. Let's start by defining what you want to build. Run `/requirements` with a description of your idea (e.g. `/requirements I want to build a task management app`)."
-- If the user already described their idea in the current message, run `/requirements` automatically with their description
+- Instead, tell the user: "This project hasn't been set up yet. Let's start by defining what you want to build. Run `/init` with a description of your idea (e.g. `/init I want to build a task management app`)."
+- If the user already described their idea in the current message, run `/init` automatically with their description
 
 **If the project is initialized but the user requests a feature not yet in INDEX.md:**
-- Guide them to run `/requirements` first to create the feature spec before any implementation
+- Guide them to run `/write-spec` first to create the feature spec before any implementation
 
 ## Feature Tracking
 - All features are tracked in `features/INDEX.md` - read it before starting any work
@@ -48,8 +48,9 @@ After completing work on any feature, you MUST update tracking files. Follow thi
 
 **What to update in `features/INDEX.md`:**
 - Feature status column must match the feature spec header
-- Valid statuses: Planned → Architected → In Progress → In Review → Approved → Deployed
-  - **Planned**: after `/requirements`
+- Valid statuses: Roadmap → Planned → Architected → In Progress → In Review → Approved → Deployed
+  - **Roadmap**: after `/init` — feature identified, no spec file yet
+  - **Planned**: after `/write-spec`
   - **Architected**: after `/architecture`
   - **In Progress**: after `/frontend` or `/backend` starts
   - **In Review**: after `/qa` starts

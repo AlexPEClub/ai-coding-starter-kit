@@ -36,26 +36,30 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### 4. Initialize Your Project
 
-Open Claude Code and describe your project. The `/requirements` skill automatically detects that this is a fresh project and enters **Init Mode**:
+Open Claude Code and run `/init` with a brief description of your idea:
 
 ```
-/requirements I want to build a project management tool for small teams
+/init I want to build a project management tool for small teams
 where users can create projects, assign tasks, and track progress.
 ```
 
-The skill will:
-1. Ask interactive questions to clarify your vision, target users, and MVP scope
-2. Create your **Product Requirements Document** (`docs/PRD.md`)
-3. Break the project into individual features (Single Responsibility)
-4. Create all **feature specs** (`features/PROJ-1.md`, `PROJ-2.md`, etc.)
-5. Update **feature tracking** (`features/INDEX.md`)
-6. Recommend which feature to build first
+The skill interviews you one question at a time (**Grill Me** principle — always with a recommended answer you just confirm or correct) until there's a shared understanding. It then:
+1. Creates your **Product Requirements Document** (`docs/PRD.md`)
+2. Breaks the project into a prioritized feature map (P0/P1/P2)
+3. Updates **feature tracking** (`features/INDEX.md`)
+4. Recommends which feature to build first
 
-You don't need to put everything in the first prompt - a brief description is enough. The skill asks follow-up questions interactively.
+### 5. Spec Your First Feature
 
-### 5. Build Features
+After initialization, create a detailed spec for the first feature:
 
-After project initialization, build features one at a time using skills:
+```
+/write-spec PROJ-1
+```
+
+The skill interviews you about this single feature in depth — user stories, edge cases, acceptance criteria. Use `/refine PROJ-X` at any point to revisit and improve an existing spec.
+
+### 6. Build Features
 
 ```
 /architecture    Design the tech approach for features/PROJ-1-user-auth.md
@@ -67,15 +71,15 @@ After project initialization, build features one at a time using skills:
 
 Each skill suggests the next step when it finishes. Handoffs are always user-initiated.
 
-To add more features later, run `/requirements` again - it detects the existing PRD and adds a single feature.
-
 ---
 
 ## Available Skills
 
 | Skill | Command | What It Does |
 |-------|---------|-------------|
-| Requirements Engineer | `/requirements` | Creates feature specs with user stories, acceptance criteria, edge cases |
+| Project Initializer | `/init` | One-time setup: creates PRD + feature map via Grill Me interview |
+| Feature Spec Writer | `/write-spec` | Creates a full spec for one feature (user stories, AC, edge cases) |
+| Spec Refiner | `/refine PROJ-X` | Reopens an existing spec to improve, extend, or challenge it |
 | Solution Architect | `/architecture` | Designs PM-friendly tech architecture (no code, only high-level design) |
 | Frontend Developer | `/frontend` | Builds UI with React, Tailwind CSS, and shadcn/ui |
 | Backend Developer | `/backend` | Builds APIs, database schemas, RLS policies with Supabase |
@@ -95,7 +99,9 @@ To add more features later, run `/requirements` again - it detects the existing 
 ## Development Workflow
 
 ```
-1. Define    /requirements  -->  Feature spec in features/PROJ-X.md
+0. Setup     /init          -->  PRD + feature map (once per project)
+1. Spec      /write-spec      -->  Feature spec in features/PROJ-X.md
+             /refine PROJ-X -->  Revisit and improve an existing spec
 2. Design    /architecture  -->  Tech design added to feature spec
 3. Build     /frontend      -->  UI components implemented
              /backend       -->  APIs + database (if needed)
@@ -144,7 +150,9 @@ ai-coding-starter-kit/
 |   |   +-- backend.md                   RLS, validation, queries
 |   |   +-- security.md                  Secrets, headers, auth
 |   +-- skills/                      <-- Invocable workflows (/command)
-|   |   +-- requirements/SKILL.md        /requirements
+|   |   +-- init/SKILL.md                /init
+|   |   +-- write-spec/SKILL.md           /write-spec
+|   |   +-- refine/SKILL.md              /refine
 |   |   +-- architecture/SKILL.md        /architecture
 |   |   +-- frontend/SKILL.md            /frontend (runs as sub-agent)
 |   |   +-- backend/SKILL.md             /backend (runs as sub-agent)
@@ -179,20 +187,13 @@ ai-coding-starter-kit/
 
 ## Getting Started
 
-### 1. Fill Out Your PRD
+### 1. Initialize the Project
 
-Define your product vision in `docs/PRD.md`:
-- What are you building and why?
-- Who are the target users?
-- What features are on the roadmap?
+Run `/init` with a brief description of your idea. The skill interviews you one question at a time and fills out `docs/PRD.md` with your vision, target users, and a prioritized feature map.
 
-### 2. Build Your First Feature
+### 2. Spec Your First Feature
 
-Run `/requirements` with your feature idea. The skill will:
-- Ask interactive questions to clarify requirements
-- Create a feature spec in `features/PROJ-1-name.md`
-- Update `features/INDEX.md` with the new feature
-- Suggest running `/architecture` as the next step
+Run `/write-spec PROJ-1`. The skill interviews you in depth about this single feature and creates a complete spec in `features/PROJ-1-name.md` — user stories, acceptance criteria, edge cases. Then suggest running `/architecture` as the next step.
 
 ### 3. Add shadcn/ui Components (as needed)
 
@@ -220,7 +221,9 @@ Each skill is a structured workflow that Claude Code discovers automatically. Sk
 
 | Skill | Execution | Why? |
 |-------|-----------|------|
-| `/requirements` | Inline | Needs live interaction with user |
+| `/init` | Inline | Needs live interview with user |
+| `/write-spec` | Inline | Needs live interview with user |
+| `/refine` | Inline | Needs live interview with user |
 | `/architecture` | Inline | Short output, user reviews in real-time |
 | `/frontend` | Sub-agent (forked) | Heavy file editing, lots of output |
 | `/backend` | Sub-agent (forked) | Heavy file editing, SQL, API code |

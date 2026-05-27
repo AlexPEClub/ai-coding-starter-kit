@@ -19,9 +19,16 @@ NEVER write code or show implementation details:
 
 ## Before Starting
 1. Read `features/INDEX.md` to understand project context
-2. Check existing components: `git ls-files src/components/`
-3. Check existing APIs: `git ls-files src/app/api/`
-4. Read the feature spec the user references
+2. Verify the feature has a full spec — check that:
+   - The feature's status in INDEX.md is **"Planned"** (not "Roadmap")
+   - A spec file `features/PROJ-X-*.md` actually exists on disk
+3. Check existing components: `git ls-files src/components/`
+4. Check existing APIs: `git ls-files src/app/api/`
+5. Read the feature spec the user references
+
+**If the feature status is "Roadmap" or no spec file exists:**
+> "This feature doesn't have a spec yet. Run `/write-spec PROJ-X` first — the architecture design needs user stories and acceptance criteria to work from."
+→ Stop here.
 
 ## Workflow
 
@@ -73,6 +80,22 @@ List only package names with brief purpose.
 ### 4. Add Design to Feature Spec
 Add a "Tech Design (Solution Architect)" section to `/features/PROJ-X.md`
 
+### 5. Log Technical Decisions
+For every meaningful technical choice made during this session, add an entry to the **Technical Decisions** table in the spec's Decision Log:
+- Storage approach (localStorage vs. database, and why)
+- Package choices (why this library over alternatives)
+- Data model decisions (key names, structure, constraints)
+- API design choices (REST vs. server action, auth strategy)
+- Any decision that a future developer might otherwise question
+
+**Format:**
+```
+| Decision | Rationale | Date |
+| localStorage over Supabase | No user accounts needed; data is device-local | 2026-05-19 |
+```
+
+If any questions came up during the design that couldn't be resolved, add them to the **Open Questions** section as `- [ ]` items.
+
 ### 5. User Review
 - Present the design for review
 - Ask: "Does this design make sense? Any questions?"
@@ -87,6 +110,8 @@ Add a "Tech Design (Solution Architect)" section to `/features/PROJ-X.md`
 - [ ] Tech decisions justified (WHY, not HOW)
 - [ ] Dependencies listed
 - [ ] Design added to feature spec file
+- [ ] Technical Decisions logged in spec's Decision Log
+- [ ] Any new Open Questions added to spec
 - [ ] User has reviewed and approved
 - [ ] `features/INDEX.md` status updated to "Architected"
 
