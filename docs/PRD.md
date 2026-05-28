@@ -25,7 +25,7 @@ TierPhysio ist eine Multi-Tenant-Plattform für Tierphysiotherapeuten und Tierbe
 
 | Priority | Feature | Status |
 |----------|---------|--------|
-| P0 (MVP) | Multi-Tenant Infrastruktur (Supabase) | Planned |
+| P0 (MVP) | Multi-Tenant Infrastruktur (Supabase) | Spec Written |
 | P0 (MVP) | Therapeuten-Authentifizierung & Workspace | Planned |
 | P0 (MVP) | Patienten-Verwaltung (CRUD) | Planned |
 | P0 (MVP) | Übungsdatenbank & Editor | Planned |

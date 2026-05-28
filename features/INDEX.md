@@ -15,7 +15,7 @@
 
 | ID | Feature | Priority | Status | Spec | Dependencies | Created |
 |----|---------|----------|--------|------|--------------|---------|
-| PROJ-1 | Supabase Multi-Tenant Infrastructure | P0 | Roadmap | — | None | 2026-05-28 |
+| PROJ-1 | Supabase Multi-Tenant Infrastructure | P0 | Planned | [Spec](PROJ-1-supabase-multi-tenant-infrastructure.md) | None | 2026-05-28 |
 | PROJ-2 | Therapeuten-Authentifizierung & Workspace | P0 | Roadmap | — | PROJ-1 | 2026-05-28 |
 | PROJ-3 | Patienten-Verwaltung (CRUD) | P0 | Roadmap | — | PROJ-2 | 2026-05-28 |
 | PROJ-4 | Übungsdatenbank & Editor | P0 | Roadmap | — | PROJ-2 | 2026-05-28 |
