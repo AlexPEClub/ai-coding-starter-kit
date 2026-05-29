@@ -20,7 +20,7 @@
 | PROJ-3 | Patienten-Verwaltung (CRUD) | P0 | Planned | [Spec](PROJ-3-patienten-verwaltung.md) | PROJ-2 | 2026-05-28 |
 | PROJ-4 | Übungsdatenbank & Editor | P0 | Roadmap | — | PROJ-2 | 2026-05-28 |
 | PROJ-5 | Trainingsplan-Builder | P0 | Roadmap | — | PROJ-3, PROJ-4 | 2026-05-28 |
-| PROJ-6 | Kunde-Portal (Basis-UI) | P0 | Roadmap | — | PROJ-16 | 2026-05-28 |
+| PROJ-6 | Kunde-Portal (Basis-UI) | P0 | Planned | [Spec](PROJ-6-kunde-portal-basis.md) | PROJ-16 | 2026-05-28 |
 | PROJ-7 | Tagesaufgaben & Kalender-Tracking | P0 | Roadmap | — | PROJ-6 | 2026-05-28 |
 | PROJ-8 | Video-Upload & Therapeuten-Review | P0 | Roadmap | — | PROJ-6 | 2026-05-28 |
 | PROJ-9 | Fortschritts-Analytics (Schmerz/Steifheit) | P1 | Roadmap | — | PROJ-8 | 2026-05-28 |
