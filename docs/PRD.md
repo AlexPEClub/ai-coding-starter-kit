@@ -26,11 +26,12 @@ TierPhysio ist eine Multi-Tenant-Plattform für Tierphysiotherapeuten und Tierbe
 | Priority | Feature | Status |
 |----------|---------|--------|
 | P0 (MVP) | Multi-Tenant Infrastruktur (Supabase) | Spec Written |
-| P0 (MVP) | Therapeuten-Authentifizierung & Workspace | Planned |
+| P0 (MVP) | Therapeuten-Authentifizierung & Workspace | Spec Written |
 | P0 (MVP) | Patienten-Verwaltung (CRUD) | Planned |
+| P0 (MVP) | Terminverwaltung | Planned |
+| P0 (MVP) | Kunde-Portal (Basis) | Planned |
 | P0 (MVP) | Übungsdatenbank & Editor | Planned |
 | P0 (MVP) | Trainingsplan-Builder | Planned |
-| P0 (MVP) | Kunde-Portal (Basis) | Planned |
 | P0 (MVP) | Tagesaufgaben & Kalender-Tracking | Planned |
 | P0 (MVP) | Video-Upload & Review | Planned |
 | P1 | Fortschritts-Analytics (Schmerz/Steifheit-Kurven) | Planned |
@@ -40,7 +41,7 @@ TierPhysio ist eine Multi-Tenant-Plattform für Tierphysiotherapeuten und Tierbe
 | P2 | Messaging / In-App Chat | Planned |
 | P2 | Erweiterte Reports & Export | Planned |
 | P2 | Wearables Integration | Planned |
-| P2 | Kundenverwaltung (Rechnungen, Termine) | Planned |
+| P2 | Kundenverwaltung (Rechnungen) | Planned |
 
 ## Success Metrics
 
@@ -67,7 +68,7 @@ TierPhysio ist eine Multi-Tenant-Plattform für Tierphysiotherapeuten und Tierbe
 - ❌ Erweiterte Analytics & Machine Learning
 - ❌ Übungs-Marktplatz
 - ❌ Community Features / Messaging
-- ❌ Kundenverwaltungs-Funktionen (Rechnungen, Terminplanung)
+- ❌ Kundenverwaltungs-Funktionen (Rechnungen)
 - ❌ Wearables / Third-party API Integration
 
 ---
