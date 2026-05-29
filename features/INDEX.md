@@ -30,7 +30,7 @@
 | PROJ-13 | Messaging / In-App Chat | P2 | Roadmap | — | PROJ-2 | 2026-05-28 |
 | PROJ-14 | Erweiterte Reports & Export | P2 | Roadmap | — | PROJ-9 | 2026-05-28 |
 | PROJ-15 | Kundenverwaltung (Rechnungen) | P2 | Roadmap | — | PROJ-3 | 2026-05-28 |
-| PROJ-16 | Terminverwaltung | P0 | Roadmap | — | PROJ-3 | 2026-05-28 |
+| PROJ-16 | Terminverwaltung | P0 | Planned | [Spec](PROJ-16-terminverwaltung.md) | PROJ-3 | 2026-05-28 |
 
 ## Recommended Build Order (MVP Priority)
 
