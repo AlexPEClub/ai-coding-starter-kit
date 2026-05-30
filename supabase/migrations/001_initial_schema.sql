@@ -128,17 +128,28 @@ BEGIN
 
   IF v_slug = '' THEN v_slug := 'praxis'; END IF;
   v_base_slug := v_slug;
-
-  -- Append -2, -3, … until the slug is unique (Unique constraint is the guard)
-  WHILE EXISTS (SELECT 1 FROM public.tenants WHERE slug = v_slug) LOOP
-    v_counter := v_counter + 1;
-    v_slug    := v_base_slug || '-' || v_counter;
-  END LOOP;
   -- ─────────────────────────────────────────────────────────────────────────
 
-  INSERT INTO public.tenants (name, slug, plan)
-  VALUES (v_practice, v_slug, 'trial')
-  RETURNING id INTO v_tenant_id;
+  -- ── Atomic slug INSERT with retry on concurrent collision ─────────────────
+  -- An inner BEGIN/EXCEPTION block makes this atomic: the INSERT either
+  -- succeeds or raises unique_violation, which is caught and retried.
+  -- This is safe against race conditions; the outer WHILE EXISTS pre-check
+  -- was not (window between SELECT and INSERT).
+  LOOP
+    BEGIN
+      INSERT INTO public.tenants (name, slug, plan)
+      VALUES (v_practice, v_slug, 'trial')
+      RETURNING id INTO v_tenant_id;
+      EXIT; -- INSERT succeeded → leave retry loop
+    EXCEPTION WHEN unique_violation THEN
+      v_counter := v_counter + 1;
+      IF v_counter > 100 THEN
+        RAISE EXCEPTION 'handle_new_user: exceeded 100 slug retries for "%"', v_practice;
+      END IF;
+      v_slug := v_base_slug || '-' || v_counter;
+    END;
+  END LOOP;
+  -- ─────────────────────────────────────────────────────────────────────────
 
   INSERT INTO public.profiles (user_id, tenant_id, role, full_name)
   VALUES (

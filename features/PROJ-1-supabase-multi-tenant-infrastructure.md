@@ -2,7 +2,7 @@
 
 ## Status: Approved
 **Created:** 2026-05-28
-**Last Updated:** 2026-05-30
+**Last Updated:** 2026-05-30 (BUG-1 fixed)
 
 ## Dependencies
 - None (Fundament für alle anderen Features)
@@ -258,15 +258,10 @@ import type { Tenant, Profile, UserRole } from '@/lib/database.types'
 
 ### Bugs Found
 
-#### BUG-1 — Medium: Kein Retry bei Slug-Race-Condition
-**Severity:** Medium
+#### ~~BUG-1 — Medium: Kein Retry bei Slug-Race-Condition~~ ✅ FIXED
+**Severity:** Medium → **Resolved 2026-05-30**
 **Component:** `supabase/migrations/001_initial_schema.sql` → `handle_new_user()`
-**Description:** Das `WHILE EXISTS ... INSERT`-Muster für die Slug-Generierung ist nicht atomar. Zwischen dem EXISTS-Check und dem INSERT kann ein anderer Prozess denselben Slug belegen. Der Unique-Constraint würde den INSERT zum Scheitern bringen; der EXCEPTION-Handler fängt den Fehler ab und orphaned den Auth-User. Die Spec fordert explizit "Retry-Logik im Trigger".
-**Steps to Reproduce:** Zwei gleichzeitige Registrierungen mit identischem Praxisnamen (extrem unwahrscheinlich bei MVP-Scale mit 2 Beta-Usern).
-**Expected:** Retry mit nächstem Suffix (-2, -3, …) nach `unique_violation`.
-**Actual:** Exception swallowed, User hat kein Workspace.
-**Workaround:** Bei MVP-Scale (2 User) praktisch nicht reproduzierbar. PROJ-2 zeigt Recovery-Screen für orphaned Users.
-**Fix:** `EXCEPTION WHEN unique_violation THEN` gezielt behandeln und Retry-Loop außerhalb des EXCEPTION-Blocks strukturieren, oder `INSERT ... ON CONFLICT` nutzen.
+**Fix:** Replaced non-atomic `WHILE EXISTS ... INSERT` with a `LOOP / BEGIN / EXCEPTION WHEN unique_violation` retry block. The INSERT is now truly atomic — on collision, the counter is incremented and the INSERT retried, up to 100 attempts. A `RAISE EXCEPTION` after 100 retries prevents infinite loops.
 
 #### BUG-2 — Low: TypeScript-Typ für `plan` zu weit
 **Severity:** Low
