@@ -1,8 +1,8 @@
 # PROJ-1: Supabase Multi-Tenant Infrastructure
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-05-28
-**Last Updated:** 2026-05-28
+**Last Updated:** 2026-05-30
 
 ## Dependencies
 - None (Fundament für alle anderen Features)
@@ -85,15 +85,122 @@
 | RLS over Schema-per-Tenant | Schema-per-Tenant erst ab >1.000 Tenants sinnvoll; RLS ist der Supabase-Standard und ausreichend für ~100–200 User | 2026-05-28 |
 
 ### Technical Decisions
-<!-- Added by /architecture -->
+
 | Decision | Rationale | Date |
 |----------|-----------|------|
-| _To be filled by /architecture_ | | |
+| RLS over separate databases/schemas | Database-layer isolation; immune to app-code bugs; Supabase standard; right-sized for <200 users | 2026-05-30 |
+| Single `get_tenant_id()` helper | All RLS policies call one function — one place to update if lookup logic changes | 2026-05-30 |
+| Atomic trigger (tenant + profile together) | Prevents orphaned auth users who have a login but no workspace | 2026-05-30 |
+| `plan` as text + CHECK constraint (not enum) | Easier to extend new tiers without a DB migration; safer than free text | 2026-05-30 |
+| Practice name via signup `user_metadata` | No extra API call needed; trigger reads `raw_user_meta_data->>'practice_name'` directly | 2026-05-30 |
+| Numbered SQL migration files in `supabase/migrations/` | Schema changes version-controlled alongside app code; repeatable and auditable | 2026-05-30 |
+| `@supabase/ssr` for Next.js App Router | Required for cookie-based auth in server components; official Supabase recommendation for Next.js 13+ | 2026-05-30 |
 
 ---
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### System Structure
+
+```
+Supabase Platform
++-- auth.users  (Supabase built-in)
+|       |
+|       └── Trigger: on_user_created (fires on every signup)
+|               +-- Step 1: Create tenants record (practice name + auto-slug)
+|               +-- Step 2: Create profiles record (user_id → tenant_id, role = 'owner')
+|               └── (Atomic — both succeed or neither)
+|
++-- Database Tables
+|   +-- tenants
+|   |       id, name, slug, plan, created_at
+|   |       RLS: practice sees only its own tenant record
+|   |
+|   +-- profiles
+|           id, user_id, tenant_id, role, full_name, created_at
+|           RLS: user sees own profile + profiles in the same practice
+|
++-- Helper Functions
+|   +-- get_tenant_id()   → returns tenant_id for the current logged-in user
+|   +-- generate_slug()   → "Tierphysio München" → "tierphysio-munchen"
+|                            handles umlauts, special chars, collision suffix
+|
++-- RLS Policy Pattern (applied to every tenant-isolated table)
+        SELECT / INSERT / UPDATE / DELETE:
+        filter WHERE tenant_id = get_tenant_id()
+        Applied now: tenants, profiles
+        Required for all future tables: patients, exercises, plans, videos, …
+```
+
+### Registration Flow
+
+1. Therapist enters email + password + practice name in the signup form (PROJ-2)
+2. Supabase signup call bundles practice name as `user_metadata.practice_name`
+3. `auth.users` record is created by Supabase
+4. `on_user_created` trigger fires automatically:
+   - Generates slug from practice name (with collision-safe suffix)
+   - Inserts `tenants` record (`plan = 'trial'`)
+   - Inserts `profiles` record (`role = 'owner'`, `tenant_id` → new tenant)
+5. All subsequent DB queries are silently scoped to this practice via RLS
+
+### Data Model
+
+**Tenant** — one practice (Praxis)
+- Unique ID, practice name, URL slug, plan tier, creation timestamp
+- Shared by all therapists and clients belonging to that practice
+
+**Profile** — one person's identity in the system
+- Links a Supabase auth account to a practice + role
+- Role values: `owner` | `therapist` | `client`
+- `tenant_id` is NOT NULL — every user must belong to exactly one practice
+
+### Dependencies
+
+| Package | Purpose |
+|---|---|
+| `@supabase/supabase-js` | Supabase JavaScript client (queries, auth) |
+| `@supabase/ssr` | Next.js App Router server-side auth (cookie-based sessions) |
+| Supabase CLI (dev tool) | Run migrations locally, generate TypeScript types |
+
+## Implementation Notes
+
+### Files Created
+- `supabase/migrations/001_initial_schema.sql` — full schema: tenants + profiles tables, indexes, `get_tenant_id()` helper, RLS policies, `handle_new_user()` trigger
+- `src/lib/database.types.ts` — TypeScript types for Tenant, Profile, UserRole; matches DB schema exactly
+- `src/lib/supabase.ts` — browser-side Supabase client factory (`createClient()` via `@supabase/ssr`)
+- `src/lib/supabase/server.ts` — server-side Supabase client factory (cookie-based SSR sessions)
+- `src/proxy.ts` — Next.js 16 proxy (session token refresh on every request)
+
+### Package Added
+- `@supabase/ssr` — required for Next.js App Router cookie-based auth
+
+### Deviations from Spec
+- None. `plan` implemented as `text` with CHECK constraint (`trial`, `pro`, `enterprise`) as agreed in architecture.
+
+### Manual Steps Required (before testing)
+1. Create a Supabase project at [supabase.com](https://supabase.com)
+2. Copy project URL and anon key into `.env.local`:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   ```
+3. Run the migration in Supabase Dashboard → SQL Editor:
+   paste contents of `supabase/migrations/001_initial_schema.sql`
+4. _(Optional)_ Install Supabase CLI and run `supabase db push` for local dev
+
+### How to Use in Future Features
+```ts
+// Client Component / hook
+import { createClient } from '@/lib/supabase'
+const supabase = createClient()
+
+// Server Component / API route
+import { createClient } from '@/lib/supabase/server'
+const supabase = await createClient()
+
+// TypeScript types
+import type { Tenant, Profile, UserRole } from '@/lib/database.types'
+```
 
 ## QA Test Results
 _To be added by /qa_
