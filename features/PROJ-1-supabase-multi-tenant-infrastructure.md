@@ -263,13 +263,10 @@ import type { Tenant, Profile, UserRole } from '@/lib/database.types'
 **Component:** `supabase/migrations/001_initial_schema.sql` → `handle_new_user()`
 **Fix:** Replaced non-atomic `WHILE EXISTS ... INSERT` with a `LOOP / BEGIN / EXCEPTION WHEN unique_violation` retry block. The INSERT is now truly atomic — on collision, the counter is incremented and the INSERT retried, up to 100 attempts. A `RAISE EXCEPTION` after 100 retries prevents infinite loops.
 
-#### BUG-2 — Low: TypeScript-Typ für `plan` zu weit
-**Severity:** Low
+#### ~~BUG-2 — Low: TypeScript-Typ für `plan` zu weit~~ ✅ FIXED
+**Severity:** Low → **Resolved 2026-05-30**
 **Component:** `src/lib/database.types.ts`
-**Description:** `tenants.plan` ist als `string` typisiert, obwohl die DB einen CHECK-Constraint auf `('trial', 'pro', 'enterprise')` hat. TypeScript fängt ungültige Plan-Werte nicht ab.
-**Expected:** `plan: 'trial' | 'pro' | 'enterprise'`
-**Actual:** `plan: string`
-**Impact:** Rein compile-time; Runtime-Verhalten korrekt (DB-Constraint greift).
+**Fix:** `plan` ist jetzt als `'trial' | 'pro' | 'enterprise'` in Row/Insert/Update typisiert. Convenience-Typ `TenantPlan` hinzugefügt.
 
 ---
 

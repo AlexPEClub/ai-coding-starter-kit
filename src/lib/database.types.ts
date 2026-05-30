@@ -14,21 +14,21 @@ export interface Database {
           id: string
           name: string
           slug: string
-          plan: string
+          plan: 'trial' | 'pro' | 'enterprise'
           created_at: string
         }
         Insert: {
           id?: string
           name: string
           slug: string
-          plan?: string
+          plan?: 'trial' | 'pro' | 'enterprise'
           created_at?: string
         }
         Update: {
           id?: string
           name?: string
           slug?: string
-          plan?: string
+          plan?: 'trial' | 'pro' | 'enterprise'
           created_at?: string
         }
         Relationships: []
@@ -93,6 +93,7 @@ export interface Database {
 }
 
 // Convenience row types
-export type Tenant  = Database['public']['Tables']['tenants']['Row']
-export type Profile = Database['public']['Tables']['profiles']['Row']
-export type UserRole = Profile['role']
+export type Tenant    = Database['public']['Tables']['tenants']['Row']
+export type Profile   = Database['public']['Tables']['profiles']['Row']
+export type UserRole  = Profile['role']
+export type TenantPlan = Tenant['plan']
