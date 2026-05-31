@@ -16,7 +16,7 @@
 | ID | Feature | Priority | Status | Spec | Dependencies | Created |
 |----|---------|----------|--------|------|--------------|---------|
 | PROJ-1 | Supabase Multi-Tenant Infrastructure | P0 | Approved | [Spec](PROJ-1-supabase-multi-tenant-infrastructure.md) | None | 2026-05-28 |
-| PROJ-2 | Therapeuten-Authentifizierung & Workspace | P0 | In Progress | [Spec](PROJ-2-therapeuten-authentifizierung-workspace.md) | PROJ-1 | 2026-05-28 |
+| PROJ-2 | Therapeuten-Authentifizierung & Workspace | P0 | Approved | [Spec](PROJ-2-therapeuten-authentifizierung-workspace.md) | PROJ-1 | 2026-05-28 |
 | PROJ-3 | Patienten-Verwaltung (CRUD) | P0 | Planned | [Spec](PROJ-3-patienten-verwaltung.md) | PROJ-2 | 2026-05-28 |
 | PROJ-4 | Übungsdatenbank & Editor | P0 | Planned | [Spec](PROJ-4-uebungsdatenbank-editor.md) | PROJ-2 | 2026-05-28 |
 | PROJ-5 | Trainingsplan-Builder | P0 | Planned | [Spec](PROJ-5-trainingsplan-builder.md) | PROJ-3, PROJ-4 | 2026-05-28 |
