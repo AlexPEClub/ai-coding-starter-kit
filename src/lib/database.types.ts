@@ -15,6 +15,7 @@ export interface Database {
           name: string
           slug: string
           plan: 'trial' | 'pro' | 'enterprise'
+          logo_url: string | null
           created_at: string
         }
         Insert: {
@@ -22,6 +23,7 @@ export interface Database {
           name: string
           slug: string
           plan?: 'trial' | 'pro' | 'enterprise'
+          logo_url?: string | null
           created_at?: string
         }
         Update: {
@@ -29,6 +31,7 @@ export interface Database {
           name?: string
           slug?: string
           plan?: 'trial' | 'pro' | 'enterprise'
+          logo_url?: string | null
           created_at?: string
         }
         Relationships: []
@@ -40,6 +43,10 @@ export interface Database {
           tenant_id: string
           role: 'owner' | 'therapist' | 'client'
           full_name: string | null
+          first_name: string | null
+          last_name: string | null
+          phone: string | null
+          avatar_url: string | null
           created_at: string
         }
         Insert: {
@@ -48,6 +55,10 @@ export interface Database {
           tenant_id: string
           role: 'owner' | 'therapist' | 'client'
           full_name?: string | null
+          first_name?: string | null
+          last_name?: string | null
+          phone?: string | null
+          avatar_url?: string | null
           created_at?: string
         }
         Update: {
@@ -56,6 +67,10 @@ export interface Database {
           tenant_id?: string
           role?: 'owner' | 'therapist' | 'client'
           full_name?: string | null
+          first_name?: string | null
+          last_name?: string | null
+          phone?: string | null
+          avatar_url?: string | null
           created_at?: string
         }
         Relationships: [

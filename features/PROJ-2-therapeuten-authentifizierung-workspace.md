@@ -1,8 +1,8 @@
 # PROJ-2: Therapeuten-Authentifizierung & Workspace
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-05-29
-**Last Updated:** 2026-05-29
+**Last Updated:** 2026-05-31
 
 ## Dependencies
 - Requires: PROJ-1 (Supabase Multi-Tenant Infrastructure) — für Tenant-Isolation, Auth-Provider und Storage
@@ -106,7 +106,55 @@
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Architecture decisions (decided during /backend)
+
+| Decision | Rationale | Date |
+|----------|-----------|------|
+| Auth flows are client-side only (no API routes) | Supabase Auth JS SDK handles signUp/signIn/resetPassword natively; server route adds boilerplate without benefit | 2026-05-31 |
+| Image uploads direct to Supabase Storage from browser | No server bandwidth cost; size/type validated by storage bucket config (5 MB, jpg/png/webp) | 2026-05-31 |
+| `full_name` kept as derived field alongside `first_name` / `last_name` | Zero data loss; backward compatibility for any future queries using `full_name` | 2026-05-31 |
+| `/api/workspace` PUT checks `role = 'owner'` in application layer | RLS also enforces this via `tenants_update_owner_only` policy — two-layer defense | 2026-05-31 |
+
+### Implementation Notes
+
+**Migration 002 adds:**
+- `profiles`: `first_name`, `last_name`, `phone`, `avatar_url`
+- `tenants`: `logo_url`
+- RLS policy `tenants_update_owner_only` (owners only)
+- Storage buckets `profile-avatars` and `workspace-logos` with RLS
+- Updated `handle_new_user()` trigger to populate `first_name`/`last_name`
+
+**API Routes created:**
+- `GET/PUT /api/profile` — read/update own profile
+- `GET/PUT /api/workspace` — read/update workspace (owner-only writes)
+- `GET /api/auth/callback` — PKCE code exchange for password-reset emails
+
+**Proxy (`src/proxy.ts`)** — Next.js 16 uses `proxy.ts` instead of `middleware.ts`:
+- Protects `/dashboard`, `/patients`, `/appointments`, `/exercises`, `/training-plans`, `/settings`
+- Redirects unauthenticated users to `/login?next=<path>`
+- Redirects authenticated users away from auth pages to `/dashboard`
+
+**Storage path conventions:**
+- Profile avatars: `profile-avatars/{tenant_id}/{user_id}/avatar.{ext}`
+- Workspace logos: `workspace-logos/{tenant_id}/logo.{ext}`
+
+**Frontend pages built (2026-05-31):**
+- `/login` — Email + password login with generic error messages (no account enumeration)
+- `/register` — Practice name, first/last name, email, password → Supabase signUp with user_metadata
+- `/forgot-password` — Email form → Supabase resetPasswordForEmail; always shows success (no enumeration)
+- `/reset-password` — New password form → supabase.auth.updateUser; handles expired link errors
+- `/(app)/dashboard` — Server-rendered welcome page with practice name + placeholder metric cards
+- `/(app)/settings/profile` — Edit first/last name, phone; avatar upload direct to Supabase Storage
+- `/(app)/settings/workspace` — Edit practice name; logo upload direct to Supabase Storage (owners only)
+- `AppSidebar` component — Dark sage sidebar with navigation, user avatar dropdown, logout button
+- Root `/` — Server-side redirect to `/dashboard` or `/login` based on session
+
+**Design system applied:**
+- TierPhysio sage green (`hsl(154 26% 35%)`) as primary color
+- Inter + Outfit fonts loaded via `next/font/google`
+- Dark sidebar with `hsl(154 30% 14%)` background
+- ThemeProvider from `next-themes` for future dark mode toggle
 
 ## QA Test Results
 _To be added by /qa_
