@@ -88,6 +88,107 @@ export interface Database {
           },
         ]
       }
+      owners: {
+        Row: {
+          id: string
+          tenant_id: string
+          first_name: string
+          last_name: string
+          email: string | null
+          phone: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          first_name: string
+          last_name: string
+          email?: string | null
+          phone?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          first_name?: string
+          last_name?: string
+          email?: string | null
+          phone?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'owners_tenant_id_fkey'
+            columns: ['tenant_id']
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      patients: {
+        Row: {
+          id: string
+          tenant_id: string
+          owner_id: string
+          name: string
+          species: string
+          breed: string | null
+          birth_date: string | null
+          sex: 'male' | 'female' | 'male_neutered' | 'female_spayed' | 'unknown' | null
+          weight_kg: number | null
+          anamnesis: string | null
+          photo_url: string | null
+          status: 'active' | 'archived'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          owner_id: string
+          name: string
+          species: string
+          breed?: string | null
+          birth_date?: string | null
+          sex?: 'male' | 'female' | 'male_neutered' | 'female_spayed' | 'unknown' | null
+          weight_kg?: number | null
+          anamnesis?: string | null
+          photo_url?: string | null
+          status?: 'active' | 'archived'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          owner_id?: string
+          name?: string
+          species?: string
+          breed?: string | null
+          birth_date?: string | null
+          sex?: 'male' | 'female' | 'male_neutered' | 'female_spayed' | 'unknown' | null
+          weight_kg?: number | null
+          anamnesis?: string | null
+          photo_url?: string | null
+          status?: 'active' | 'archived'
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'patients_tenant_id_fkey'
+            columns: ['tenant_id']
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'patients_owner_id_fkey'
+            columns: ['owner_id']
+            referencedRelation: 'owners'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -110,5 +211,9 @@ export interface Database {
 // Convenience row types
 export type Tenant    = Database['public']['Tables']['tenants']['Row']
 export type Profile   = Database['public']['Tables']['profiles']['Row']
+export type Owner     = Database['public']['Tables']['owners']['Row']
+export type Patient   = Database['public']['Tables']['patients']['Row']
 export type UserRole  = Profile['role']
 export type TenantPlan = Tenant['plan']
+export type PatientSex = NonNullable<Patient['sex']>
+export type PatientStatus = Patient['status']
