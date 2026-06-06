@@ -15,7 +15,7 @@
 
 | ID | Feature | Status | Spec | Created |
 |----|---------|--------|------|---------|
-| PROJ-1 | Supabase Infrastructure Setup | Planned | [Spec](PROJ-1-supabase-infrastructure-setup.md) | 2026-06-05 |
+| PROJ-1 | Supabase Infrastructure Setup | Architected | [Spec](PROJ-1-supabase-infrastructure-setup.md) | 2026-06-05 |
 | PROJ-2 | Daily Suggestion Engine | Roadmap | — | 2026-06-05 |
 | PROJ-3 | Review & Approval Dashboard | Roadmap | — | 2026-06-05 |
 | PROJ-4 | Monday.com Task Auto-Creation | Roadmap | — | 2026-06-05 |

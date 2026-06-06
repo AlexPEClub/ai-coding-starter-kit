@@ -104,12 +104,79 @@
 | Kein Passwort-Reset im MVP | Stefan kennt sein Passwort; Feature kann in PROJ-6 nachgerüstet werden | 2026-06-06 |
 
 ### Technical Decisions
-_To be added by /architecture_
+| Decision | Rationale | Date |
+|----------|-----------|------|
+| `@supabase/ssr` statt `@supabase/auth-helpers-nextjs` | Offiziell empfohlen für Next.js App Router; verwaltet Sessions korrekt über Cookies (SSR + Middleware kompatibel) | 2026-06-06 |
+| Cookies statt localStorage für Sessions | `@supabase/ssr` verwendet Cookies — funktioniert in Middleware und Server Components; localStorage wäre nur clientseitig verfügbar | 2026-06-06 |
+| Next.js Middleware für Route-Schutz | Läuft auf dem Edge vor jedem Render — kein clientseitiges Flackern, kein kurzes Aufleuchten geschützter Seiten | 2026-06-06 |
+| EU-Region Frankfurt für Supabase | Nexora AI bedient Pharma/Healthcare im DACH-Raum — DSGVO erfordert EU-Hosting | 2026-06-06 |
+| RLS mit „nur Auth-Nutzer" Policy | Backend-Regeln fordern immer RLS. Policy erlaubt alle Operationen für eingeloggte Nutzer — schützt DB ohne Multi-Tenant-Komplexität | 2026-06-06 |
+| Service Role Key serverseitig | Für PROJ-2 Suggestion Engine nötig — schreibt ohne User-Context in die DB | 2026-06-06 |
+| Nutzer manuell im Supabase Dashboard anlegen | Single-User-App, kein Sign-up in der App. Stefan wird einmalig in der Supabase-Konsole angelegt | 2026-06-06 |
 
 ---
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Komponenten-Struktur
+
+```
+App (Next.js App Router)
+│
+├── middleware.ts                      ← NEU: läuft vor jedem Request auf dem Edge
+│   └── Session prüfen → fehlt? → Redirect zu /login
+│
+├── /login                             ← Öffentliche Route (kein Auth nötig)
+│   └── LoginPage
+│       ├── Branding (NEXORA AI Logo + NORA-Status-Badge)
+│       └── LoginForm
+│           ├── Input — E-Mail         (shadcn/ui — bereits installiert)
+│           ├── Input — Passwort       (shadcn/ui — bereits installiert)
+│           ├── Button — Anmelden      (shadcn/ui — bereits installiert)
+│           └── Alert — Fehlermeldung  (shadcn/ui — bereits installiert)
+│
+└── /dashboard, /history, /settings   ← Geschützte Routen (PROJ-3 baut hier auf)
+    └── [Middleware leitet zu /login wenn keine Session]
+```
+
+### Datenebene
+
+```
+Supabase Projekt (EU-Region — Frankfurt, DSGVO-konform)
+│
+├── Auth — Email + Passwort
+│   └── 1 Nutzer: billichstefan@gmail.com
+│       (einmalig manuell im Supabase Dashboard anlegen — kein App-Sign-up)
+│
+├── Tabelle: suggestions
+│   └── RLS Policy: nur eingeloggte Nutzer dürfen lesen / schreiben
+│
+├── Tabelle: implementations
+│   └── RLS Policy: nur eingeloggte Nutzer dürfen lesen / schreiben
+│
+└── Tabelle: daily_reports
+    └── RLS Policy: nur eingeloggte Nutzer dürfen lesen / schreiben
+```
+
+### Neue / geänderte Dateien
+
+```
+src/
+├── lib/
+│   ├── supabase.ts           ← ÄNDERN: Browser-Client aktivieren (war Platzhalter)
+│   └── supabase-server.ts    ← NEU: Server-Client für SSR + Server Actions
+├── middleware.ts              ← NEU: Route-Schutz für alle Seiten außer /login
+└── app/
+    └── login/
+        └── page.tsx           ← NEU: Login-Seite (Dark Premium Design)
+```
+
+### Pakete
+
+| Paket | Zweck | Status |
+|-------|-------|--------|
+| `@supabase/supabase-js` | Supabase-Client | ✅ installiert (v2.39.3) |
+| `@supabase/ssr` | Cookie-Sessions für Next.js App Router + Middleware | ❌ noch installieren |
 
 ## QA Test Results
 _To be added by /qa_
