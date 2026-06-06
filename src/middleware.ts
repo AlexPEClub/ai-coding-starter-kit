@@ -23,8 +23,22 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
   const isLoginPage = request.nextUrl.pathname === '/login'
+
+  let user = null
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch {
+    // Supabase nicht erreichbar — kein White Screen erzwingen.
+    // Auf der Login-Seite normal weitermachen; geschützte Seiten zur Login-Seite leiten.
+    if (!isLoginPage) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      return NextResponse.redirect(url)
+    }
+    return supabaseResponse
+  }
 
   if (!user && !isLoginPage) {
     const url = request.nextUrl.clone()
