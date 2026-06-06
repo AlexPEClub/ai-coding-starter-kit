@@ -179,7 +179,74 @@ src/
 | `@supabase/ssr` | Cookie-Sessions für Next.js App Router + Middleware | ❌ noch installieren |
 
 ## QA Test Results
-_To be added by /qa_
+
+**Getestet am:** 2026-06-06
+**Tester:** QA Engineer (Claude)
+**Test-Umgebung:** Next.js Dev-Server (Port 3100) mit Dummy-Env-Variablen + statische Code-Analyse
+**Einschränkung:** Browser-basierte E2E-Tests konnten nicht ausgeführt werden — der Playwright-Chromium-Download wird von der Netzwerk-Policy der Cloud-Umgebung blockiert. HTTP-Verhalten wurde stattdessen mit curl gegen den laufenden Dev-Server verifiziert. Live-Login-Tests benötigen echte Supabase-Credentials + Test-Nutzer.
+
+### Akzeptanzkriterien
+
+| # | Kriterium | Ergebnis | Methode |
+|---|-----------|----------|---------|
+| AC1 | Nicht eingeloggt → Redirect zu /login | ✅ PASS | curl: `/`, `/dashboard`, `/settings` → alle 307 → /login; `/login` → 200 |
+| AC2 | Login mit gültigen Daten → Dashboard | ⏳ NICHT TESTBAR | Benötigt echte Credentials. Logik per Code-Review korrekt (`signInWithPassword` + Redirect bei `data.session`) |
+| AC3 | Falsche Daten → klare Fehlermeldung | ✅ PASS (Code-Review) | Login-Page fängt Error ab → „E-Mail oder Passwort ungültig." Kein Stack-Trace. E2E geschrieben |
+| AC4 | Session-Persistenz nach Browser-Neustart | ⏳ NICHT TESTBAR | `@supabase/ssr` nutzt Cookies — Logik korrekt. E2E geschrieben (skip bis Credentials) |
+| AC5 | „Abmelden" → Session beendet → /login | ❌ FAIL | **Kein Abmelden-Mechanismus implementiert** (siehe Bug #1) |
+| AC6 | Supabase-Verbindung schlägt fehl → nutzerfreundlicher Fehler | ⚠️ TEILWEISE | Login-Page: ✅ („Verbindungsfehler"). Middleware: ❌ kein try/catch um `getUser()` (siehe Bug #2) |
+| AC7 | Schema deployed → Vorschlag in `suggestions` abrufbar | ⏳ NICHT TESTBAR | SQL-Schema per Review korrekt (alle Pflichtfelder, CHECK-Constraints). Benötigt Live-DB |
+| AC8 | Implementation ↔ suggestion via `suggestion_id` | ✅ PASS (Review) | FK `REFERENCES suggestions(id) ON DELETE CASCADE` korrekt |
+| AC9 | Fehlende Env-Variablen → klarer Fehler (fail fast) | ✅ PASS | 3 Unit-Tests grün — `createClient()` wirft mit Variablenname |
+
+**Zusammenfassung:** 4 PASS · 1 TEILWEISE · 1 FAIL · 3 nicht live testbar (Logik per Review ok)
+
+### Edge Cases
+
+| Edge Case | Ergebnis |
+|-----------|----------|
+| Leeres Login-Formular → Button deaktiviert | ✅ PASS (`disabled`-Attribut bei leeren Feldern verifiziert) |
+| Netzwerkfehler beim Login → Fehlermeldung, Eingabe bleibt | ✅ PASS (Code-Review: `finally`-Block, kein Reset der Felder) |
+| Fehlende Env-Variablen → fail fast | ✅ PASS (Unit-Test) |
+| Doppelter Report pro Datum → DB-Constraint | ✅ PASS (Review: `report_date DATE NOT NULL UNIQUE`) |
+
+### Security Audit (Red Team)
+
+| Prüfung | Ergebnis |
+|---------|----------|
+| Service-Role-Key im Client-HTML? | ✅ Nicht vorhanden |
+| Service-Role-Key in statischen JS-Chunks? | ✅ Nicht vorhanden |
+| Anon-Key (NEXT_PUBLIC) exponiert? | ✅ Erwartet & sicher (nur Anon-Key, nicht Service-Key) |
+| RLS auf allen 3 Tabellen aktiviert? | ✅ `ENABLE ROW LEVEL SECURITY` auf allen Tabellen |
+| RLS-Policies für SELECT/INSERT/UPDATE? | ✅ Vorhanden (auth.uid() IS NOT NULL) |
+| ⚠️ Hinweis: `createServiceRoleClient` ohne `server-only`-Schutz | Empfehlung Bug #3 |
+
+### Gefundene Bugs
+
+**Bug #1 — AC5: Kein Abmelden-Mechanismus (Severity: Medium)**
+- Es existiert nirgends ein „Abmelden"-Button oder `supabase.auth.signOut()`-Aufruf.
+- AC5 ist damit nicht erfüllbar. Das Dashboard ist nur ein Platzhalter (PROJ-3).
+- **Empfehlung:** Entweder minimalen Logout in PROJ-1 ergänzen ODER AC5 bewusst nach PROJ-3 (Dashboard) verschieben, wo die UI dafür entsteht. Architektur-Entscheidung nötig.
+
+**Bug #2 — AC6: Middleware ohne Fehlerbehandlung (Severity: Medium)**
+- `src/middleware.ts` ruft `await supabase.auth.getUser()` ohne try/catch auf.
+- Ist Supabase nicht erreichbar, kann die Middleware eine Exception werfen → Next.js-Fehlerseite statt nutzerfreundlicher Meldung. AC6 fordert explizit „kein weißer Screen".
+- **Empfehlung:** `getUser()` in try/catch kapseln; bei Fehler kontrolliert handeln (z.B. Durchlass zur Login-Seite oder Wartungs-Banner).
+
+**Bug #3 — Service-Role-Client ohne `server-only`-Schutz (Severity: Low)**
+- `createServiceRoleClient` in `supabase-server.ts` ist technisch importierbar aus Client-Code. Der Key wäre dort zwar `undefined` (kein Leak, da nicht NEXT_PUBLIC), aber als Defense-in-Depth sollte das `server-only`-Paket importiert werden, um versehentliche Client-Imports zur Build-Zeit zu verhindern.
+
+**Bug #4 — `middleware`-Datei-Konvention deprecated (Severity: Low)**
+- Next.js 16 warnt: „The `middleware` file convention is deprecated. Please use `proxy` instead." Funktioniert aktuell, sollte aber vor einem späteren Next-Update migriert werden.
+
+### Automatisierte Tests
+
+- **Unit-Tests:** `src/lib/supabase.test.ts` — 3 Tests, alle grün (`npm test`)
+- **E2E-Tests:** `tests/PROJ-1-supabase-infrastructure.spec.ts` — 10 Tests geschrieben (parsen korrekt via `playwright test --list`), 3 davon `skip` bis echte Credentials vorhanden. Ausführung blockiert durch fehlenden Browser-Download in der Cloud-Umgebung.
+
+### Production-Ready-Empfehlung: ⚠️ NOCH NICHT
+
+Keine **kritischen** Bugs, aber **2 Medium-Bugs** (AC5 Abmelden, AC6 Middleware-Fehlerbehandlung) sollten vor dem Deploy adressiert oder bewusst akzeptiert/verschoben werden. AC5 ist eine Scoping-Frage (gehört Logout zu PROJ-1 oder PROJ-3?).
 
 ## Deployment
 _To be added by /deploy_
