@@ -1,14 +1,16 @@
-// Supabase Client Setup
-// Uncomment this file when you're ready to use Supabase
+import { createBrowserClient } from '@supabase/ssr'
 
-/*
-import { createClient } from '@supabase/supabase-js'
+export function createClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  if (!url || !key) {
+    throw new Error(
+      'Fehlende Supabase Umgebungsvariablen:\n' +
+      (!url ? '  - NEXT_PUBLIC_SUPABASE_URL\n' : '') +
+      (!key ? '  - NEXT_PUBLIC_SUPABASE_ANON_KEY\n' : '')
+    )
+  }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-*/
-
-// For now, export a placeholder to avoid import errors
-export const supabase = null;
+  return createBrowserClient(url, key)
+}
