@@ -1,6 +1,6 @@
 # PROJ-3: Review & Approval Dashboard
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-06-06
 **Last Updated:** 2026-06-06
 
@@ -158,7 +158,63 @@ src/app/actions/
 Keine. Alle shadcn-Komponenten bereits installiert: `Badge`, `Card`, `Button`, `Collapsible`, `Skeleton`, `Sonner`. Einzige Ergänzung: `<Toaster />` in `src/app/layout.tsx`.
 
 ## QA Test Results
-_To be added by /qa_
+
+**Getestet am:** 2026-06-07
+**Methode:** Code-Level-Audit gegen alle Acceptance Criteria + Security Review + automatisierte Unit-Tests. Live-E2E-Ausführung in dieser Cloud-Umgebung nicht möglich (keine Supabase-Credentials → Dev-Server startet nicht; identische Einschränkung wie PROJ-1). E2E-Tests sind geschrieben und mit `test.skip` hinterlegt, bis Test-Nutzer + Seed-Daten vorhanden sind.
+
+### Automatisierte Tests
+- **Unit-Tests:** 10/10 grün (`npm test`) — davon 7 für die Server Action `updateSuggestionStatus`
+- **Build:** `npm run build` erfolgreich, keine TypeScript-Fehler
+- **E2E:** 1 aktiver Test (Route-Schutz /dashboard → /login), 10 `test.skip` (benötigen Login + Seed-Daten)
+
+### Acceptance Criteria
+
+| # | Kriterium | Ergebnis |
+|---|-----------|----------|
+| 1 | Alle pending-Vorschläge, gruppiert nach Kategorie | ✅ Pass (Code) |
+| 2 | Ältere Tage zeigen report_date, heute kein Datum | ✅ Pass (Code) |
+| 3 | Zähler `X offen · Y bestätigt · Z abgelehnt` | ✅ Pass (Code) |
+| 4 | Empty State „Alle Vorschläge bearbeitet…" | ✅ Pass (Code) |
+| 5 | Karte: Badge, Titel, Body, 2 Buttons | ✅ Pass (Code) |
+| 6 | Insight + Source aufklappbar | ✅ Pass (Code) |
+| 7 | Bestätigen: Lade-Zustand, Karte ändert sich erst nach DB-Bestätigung | ✅ Pass (Code) |
+| 8 | Ablehnen: pessimistisch, erst nach DB-Bestätigung | ✅ Pass (Code) |
+| 9 | Nach Aktion: neuer Zustand + Rückgängig-Link | ✅ Pass (Code) |
+| 10 | Rückgängig → zurück auf pending | ✅ Pass (Code) |
+| 11 | Nach Reload verschwinden bearbeitete Karten | ✅ Pass (Code) |
+| 12 | DB-Fehler → Toast, Karte bleibt pending | ✅ Pass (Code) |
+| 13 | Nicht eingeloggt → Redirect zu /login | ✅ Pass (Middleware, PROJ-1) |
+| 14 | Mobile 1 Spalte, Desktop 2–3 Spalten | ✅ Pass (Code: `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`) |
+
+**Ergebnis: 14/14 Acceptance Criteria auf Code-Ebene erfüllt.**
+
+### Security Audit (Red Team)
+
+| Prüfung | Ergebnis |
+|---------|----------|
+| Auth-Bypass | ✅ Doppelte Absicherung: Server Action prüft `getUser()` + RLS-Policy `auth.uid() IS NOT NULL` |
+| Input-Injection (status) | ✅ Zod-Enum-Whitelist (`approved`/`rejected`/`pending`) |
+| Input-Injection (id) | ✅ Zod-UUID-Validierung vor DB-Zugriff |
+| SQL-Injection | ✅ Supabase parametrisiert alle Queries |
+| XSS | ✅ Titel/Body über React gerendert (auto-escaped), kein `dangerouslySetInnerHTML` |
+| Secrets-Exposure | ✅ Server Action läuft serverseitig; Service-Role-Key nicht verwendet (Cookie-Client mit RLS) |
+
+### Gefundene Bugs
+
+| # | Severity | Beschreibung | Status |
+|---|----------|-------------|--------|
+| 1 | Low | `today` wird in UTC berechnet (`toISOString`). Um Mitternacht (CET/CEST) kann das Datum-Badge für „heutige" Vorschläge kurzzeitig falsch erscheinen. | Offen — akzeptabel für MVP |
+| 2 | Low | „mehr anzeigen"-Link basiert auf `body.length > 200`, die visuelle Kürzung auf `line-clamp-3`. Bei schmalen Viewports können beide leicht auseinanderlaufen (Link sichtbar ohne Kürzung oder umgekehrt). | Offen — kosmetisch |
+| 3 | Info | RLS-Policy erlaubt jedem eingeloggten Nutzer Updates auf jeden Vorschlag (kein owner-scoping). Per Spec Single-User → akzeptabel. Vor Multi-User (Out of Scope) zu härten. | Dokumentiert |
+| 4 | Info | Keine Rate-Limitierung auf der Server Action. Single-User, geringes Risiko. | Dokumentiert |
+
+**Keine Critical- oder High-Bugs.**
+
+### Produktionsreife-Entscheidung: ✅ READY
+
+Alle 14 Acceptance Criteria auf Code-Ebene erfüllt, keine Critical/High-Bugs, Security-Audit bestanden. Die 4 gefundenen Punkte sind Low/Informational und blockieren kein Deployment.
+
+**Empfehlung vor Live-Gang:** Test-Nutzer in Supabase anlegen + Seed-Daten in `suggestions` einfügen, dann die 10 geskippten E2E-Tests aktivieren, um die Interaktionen (Bestätigen/Ablehnen/Rückgängig) gegen die echte DB zu verifizieren.
 
 ## Deployment
 _To be added by /deploy_
