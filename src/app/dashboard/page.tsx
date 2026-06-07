@@ -11,6 +11,7 @@ export default async function DashboardPage() {
     .select('id, title, body, insight, source, category, status, report_date')
     .order('report_date', { ascending: false })
     .order('created_at', { ascending: true })
+    .limit(500)
 
   const suggestions = (data ?? []) as Suggestion[]
 
