@@ -1,6 +1,6 @@
 # PROJ-4: Monday.com Task Auto-Creation
 
-## Status: Planned
+## Status: Architected
 **Created:** 2026-06-07
 **Last Updated:** 2026-06-07
 
@@ -78,12 +78,93 @@
 | Board-ID in Supabase `app_config` statt Env-Var | Kein Redeployment nach erster Board-Erstellung nötig; Board-ID ist Laufzeit-Zustand | 2026-06-07 |
 
 ### Technical Decisions
-_To be added by /architecture_
+| Decision | Rationale | Date |
+|----------|-----------|------|
+| Raw `fetch` statt Monday SDK (`monday-sdk-js`) | Monday.com GraphQL ist einfach genug für direkten `fetch`-Aufruf; kein zusätzliches npm-Paket, keine Bundle-Vergrößerung | 2026-06-07 |
+| `app_config`-Tabelle in Supabase statt Env-Var für Board-ID | Board-ID ist Laufzeit-Zustand (wird erst bei erstem Lauf bekannt); Env-Var würde Redeployment nach Board-Erstellung erfordern | 2026-06-07 |
+| Monday-Task zuerst, dann Supabase-Update | Verhindert `approved`-Zustand ohne Monday-Task; bei Monday-Fehler bleibt DB sauber auf `pending` | 2026-06-07 |
+| Kein neues UI-Komponent — nur Toast-Link in bestehender `SuggestionCard` | PROJ-4 ist rein backend-seitig; die UI-Oberfläche ändert sich minimal | 2026-06-07 |
+| Keine Speicherung der Monday-Task-URL in Supabase für MVP | URL wird nur im Toast gezeigt; persistente Speicherung kommt in PROJ-6 (Implementation Tracking) | 2026-06-07 |
+| Neue `src/lib/monday.ts` — eigene Datei, nicht in `anthropic.ts` | Klare Trennung der externen Dienste; leichter testbar und austauschbar | 2026-06-07 |
 
 ---
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Komponenten-Struktur
+
+Keine neuen UI-Seiten oder -Komponenten. Änderungen sind fast vollständig backend-seitig — nur der Toast in der bestehenden `SuggestionCard` erhält einen Link.
+
+```
+Dashboard (bestehend — unverändert)
+└── SuggestionCard (bestehend — Toast-Link ergänzen)
+    └── "Bestätigen"-Button
+        └── updateSuggestionStatus() [Server Action — ERWEITERT]
+            ├── 1. Monday: Board suchen oder erstellen
+            │       └── app_config-Tabelle (Supabase) — Board-ID lesen/schreiben
+            ├── 2. Monday: Gruppe suchen oder erstellen (Marketing/Produkt/Operations)
+            ├── 3. Monday: Task anlegen (Titel → Task-Name)
+            ├── 4. Monday: Update-Nachricht hinzufügen (Body + Insight + Quelle)
+            ├── 5. Supabase: suggestions.status → 'approved'
+            └── Rückgabe: { monday_task_url }
+```
+
+### Neue Dateien
+
+| Datei | Zweck |
+|---|---|
+| `src/lib/monday.ts` | Monday.com GraphQL-Client — alle API-Calls an Monday |
+| Supabase Migration | `app_config`-Tabelle anlegen (Key-Value-Store) |
+
+### Geänderte Dateien
+
+| Datei | Änderung |
+|---|---|
+| `src/app/actions/suggestions.ts` | `updateSuggestionStatus` um Monday-Logik erweitern |
+| `src/app/dashboard/suggestion-card.tsx` | Toast mit klickbarem Link wenn `monday_task_url` zurückkommt |
+
+### Datenbankänderungen
+
+**Neue Tabelle: `app_config`** (Key-Value-Store für Laufzeitkonfiguration)
+
+```
+app_config
+├── key         Text (Primärschlüssel) — z. B. "monday_board_id"
+├── value       Text                  — z. B. "12345678"
+└── updated_at  Timestamp
+```
+
+Keine neue Spalte in `suggestions` für MVP — Monday-Task-URL wird nur im Toast gezeigt, nicht dauerhaft gespeichert (kommt in PROJ-6).
+
+### Ablauf
+
+```
+Stefan klickt "Bestätigen"
+       │
+       ├─ MONDAY_API_KEY vorhanden? → Nein → Toast "nicht konfiguriert", Abbruch
+       │
+       ├─ Board-ID aus app_config lesen
+       │   ├─ Vorhanden → Board in Monday prüfen
+       │   │   ├─ Existiert → weiter
+       │   │   └─ Gelöscht → Board neu erstellen, ID speichern
+       │   └─ Nicht vorhanden → Board + Gruppen erstellen, ID speichern
+       │
+       ├─ Passende Gruppe suchen → nicht vorhanden → erstellen
+       ├─ Task anlegen (Titel, max. 255 Zeichen)
+       ├─ Update-Nachricht hinzufügen (Body + 💡 Insight + 📎 Quelle)
+       ├─ Supabase: suggestions.status → 'approved'
+       └─ Toast: "✓ Task erstellt" + Link zur Monday-Task-URL
+```
+
+### Neue Umgebungsvariable
+
+| Variable | Zweck |
+|---|---|
+| `MONDAY_API_KEY` | Monday.com Personal API Token — nur server-seitig, nie `NEXT_PUBLIC_` |
+
+### Abhängigkeiten
+
+Keine neuen npm-Pakete. Monday.com GraphQL wird mit Standard-`fetch` aufgerufen.
 
 ## QA Test Results
 _To be added by /qa_
