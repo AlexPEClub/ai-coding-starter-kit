@@ -1,6 +1,6 @@
 # PROJ-2: Daily Suggestion Engine
 
-## Status: Planned
+## Status: Architected
 **Created:** 2026-06-07
 **Last Updated:** 2026-06-07
 
@@ -71,10 +71,10 @@
 - **Kosten**: 30-Tage-Kontext begrenzt die Token-Menge; ein Lauf pro Tag
 
 ## Open Questions
-- [ ] Welches Claude-Modell wird verwendet (Kosten vs. Qualität)? → Entscheidung in `/architecture`
-- [ ] Genaues Antwortformat von Claude (JSON-Schema für die Vorschläge)? → `/architecture`
-- [ ] Wird der manuelle Trigger zusätzlich durch das Cron-Secret oder rein durch Login geschützt? → `/architecture`
-- [ ] Zeitzone des 07:00-Cron (UTC vs. CET/CEST)? → `/architecture`
+- [x] Welches Claude-Modell wird verwendet? → **Opus 4.8** (`claude-opus-4-8`) — beste Qualität, Kosten bei 1 Lauf/Tag vernachlässigbar
+- [x] Genaues Antwortformat von Claude? → **Structured Outputs** (`output_config.format` mit JSON-Schema), validierte Vorschlags-Liste
+- [x] Endpunkt-Schutz? → **Cron-Secret (Bearer) ODER eingeloggte Session** — ein Endpunkt, zwei Auth-Wege
+- [x] Cron-Zeitzone? → **06:00 UTC** (Vercel-Cron läuft in UTC; ≈ 07:00–08:00 deutsche Zeit je nach Sommerzeit)
 
 ## Decision Log
 
@@ -92,12 +92,63 @@
 | Ein geschützter Endpunkt für Cron UND „Jetzt generieren"-Button | Kein doppelter Code; bequemes Testen/Nachholen | 2026-06-07 |
 
 ### Technical Decisions
-_To be added by /architecture_
+| Decision | Rationale | Date |
+|----------|-----------|------|
+| Offizielles `@anthropic-ai/sdk` als Claude-Client | Standard für Next.js/TypeScript, typsicher | 2026-06-07 |
+| Modell: Opus 4.8 (`claude-opus-4-8`) | Höchste strategische Qualität; bei 1 Lauf/Tag Kosten vernachlässigbar | 2026-06-07 |
+| Structured Outputs (`output_config.format` + JSON-Schema) | Claude liefert garantiert valide Vorschläge mit allen Pflichtfeldern; kein Parsing-Risiko | 2026-06-07 |
+| Service-Role-Client für DB-Schreibzugriff | Cron-Lauf hat keine User-Session; Key bereits in PROJ-1 vorbereitet | 2026-06-07 |
+| Endpunkt-Schutz: Cron-Secret (Bearer) ODER eingeloggte Session | Vercel-Cron nutzt Secret, Button nutzt Session — ein Endpunkt, zwei Auth-Wege | 2026-06-07 |
+| Cron um 06:00 UTC via `vercel.json` | Vercel-Cron läuft in UTC; fester Zeitpunkt, DST-Verschiebung akzeptiert | 2026-06-07 |
+| Neue Env-Vars: `ANTHROPIC_API_KEY`, `CRON_SECRET` | API-Zugang + Endpunkt-Schutz, beide server-seitig | 2026-06-07 |
 
 ---
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Komponenten-Struktur
+
+```
+src/app/api/generate-suggestions/
+  route.ts                 (Geschützter POST-Endpunkt — Cron + Button rufen ihn auf)
+
+src/lib/
+  anthropic.ts             (Claude-Client + Generierungs-Logik mit Retry)
+  nora-context.ts          (Fester Firmen-Kontext über Nexora AI — die "Wissensbasis")
+
+src/app/dashboard/
+  generate-button.tsx      ("Jetzt generieren"-Button, oben rechts neben Logout)
+
+vercel.json                (Cron-Job-Definition: täglich 06:00 UTC)
+```
+
+### Datenfluss
+
+```
+Auslöser A: Vercel Cron (täglich 06:00 UTC)   Auslöser B: Stefan klickt "Jetzt generieren"
+        │                                             │
+        └─────────────────┬───────────────────────────┘
+                          ▼
+   POST /api/generate-suggestions  (prüft: gültiges Cron-Secret ODER eingeloggte Session)
+                          │
+                          ├─ 1. Existiert heute schon ein "sent"-Report? → Ja: abbrechen (Doppellauf-Schutz)
+                          ├─ 2. Lade letzte ~30 Tage Vorschläge (Wiederholungs-Kontext)
+                          ├─ 3. Claude API (Opus 4.8): Firmen-Kontext + Historie → 3–5 Vorschläge (JSON)
+                          │      (bei Fehler: 2–3 Retries mit kurzer Pause)
+                          ├─ 4a. Erfolg → Vorschläge speichern (status pending) + daily_report "sent"
+                          └─ 4b. Endgültiger Fehler → daily_report "failed", nichts gespeichert
+```
+
+### Datenmodell
+Keine neuen Tabellen — nutzt die bestehenden `suggestions` + `daily_reports` aus PROJ-1.
+NORA befüllt pro Vorschlag: `title`, `body`, `insight`, `source`, `category`, `report_date`, `status='pending'`.
+
+### Neue Packages
+- `@anthropic-ai/sdk` — offizieller Claude-Client (1 neues Package)
+
+### Neue Umgebungsvariablen
+- `ANTHROPIC_API_KEY` — Claude-API-Schlüssel (server-seitig, nie `NEXT_PUBLIC_`)
+- `CRON_SECRET` — geheimer Token für den Cron-Aufruf des Endpunkts
 
 ## QA Test Results
 _To be added by /qa_
