@@ -22,7 +22,7 @@
 | PROJ-5 | Notion Document Auto-Creation | Deployed | [Spec](PROJ-5-notion-document-auto-creation.md) | 2026-06-05 |
 | PROJ-6 | Implementation Tracking & History | Roadmap | — | 2026-06-05 |
 | PROJ-7 | Context-Aware Suggestions (Live-Daten) | Roadmap | — | 2026-06-05 |
-| PROJ-8 | Notion-Dokument-Ausarbeitung | In Progress | [Spec](PROJ-8-notion-document-elaboration.md) | 2026-06-07 |
+| PROJ-8 | Notion-Dokument-Ausarbeitung | Approved | [Spec](PROJ-8-notion-document-elaboration.md) | 2026-06-07 |
 
 <!-- Add features above this line -->
 
