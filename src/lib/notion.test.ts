@@ -3,6 +3,7 @@ import {
   fetchDatabase,
   createNoraBizDevDatabase,
   createPage,
+  normalizeNotionId,
   CATEGORY_TO_NOTION,
 } from './notion'
 
@@ -10,7 +11,8 @@ const TEST_KEY = 'secret_testkey123'
 const TEST_DB_ID = 'db-aabbccdd-1234-5678-90ab-cdef01234567'
 const TEST_PAGE_ID = 'page-aabbccdd-1234-5678-90ab-cdef01234567'
 const TEST_PAGE_URL = 'https://www.notion.so/Test-Seite-aabbccdd'
-const TEST_PARENT_ID = 'parent-aabbccdd-1234-5678-90ab-cdef01234567'
+const TEST_PARENT_ID = 'aabbccdd112233445566778899aabbcc'
+const TEST_PARENT_ID_UUID = 'aabbccdd-1122-3344-5566-778899aabbcc'
 
 function mockFetch(response: unknown, status = 200) {
   return vi.spyOn(global, 'fetch').mockResolvedValue({
@@ -19,6 +21,40 @@ function mockFetch(response: unknown, status = 200) {
     json: () => Promise.resolve(response),
   } as Response)
 }
+
+describe('normalizeNotionId', () => {
+  const EXPECTED = '32a3c7c0-25d9-80f8-b069-d827abcdef01'
+
+  it('formatiert rohe 32-stellige Hex-ID als UUID', () => {
+    expect(normalizeNotionId('32a3c7c025d980f8b069d827abcdef01')).toBe(EXPECTED)
+  })
+
+  it('lässt bereits gestrichelte UUID unverändert', () => {
+    expect(normalizeNotionId(EXPECTED)).toBe(EXPECTED)
+  })
+
+  it('extrahiert die ID aus einer vollen Notion-URL', () => {
+    expect(
+      normalizeNotionId('https://www.notion.so/Nora-32a3c7c025d980f8b069d827abcdef01')
+    ).toBe(EXPECTED)
+  })
+
+  it('extrahiert die ID aus einer app.notion.com/p-URL', () => {
+    expect(
+      normalizeNotionId('https://app.notion.com/p/Nora-32a3c7c025d980f8b069d827abcdef01')
+    ).toBe(EXPECTED)
+  })
+
+  it('ignoriert Query-Parameter (z.B. ?v=...)', () => {
+    expect(
+      normalizeNotionId('https://www.notion.so/Nora-32a3c7c025d980f8b069d827abcdef01?pvs=4')
+    ).toBe(EXPECTED)
+  })
+
+  it('gibt den Originalwert zurück wenn keine 32-Hex-ID gefunden wird', () => {
+    expect(normalizeNotionId('kein-gültiger-wert')).toBe('kein-gültiger-wert')
+  })
+})
 
 describe('notion.ts — API Client', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -79,11 +115,18 @@ describe('notion.ts — API Client', () => {
       expect(result).toEqual({ id: TEST_DB_ID })
     })
 
-    it('setzt parent auf die übergebene Parent-Page-ID', async () => {
+    it('setzt parent auf die normalisierte Parent-Page-ID (UUID-Format)', async () => {
       const spy = mockFetch({ id: TEST_DB_ID })
       await createNoraBizDevDatabase(TEST_KEY, TEST_PARENT_ID)
       const body = JSON.parse(spy.mock.calls[0][1]?.body as string)
-      expect(body.parent).toEqual({ type: 'page_id', page_id: TEST_PARENT_ID })
+      expect(body.parent).toEqual({ type: 'page_id', page_id: TEST_PARENT_ID_UUID })
+    })
+
+    it('normalisiert eine volle Notion-URL als Parent-Page-ID', async () => {
+      const spy = mockFetch({ id: TEST_DB_ID })
+      await createNoraBizDevDatabase(TEST_KEY, `https://app.notion.com/p/Nora-${TEST_PARENT_ID}`)
+      const body = JSON.parse(spy.mock.calls[0][1]?.body as string)
+      expect(body.parent.page_id).toBe(TEST_PARENT_ID_UUID)
     })
 
     it('enthält alle vier Properties (Name, Kategorie, Datum, Monday-Task-Link)', async () => {

@@ -7,6 +7,23 @@ export const CATEGORY_TO_NOTION: Record<string, string> = {
   operations: 'Operations',
 }
 
+/**
+ * Normalisiert eine Notion-Page-/Database-ID. Akzeptiert:
+ * - rohe 32-stellige Hex-ID (`32a3c7c0...`)
+ * - gestrichelte UUID (`32a3c7c0-25d9-...`)
+ * - volle Notion-URL (`https://www.notion.so/Titel-32a3c7c0...?v=...`)
+ * Gibt die als UUID formatierte ID zurück (8-4-4-4-12).
+ * Bei unerwartetem Format wird der Originalwert zurückgegeben (Notion validiert dann).
+ */
+export function normalizeNotionId(input: string): string {
+  const withoutQuery = input.split(/[?#]/)[0]
+  const lastSegment = withoutQuery.split('/').pop() ?? ''
+  // Notion trennt Slug und ID mit einem Bindestrich; die ID sind die letzten 32 Hex-Zeichen.
+  const raw = lastSegment.replace(/-/g, '').slice(-32)
+  if (!/^[0-9a-fA-F]{32}$/.test(raw)) return input
+  return `${raw.slice(0, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}-${raw.slice(16, 20)}-${raw.slice(20)}`
+}
+
 function notionHeaders(apiKey: string): Record<string, string> {
   return {
     'Content-Type': 'application/json',
@@ -50,7 +67,7 @@ export async function createNoraBizDevDatabase(
   parentPageId: string
 ): Promise<{ id: string }> {
   const data = await notionPost<{ id: string }>(apiKey, '/databases', {
-    parent: { type: 'page_id', page_id: parentPageId },
+    parent: { type: 'page_id', page_id: normalizeNotionId(parentPageId) },
     title: [{ type: 'text', text: { content: DB_NAME } }],
     properties: {
       Name: { title: {} },
