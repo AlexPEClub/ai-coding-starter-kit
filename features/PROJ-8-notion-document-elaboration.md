@@ -60,8 +60,8 @@ Die Ausarbeitung passiert **on-demand bei der Bestätigung** (kein Vorab-Lauf f�
 - Markenkontext: `NORA_COMPANY_CONTEXT` (PROJ-2) muss in den Ausarbeitungs-Prompt einfließen, damit Ton & Fachlichkeit stimmen.
 
 ## Open Questions
-- [ ] Maximale Länge/Tiefe je Dokumenttyp — soll es weiche Ziellängen geben (z. B. LinkedIn-Post ~150–250 Wörter, Strategie-Dok länger), oder überlassen wir das ganz Claude? (Architektur/Implementierung kann hier einen sinnvollen Default setzen.)
-- [ ] Soll der Monday-Task einen Hinweis/Link erhalten, dass das ausgearbeitete Dokument in Notion liegt? (Heute trägt die Notion-Seite den Monday-Link — Rückrichtung optional.)
+- [x] Maximale Länge/Tiefe je Dokumenttyp → **Entschieden (Architektur):** weiche Ziellängen als Prompt-Empfehlung je Kategorie (Marketing ~200–250 W, Produkt ~400–500 W, Operations ~300–400 W, Default ~300 W), keine technische Erzwingung.
+- [x] Monday-Task Rücklink auf Notion → **Entschieden (Architektur):** nicht in PROJ-8. Notion-Seite trägt bereits den Monday-Link; Rückrichtung bringt zusätzlichen API-Aufruf + Fehlerquelle ohne klaren Nutzen. Kann später ergänzt werden.
 
 ## Decision Log
 
@@ -78,13 +78,85 @@ Die Ausarbeitung passiert **on-demand bei der Bestätigung** (kein Vorab-Lauf f�
 <!-- Added by /architecture -->
 | Decision | Rationale | Date |
 |----------|-----------|------|
-| _To be added by /architecture_ | | |
+| Erweiterung der bestehenden Bestätigungs-Server-Action statt neues Endpoint/UI | Trigger (Bestätigung) und Notion-Pfad existieren schon (PROJ-4/5); minimaler Eingriff, kein Frontend-Change | 2026-06-07 |
+| Neue Funktion `elaborateDocument` in `src/lib/anthropic.ts` (neben `generateSuggestions`) | LLM-Logik gehört in die Anthropic-Lib; gleiche Retry-/Client-Muster wiederverwendbar | 2026-06-07 |
+| Kategorie-spezifische Prompts mit weichen Ziellängen (keine harte Erzwingung) | Jede Kategorie braucht anderes Format; Claude soll kontextuell entscheiden, nicht starr abschneiden | 2026-06-07 |
+| Reichhaltige Notion-Blöcke via `append_children` in 100er-Batches | Notion erlaubt max. 100 Kinder-Blöcke pro Aufruf; Aufteilung verhindert API-Fehler bei langen Dokumenten | 2026-06-07 |
+| `insight`/`source` bleiben als Referenz am Seitenende erhalten | Kontext geht nicht verloren; ausgearbeitetes Dokument ergänzt statt ersetzt | 2026-06-07 |
+| Kein neues Supabase-Feld | Ausgearbeitete Inhalte leben in Notion; Supabase speichert weiterhin nur den Kurz-Vorschlag | 2026-06-07 |
+| Best-effort-Kette: Monday hart, Ausarbeitung + Notion weich | Stefans < 2-Min-Workflow darf nie an einer LLM-/Notion-Störung scheitern (Muster aus PROJ-5) | 2026-06-07 |
+| Monday-Task ohne Notion-Rücklink | Vermeidet zusätzlichen Monday-API-Aufruf + Fehlerquelle; Nutzen gering | 2026-06-07 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Kernaussage
+Kein neues UI, kein neues Datenbankschema, kein neues API-Endpoint. PROJ-8 erweitert die bestehende Server-seitige Bestätigungs-Logik (PROJ-4/5). Stefan sieht denselben Button und dieselben Toasts — NORA arbeitet im Hintergrund mehr.
+
+### A) Datenfluss (Änderung)
+```
+Stefan klickt "Bestätigen"
+  → Monday-Task erstellen (unverändert, hart: Fehler bricht ab)
+  → elaborateDocument(Claude) — NEU, kategorie-spezifischer Prompt
+      ✓ Erfolg → Notion-Seite mit vollem, gegliedertem Dokument
+      ✗ Fehler → Notion-Seite mit bisherigem Kurztext (Fallback) + Warnung
+  → Toast: ✓ Task + ✓ Notion  (oder ⚠ Warnung)
+```
+
+### B) Betroffene Bausteine
+```
+src/lib/anthropic.ts        ERWEITERT: neue Funktion elaborateDocument()
+src/lib/notion.ts           ERWEITERT: createPage akzeptiert reichhaltige Block-Struktur
+                                        + Aufteilung in 100er-Batches (append_children)
+src/app/actions/suggestions.ts  ERWEITERT: ruft elaborateDocument vor createPage auf
+```
+Kein neues UI-Component. Der Bestätigungs-Button hat bereits einen Ladezustand — er lädt nun etwas länger.
+
+### C) Funktion `elaborateDocument`
+- **Input:** title, body, insight, source, category, `NORA_COMPANY_CONTEXT`
+- **Output:** strukturiertes Dokument als Liste von Abschnitten (Überschrift + Absätze), passend zu Notion-Blöcken
+- **Modell:** `claude-opus-4-8`, adaptive thinking, mit Retry-Logik analog `generateSuggestions`
+
+**Kategorie-spezifische Formate (weiche Ziellängen):**
+
+| Kategorie | Format | Ziellänge |
+|-----------|--------|-----------|
+| marketing | LinkedIn-/Blogpost-Entwurf — Hook, Hauptaussage, Call-to-Action | ~200–250 W |
+| product | Feature-/Spec-Konzept — Problem, Lösung, Umsetzungsschritte, Erfolgskriterium | ~400–500 W |
+| operations | Schritt-für-Schritt-Prozess / Checkliste — Kontext, nummerierte Schritte, Hinweise | ~300–400 W |
+| *(unbekannt)* | Generisches Strategie-Dokument — Kontext, Ziel, Maßnahmen, nächste Aktion | ~300 W |
+
+### D) Notion-Seitenstruktur (Beispiel Marketing)
+```
+[Seitentitel — unverändert]
+
+## LinkedIn-Post-Entwurf
+[fertig formulierter Post]
+## Hintergrund & Strategie
+[warum jetzt, für wen]
+## Nächste Aktion
+[konkrete erste Schritte]
+────────────────────────
+💡 Insight   [bisheriger Kurztext — bleibt als Referenz]
+📎 Quelle    [bisheriger Quell-Hinweis — bleibt als Referenz]
+```
+Notion-Limit: max. 100 Kinder-Blöcke/Aufruf → längere Dokumente werden automatisch in mehreren `append_children`-Aufrufen angehängt.
+
+### E) Fehlerbehandlung (Best-Effort-Kette)
+```
+Monday-Task        Fehler → gesamte Bestätigung schlägt fehl (wie heute)
+elaborateDocument  Fehler/kein Key → Fallback auf Kurztext + Warnung
+createPage(Notion) Fehler → notion_warning (wie PROJ-5)
+```
+Kein neuer Fehlerfall aus Stefans Sicht.
+
+### F) Unverändert
+Dashboard-UI, Supabase-Schema, Monday-Task-Inhalt, Toast-Muster, Auth/RLS.
+
+### G) Dependencies
+Keine neuen Pakete — `@anthropic-ai/sdk` (Claude) und Raw-Fetch (Notion) sind bereits vorhanden.
 
 ## QA Test Results
 _To be added by /qa_
