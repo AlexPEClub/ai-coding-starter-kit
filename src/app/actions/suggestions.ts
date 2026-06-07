@@ -10,7 +10,8 @@ import {
   addUpdate,
   type MondayGroup,
 } from '@/lib/monday'
-import { fetchDatabase, createNoraBizDevDatabase, createPage } from '@/lib/notion'
+import { fetchDatabase, createNoraBizDevDatabase, createPage, type ElaboratedSection } from '@/lib/notion'
+import { elaborateDocument } from '@/lib/anthropic'
 
 const VALID_STATUSES = ['approved', 'rejected', 'pending'] as const
 
@@ -25,6 +26,7 @@ type ActionResult = {
   monday_task_url?: string
   notion_page_url?: string
   notion_warning?: string
+  elaboration_warning?: string
 }
 
 async function getOrCreateMondayBoard(
@@ -125,6 +127,7 @@ export async function updateSuggestionStatus(
       // Notion best-effort — failure must not block approval
       let notion_page_url: string | undefined
       let notion_warning: string | undefined
+      let elaboration_warning: string | undefined
 
       const notionApiKey = process.env.NOTION_API_KEY
       const notionParentPageId = process.env.NOTION_PARENT_PAGE_ID
@@ -136,6 +139,22 @@ export async function updateSuggestionStatus(
       } else {
         try {
           const { databaseId } = await getOrCreateNotionDatabase(supabase, notionApiKey, notionParentPageId)
+
+          // PROJ-8: Elaborate document with Claude (best-effort — falls back to short text on failure)
+          let elaboratedSections: ElaboratedSection[] | undefined
+          try {
+            const elaboration = await elaborateDocument({
+              title: suggestion.title as string,
+              body: suggestion.body as string,
+              insight: suggestion.insight as string | null,
+              source: suggestion.source as string | null,
+              category: suggestion.category as string,
+            })
+            elaboratedSections = elaboration.sections
+          } catch {
+            elaboration_warning = 'Notion-Seite mit Kurztext erstellt — Voll-Ausarbeitung fehlgeschlagen.'
+          }
+
           const page = await createPage(notionApiKey, databaseId, {
             title: suggestion.title as string,
             category: suggestion.category as string,
@@ -143,6 +162,7 @@ export async function updateSuggestionStatus(
             body: suggestion.body as string,
             insight: suggestion.insight as string | null,
             source: suggestion.source as string | null,
+            elaboratedSections,
           })
           notion_page_url = page.url
         } catch (err) {
@@ -162,7 +182,7 @@ export async function updateSuggestionStatus(
         return { success: false, error: updateError.message }
       }
 
-      return { success: true, monday_task_url: item.url, notion_page_url, notion_warning }
+      return { success: true, monday_task_url: item.url, notion_page_url, notion_warning, elaboration_warning }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Monday.com nicht erreichbar — bitte erneut versuchen.'
       return { success: false, error: message }

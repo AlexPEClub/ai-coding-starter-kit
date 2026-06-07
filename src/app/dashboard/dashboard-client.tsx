@@ -68,6 +68,9 @@ export function DashboardClient({ initialSuggestions }: DashboardClientProps) {
             },
             duration: 8000,
           })
+          if (result.elaboration_warning) {
+            toast.info(result.elaboration_warning, { duration: 6000 })
+          }
         } else if (result.notion_warning) {
           toast.warning(result.notion_warning, { duration: 6000 })
         }

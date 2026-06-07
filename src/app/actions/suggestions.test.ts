@@ -31,6 +31,13 @@ vi.mock('@/lib/notion', () => ({
   createPage: vi.fn().mockResolvedValue({ id: 'page-123', url: 'https://www.notion.so/Test-page-123' }),
 }))
 
+vi.mock('@/lib/anthropic', () => ({
+  elaborateDocument: vi.fn().mockResolvedValue({
+    sections: [{ heading: 'Test-Abschnitt', content: 'Test-Inhalt' }],
+  }),
+  generateSuggestions: vi.fn(),
+}))
+
 import { updateSuggestionStatus } from './suggestions'
 
 const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000'
@@ -191,6 +198,66 @@ describe('updateSuggestionStatus', () => {
       expect(result.success).toBe(true)
       expect(result.notion_warning).toContain('überlastet')
       expect(mockUpdate).toHaveBeenCalled()
+    })
+
+    describe('PROJ-8 — Dokument-Ausarbeitung', () => {
+      beforeEach(() => {
+        process.env.MONDAY_API_KEY = 'test-key'
+        process.env.NOTION_API_KEY = 'notion-test-key'
+        process.env.NOTION_PARENT_PAGE_ID = 'parent-page-123'
+      })
+
+      it('ruft elaborateDocument auf und übergibt elaboratedSections an createPage', async () => {
+        const { fetchBoard } = await import('@/lib/monday')
+        vi.mocked(fetchBoard).mockResolvedValue({ id: 'board-123', groups: [{ id: 'g1', title: 'Marketing' }] })
+        const { elaborateDocument } = await import('@/lib/anthropic')
+        const mockSections = [{ heading: 'Abschnitt', content: 'Inhalt' }]
+        vi.mocked(elaborateDocument).mockResolvedValue({ sections: mockSections })
+        const { createPage } = await import('@/lib/notion')
+        vi.mocked(createPage).mockResolvedValue({ id: 'page-123', url: 'https://www.notion.so/Test-page-123' })
+
+        await updateSuggestionStatus(VALID_UUID, 'approved')
+        expect(elaborateDocument).toHaveBeenCalledWith(expect.objectContaining({
+          title: MOCK_SUGGESTION.title,
+          category: MOCK_SUGGESTION.category,
+        }))
+        expect(createPage).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.any(String),
+          expect.objectContaining({ elaboratedSections: mockSections })
+        )
+      })
+
+      it('setzt elaboration_warning wenn elaborateDocument wirft — Notion-Seite wird trotzdem erstellt', async () => {
+        const { fetchBoard } = await import('@/lib/monday')
+        vi.mocked(fetchBoard).mockResolvedValue({ id: 'board-123', groups: [{ id: 'g1', title: 'Marketing' }] })
+        const { elaborateDocument } = await import('@/lib/anthropic')
+        vi.mocked(elaborateDocument).mockRejectedValue(new Error('Claude nicht erreichbar'))
+        const { createPage } = await import('@/lib/notion')
+        vi.mocked(createPage).mockResolvedValue({ id: 'page-123', url: 'https://www.notion.so/Test-page-123' })
+
+        const result = await updateSuggestionStatus(VALID_UUID, 'approved')
+        expect(result.success).toBe(true)
+        expect(result.notion_page_url).toBe('https://www.notion.so/Test-page-123')
+        expect(result.elaboration_warning).toContain('Voll-Ausarbeitung fehlgeschlagen')
+        // createPage wird trotzdem aufgerufen — ohne elaboratedSections (Fallback)
+        expect(createPage).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.any(String),
+          expect.objectContaining({ elaboratedSections: undefined })
+        )
+      })
+
+      it('hat kein elaboration_warning bei erfolgreicher Ausarbeitung', async () => {
+        const { fetchBoard } = await import('@/lib/monday')
+        vi.mocked(fetchBoard).mockResolvedValue({ id: 'board-123', groups: [{ id: 'g1', title: 'Marketing' }] })
+        const { elaborateDocument } = await import('@/lib/anthropic')
+        vi.mocked(elaborateDocument).mockResolvedValue({ sections: [{ heading: 'Post', content: 'Inhalt' }] })
+
+        const result = await updateSuggestionStatus(VALID_UUID, 'approved')
+        expect(result.success).toBe(true)
+        expect(result.elaboration_warning).toBeUndefined()
+      })
     })
 
     it('gibt error zurück wenn Monday API fehlschlägt (kein DB-Update)', async () => {

@@ -5,6 +5,7 @@ import {
   createPage,
   normalizeNotionId,
   CATEGORY_TO_NOTION,
+  type ElaboratedSection,
 } from './notion'
 
 const TEST_KEY = 'secret_testkey123'
@@ -266,6 +267,101 @@ describe('notion.ts — API Client', () => {
     it('wirft bei HTTP 429', async () => {
       mockFetch({}, 429)
       await expect(createPage(TEST_KEY, TEST_DB_ID, baseParams)).rejects.toThrow('überlastet')
+    })
+
+    describe('mit elaboratedSections (PROJ-8)', () => {
+      const sections: ElaboratedSection[] = [
+        { heading: 'LinkedIn-Post-Entwurf', content: 'Fertig formulierter Post.' },
+        { heading: 'Hintergrund & Strategie', content: 'Warum dieser Post jetzt.' },
+      ]
+
+      it('verwendet heading_2-Blöcke wenn elaboratedSections gesetzt sind', async () => {
+        const spy = mockFetch({ id: TEST_PAGE_ID, url: TEST_PAGE_URL })
+        await createPage(TEST_KEY, TEST_DB_ID, { ...baseParams, elaboratedSections: sections })
+        const body = JSON.parse(spy.mock.calls[0][1]?.body as string)
+        const types = body.children.map((b: { type: string }) => b.type)
+        expect(types).toContain('heading_2')
+      })
+
+      it('enthält Abschnittsüberschriften und Inhalte in korrekter Reihenfolge', async () => {
+        const spy = mockFetch({ id: TEST_PAGE_ID, url: TEST_PAGE_URL })
+        await createPage(TEST_KEY, TEST_DB_ID, { ...baseParams, elaboratedSections: sections })
+        const body = JSON.parse(spy.mock.calls[0][1]?.body as string)
+        const headings = body.children
+          .filter((b: { type: string }) => b.type === 'heading_2')
+          .map((b: { heading_2: { rich_text: Array<{ text: { content: string } }> } }) => b.heading_2.rich_text[0].text.content)
+        expect(headings[0]).toBe('LinkedIn-Post-Entwurf')
+        expect(headings[1]).toBe('Hintergrund & Strategie')
+      })
+
+      it('fügt Insight und Quelle als heading_3 am Ende an', async () => {
+        const spy = mockFetch({ id: TEST_PAGE_ID, url: TEST_PAGE_URL })
+        await createPage(TEST_KEY, TEST_DB_ID, { ...baseParams, elaboratedSections: sections })
+        const body = JSON.parse(spy.mock.calls[0][1]?.body as string)
+        const h3Texts = body.children
+          .filter((b: { type: string }) => b.type === 'heading_3')
+          .map((b: { heading_3: { rich_text: Array<{ text: { content: string } }> } }) => b.heading_3.rich_text[0].text.content)
+        expect(h3Texts).toContain('💡 Insight')
+        expect(h3Texts).toContain('📎 Quelle')
+        // Heading_3 must come after all heading_2 blocks
+        const lastH2Idx = body.children.map((b: { type: string }) => b.type).lastIndexOf('heading_2')
+        const firstH3Idx = body.children.map((b: { type: string }) => b.type).indexOf('heading_3')
+        expect(firstH3Idx).toBeGreaterThan(lastH2Idx)
+      })
+
+      it('fällt auf Short-Text-Format zurück wenn elaboratedSections leer sind', async () => {
+        const spy = mockFetch({ id: TEST_PAGE_ID, url: TEST_PAGE_URL })
+        await createPage(TEST_KEY, TEST_DB_ID, { ...baseParams, elaboratedSections: [] })
+        const body = JSON.parse(spy.mock.calls[0][1]?.body as string)
+        expect(body.children[0].type).toBe('paragraph')
+        expect(body.children[0].paragraph.rich_text[0].text.content).toBe('Test Body')
+      })
+
+      it('fällt auf Short-Text-Format zurück wenn elaboratedSections nicht gesetzt sind', async () => {
+        const spy = mockFetch({ id: TEST_PAGE_ID, url: TEST_PAGE_URL })
+        await createPage(TEST_KEY, TEST_DB_ID, baseParams)
+        const body = JSON.parse(spy.mock.calls[0][1]?.body as string)
+        expect(body.children[0].type).toBe('paragraph')
+      })
+
+      it('splittet Content bei doppelten Zeilenumbrüchen in mehrere Paragraph-Blöcke', async () => {
+        const multiParaSection: ElaboratedSection[] = [
+          { heading: 'Abschnitt', content: 'Erster Absatz.\n\nZweiter Absatz.' },
+        ]
+        const spy = mockFetch({ id: TEST_PAGE_ID, url: TEST_PAGE_URL })
+        await createPage(TEST_KEY, TEST_DB_ID, { ...baseParams, elaboratedSections: multiParaSection })
+        const body = JSON.parse(spy.mock.calls[0][1]?.body as string)
+        const paragraphs = body.children.filter((b: { type: string }) => b.type === 'paragraph')
+        const paragraphTexts = paragraphs.map(
+          (b: { paragraph: { rich_text: Array<{ text: { content: string } }> } }) =>
+            b.paragraph.rich_text[0].text.content
+        )
+        expect(paragraphTexts).toContain('Erster Absatz.')
+        expect(paragraphTexts).toContain('Zweiter Absatz.')
+      })
+
+      it('ruft PATCH /blocks/{id}/children auf wenn mehr als 100 Blöcke vorliegen', async () => {
+        // 51 sections → 51 headings + 51 paragraphs = 102 blocks > 100
+        const manySections: ElaboratedSection[] = Array.from({ length: 51 }, (_, i) => ({
+          heading: `Abschnitt ${i + 1}`,
+          content: `Inhalt ${i + 1}`,
+        }))
+        const spy = vi.spyOn(global, 'fetch')
+          .mockResolvedValueOnce({
+            ok: true, status: 200,
+            json: () => Promise.resolve({ id: TEST_PAGE_ID, url: TEST_PAGE_URL }),
+          } as Response)
+          .mockResolvedValueOnce({
+            ok: true, status: 200,
+            json: () => Promise.resolve({ results: [] }),
+          } as Response)
+
+        await createPage(TEST_KEY, TEST_DB_ID, { ...baseParams, elaboratedSections: manySections })
+        expect(spy).toHaveBeenCalledTimes(2)
+        const patchCall = spy.mock.calls[1]
+        expect(patchCall[1]?.method).toBe('PATCH')
+        expect((patchCall[0] as string)).toContain(TEST_PAGE_ID)
+      })
     })
   })
 })

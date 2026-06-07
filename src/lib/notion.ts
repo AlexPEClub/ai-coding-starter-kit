@@ -87,6 +87,11 @@ export async function createNoraBizDevDatabase(
   return { id: data.id }
 }
 
+export type ElaboratedSection = {
+  heading: string
+  content: string
+}
+
 export type CreatePageParams = {
   title: string
   category: string
@@ -94,6 +99,7 @@ export type CreatePageParams = {
   body: string
   insight: string | null
   source: string | null
+  elaboratedSections?: ElaboratedSection[]
 }
 
 function richText(content: string) {
@@ -104,14 +110,54 @@ function paragraphBlock(content: string) {
   return { object: 'block', type: 'paragraph', paragraph: { rich_text: richText(content) } }
 }
 
+function heading2Block(content: string) {
+  return { object: 'block', type: 'heading_2', heading_2: { rich_text: richText(content) } }
+}
+
 function heading3Block(content: string) {
   return { object: 'block', type: 'heading_3', heading_3: { rich_text: richText(content) } }
+}
+
+// Split content into paragraph blocks; chunks long text to stay within Notion's 2000-char limit.
+function contentToBlocks(content: string): unknown[] {
+  const paragraphs = content.split(/\n\n+/).map(p => p.trim()).filter(Boolean)
+  if (paragraphs.length === 0) return [paragraphBlock(content.slice(0, 2000))]
+  return paragraphs.flatMap(p => {
+    if (p.length <= 2000) return [paragraphBlock(p)]
+    const chunks: unknown[] = []
+    for (let i = 0; i < p.length; i += 2000) chunks.push(paragraphBlock(p.slice(i, i + 2000)))
+    return chunks
+  })
+}
+
+function elaboratedSectionsToBlocks(sections: ElaboratedSection[]): unknown[] {
+  return sections.flatMap(s => [
+    heading2Block(s.heading.slice(0, 2000)),
+    ...contentToBlocks(s.content),
+  ])
+}
+
+async function notionPatch<T>(apiKey: string, path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${NOTION_API_URL}${path}`, {
+    method: 'PATCH',
+    headers: notionHeaders(apiKey),
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) await handleError(res)
+  return res.json() as Promise<T>
+}
+
+// Appends blocks to an existing page in batches (Notion limit: 100 per request).
+async function appendBlocksToPage(apiKey: string, pageId: string, blocks: unknown[]): Promise<void> {
+  for (let i = 0; i < blocks.length; i += 100) {
+    await notionPatch(apiKey, `/blocks/${pageId}/children`, { children: blocks.slice(i, i + 100) })
+  }
 }
 
 export async function createPage(
   apiKey: string,
   databaseId: string,
-  { title, category, mondayUrl, body, insight, source }: CreatePageParams
+  { title, category, mondayUrl, body, insight, source, elaboratedSections }: CreatePageParams
 ): Promise<{ id: string; url: string }> {
   const today = new Date().toISOString().split('T')[0]
   const categoryName = CATEGORY_TO_NOTION[category] ?? category
@@ -125,20 +171,40 @@ export async function createPage(
     properties['Monday-Task-Link'] = { url: mondayUrl }
   }
 
-  const children: unknown[] = [paragraphBlock(body)]
-  if (insight) {
-    children.push(heading3Block('💡 Insight'))
-    children.push(paragraphBlock(insight))
-  }
-  if (source) {
-    children.push(heading3Block('📎 Quelle'))
-    children.push(paragraphBlock(source))
+  let allBlocks: unknown[]
+  if (elaboratedSections && elaboratedSections.length > 0) {
+    const richBlocks = elaboratedSectionsToBlocks(elaboratedSections)
+    const referenceBlocks: unknown[] = []
+    if (insight) {
+      referenceBlocks.push(heading3Block('💡 Insight'))
+      referenceBlocks.push(paragraphBlock(insight))
+    }
+    if (source) {
+      referenceBlocks.push(heading3Block('📎 Quelle'))
+      referenceBlocks.push(paragraphBlock(source))
+    }
+    allBlocks = [...richBlocks, ...referenceBlocks]
+  } else {
+    allBlocks = [paragraphBlock(body)]
+    if (insight) {
+      allBlocks.push(heading3Block('💡 Insight'))
+      allBlocks.push(paragraphBlock(insight))
+    }
+    if (source) {
+      allBlocks.push(heading3Block('📎 Quelle'))
+      allBlocks.push(paragraphBlock(source))
+    }
   }
 
   const data = await notionPost<{ id: string; url: string }>(apiKey, '/pages', {
     parent: { type: 'database_id', database_id: databaseId },
     properties,
-    children,
+    children: allBlocks.slice(0, 100),
   })
+
+  if (allBlocks.length > 100) {
+    await appendBlocksToPage(apiKey, data.id, allBlocks.slice(100))
+  }
+
   return { id: data.id, url: data.url }
 }
