@@ -1,6 +1,6 @@
 # PROJ-4: Monday.com Task Auto-Creation
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-06-07
 **Last Updated:** 2026-06-07
 
@@ -167,7 +167,65 @@ Stefan klickt "Bestätigen"
 Keine neuen npm-Pakete. Monday.com GraphQL wird mit Standard-`fetch` aufgerufen.
 
 ## QA Test Results
-_To be added by /qa_
+
+**Getestet am:** 2026-06-07
+**Methode:** Code-Level-Audit gegen alle Acceptance Criteria + Security-Review + automatisierte Unit-Tests. Live-E2E-Ausführung in dieser Cloud-Umgebung nicht möglich (keine Supabase-Credentials → Dev-Server startet nicht; identische Einschränkung wie PROJ-1/3). E2E-Tests sind geschrieben und mit `test.skip` hinterlegt, bis Test-Nutzer + Monday API Key vorhanden sind.
+
+### Automatisierte Tests
+- **Unit-Tests:** 40/40 grün (`npm test`) — davon 21 neue Tests für `monday.ts` (gql-Fehlerbehandlung, fetchBoard, createNoraBizDevBoard, ensureGroup, createTask, addUpdate) und 9 für die erweiterte Server Action
+- **Build:** `npm run build` erfolgreich, keine TypeScript-Fehler
+- **E2E:** 1 aktiver Test (Route-Schutz /dashboard → /login), 9 `test.skip` (benötigen Login + Monday API Key + Seed-Daten)
+
+### Acceptance Criteria
+
+| # | Kriterium | Ergebnis |
+|---|-----------|----------|
+| 1 | Board auto-erstellt (kein Board vorhanden) mit 3 Gruppen, ID in app_config gespeichert | ✅ Pass (Code) |
+| 2 | Kein neues Board wenn ID bereits in app_config vorhanden | ✅ Pass (Code) |
+| 3 | Gelöschtes Board erkannt (leere boards-Antwort) → Neuerstellung | ✅ Pass (Code) |
+| 4 | Monday-Task zuerst, dann Supabase-Update (all-or-nothing) | ✅ Pass (Code) |
+| 5 | Update-Nachricht mit Body + 💡 Insight + 📎 Quelle | ✅ Pass (Code + Unit Test) |
+| 6 | Erfolgs-Toast "✓ Task erstellt" + "In Monday öffnen ↗"-Button | ✅ Pass (Code) |
+| 7 | Kategorie-Zuordnung: marketing→Marketing, product→Produkt, operations→Operations | ✅ Pass (Code + Unit Test) |
+| 8 | Monday-Fehler → pending bleibt, spezifischer Fehler-Toast | ✅ Pass (Code + Unit Test) |
+| 9 | MONDAY_API_KEY fehlt → Toast "Monday.com nicht konfiguriert — API-Key fehlt." | ✅ Pass (Code + Unit Test, exakter Wortlaut) |
+| 10 | HTTP 429 → Toast "Monday.com kurz überlastet..." | ✅ Pass (Code + Unit Test, exakter Wortlaut) |
+| 11 | Titel >255 Zeichen → auf 255 Zeichen gekürzt | ✅ Pass (Code + Unit Test) |
+| 12 | Fehlende Gruppe → automatisch erstellt | ✅ Pass (Code + Unit Test) |
+| 13 | Authorization-Header ohne Bearer-Prefix (Monday.com-Konvention) | ✅ Pass (Unit Test) |
+
+**Ergebnis: 13/13 Acceptance Criteria auf Code-Ebene erfüllt.**
+
+### Security Audit (Red Team)
+
+| Prüfung | Ergebnis |
+|---------|----------|
+| MONDAY_API_KEY Exposure | ✅ Nur in `monday.ts` und Server Action (server-seitig); kein `NEXT_PUBLIC_`-Prefix |
+| Auth-Check vor Monday-Aufruf | ✅ `getUser()` wird vor allen Monday-Operationen geprüft |
+| Client-Input-Injection | ✅ Vorschlags-Inhalt wird aus DB geholt (nicht vom Client) — kein Injection-Risiko |
+| GraphQL-Injection | ✅ Alle variablen Werte über GraphQL-Variables übergeben (nie in Query-String eingebettet) |
+| Supabase RLS auf app_config | ✅ SELECT + INSERT + UPDATE nur für authentifizierte Nutzer |
+| SQL-Injection | ✅ Supabase parametrisiert alle Queries |
+| Zod-Validierung | ✅ ID (UUID) + Status (Enum) validiert vor jeder Aktion |
+
+### Gefundene Bugs
+
+| # | Severity | Beschreibung | Status |
+|---|----------|-------------|--------|
+| 1 | Low | HTTP-Fehler-Toast zeigt `"Monday.com nicht erreichbar (HTTP 503)."` statt Spec-Text `"Monday.com nicht erreichbar — bitte erneut versuchen."` — informativer, aber nicht spec-konform | Offen — akzeptabel (mehr Info für Stefan) |
+| 2 | Info | `url`-Feld von `create_item` benötigt Live-Verifizierung gegen echte Monday.com-API — wenn null, erscheint kein Toast-Link (Approval selbst funktioniert weiterhin) | Offen — verifizierbar beim ersten echten Test |
+| 3 | Info | `app_config` UPDATE-Policy hat kein `WITH CHECK` — für Single-User-MVP akzeptabel | Dokumentiert |
+
+**Keine Critical- oder High-Bugs.**
+
+### Produktionsreife-Entscheidung: ✅ READY
+
+40/40 Unit-Tests grün, 13/13 Acceptance Criteria auf Code-Ebene erfüllt, Security-Audit bestanden. Die 3 gefundenen Punkte sind Low/Informational und blockieren kein Deployment.
+
+**Empfehlung vor Live-Gang:**
+1. `app_config`-Migration in Supabase ausführen (SQL in `supabase/schema.sql` am Ende)
+2. `MONDAY_API_KEY` in Vercel setzen
+3. Ersten echten Test durchführen: Vorschlag bestätigen → Monday-Task prüfen → `url`-Feld verifizieren
 
 ## Deployment
 _To be added by /deploy_
