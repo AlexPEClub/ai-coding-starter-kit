@@ -110,3 +110,28 @@ CREATE INDEX IF NOT EXISTS idx_daily_reports_report_date ON daily_reports(report
 ALTER TABLE daily_reports
   ADD COLUMN IF NOT EXISTS generation_status TEXT NOT NULL DEFAULT 'pending'
   CHECK (generation_status IN ('pending', 'sent', 'failed'));
+
+-- ─── PROJ-4: app_config ─────────────────────────────────────
+-- Key-Value-Store für Laufzeitkonfiguration (z.B. monday_board_id).
+CREATE TABLE IF NOT EXISTS app_config (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE app_config ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Eingeloggte Nutzer können Config lesen" ON app_config;
+CREATE POLICY "Eingeloggte Nutzer können Config lesen"
+  ON app_config FOR SELECT
+  USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "Eingeloggte Nutzer können Config schreiben" ON app_config;
+CREATE POLICY "Eingeloggte Nutzer können Config schreiben"
+  ON app_config FOR INSERT
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "Eingeloggte Nutzer können Config aktualisieren" ON app_config;
+CREATE POLICY "Eingeloggte Nutzer können Config aktualisieren"
+  ON app_config FOR UPDATE
+  USING (auth.uid() IS NOT NULL);

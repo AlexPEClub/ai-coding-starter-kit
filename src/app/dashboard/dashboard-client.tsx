@@ -31,7 +31,7 @@ export function DashboardClient({ initialSuggestions }: DashboardClientProps) {
       const result = await updateSuggestionStatus(id, status)
 
       if (!result.success) {
-        toast.error('Fehler beim Speichern. Bitte versuche es erneut.')
+        toast.error(result.error ?? 'Fehler beim Speichern. Bitte versuche es erneut.')
         return
       }
 
@@ -46,6 +46,17 @@ export function DashboardClient({ initialSuggestions }: DashboardClientProps) {
         }
         return next
       })
+
+      if (status === 'approved' && result.monday_task_url) {
+        const url = result.monday_task_url
+        toast.success('✓ Task erstellt', {
+          action: {
+            label: 'In Monday öffnen ↗',
+            onClick: () => window.open(url, '_blank', 'noopener,noreferrer'),
+          },
+          duration: 8000,
+        })
+      }
     },
     []
   )

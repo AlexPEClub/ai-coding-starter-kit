@@ -2,6 +2,14 @@
 
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase-server'
+import {
+  fetchBoard,
+  createNoraBizDevBoard,
+  ensureGroup,
+  createTask,
+  addUpdate,
+  type MondayGroup,
+} from '@/lib/monday'
 
 const VALID_STATUSES = ['approved', 'rejected', 'pending'] as const
 
@@ -10,10 +18,36 @@ const UpdateStatusSchema = z.object({
   status: z.enum(VALID_STATUSES),
 })
 
+type ActionResult = { success: boolean; error?: string; monday_task_url?: string }
+
+async function getOrCreateMondayBoard(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  apiKey: string
+): Promise<{ boardId: string; groups: MondayGroup[] }> {
+  const { data: configRow } = await supabase
+    .from('app_config')
+    .select('value')
+    .eq('key', 'monday_board_id')
+    .maybeSingle()
+
+  if (configRow?.value) {
+    const board = await fetchBoard(apiKey, configRow.value)
+    if (board) return { boardId: board.id, groups: board.groups }
+  }
+
+  // Board not found or deleted — create fresh
+  const newBoard = await createNoraBizDevBoard(apiKey)
+  await supabase.from('app_config').upsert(
+    { key: 'monday_board_id', value: newBoard.id, updated_at: new Date().toISOString() },
+    { onConflict: 'key' }
+  )
+  return { boardId: newBoard.id, groups: newBoard.groups }
+}
+
 export async function updateSuggestionStatus(
   id: string,
   status: 'approved' | 'rejected' | 'pending'
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ActionResult> {
   const parsed = UpdateStatusSchema.safeParse({ id, status })
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe.' }
@@ -21,11 +55,60 @@ export async function updateSuggestionStatus(
 
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return { success: false, error: 'Nicht eingeloggt.' }
   }
 
+  if (parsed.data.status === 'approved') {
+    const mondayApiKey = process.env.MONDAY_API_KEY
+    if (!mondayApiKey) {
+      return { success: false, error: 'Monday.com nicht konfiguriert — API-Key fehlt.' }
+    }
+
+    // Fetch full suggestion to build the Monday task content
+    const { data: suggestion, error: fetchError } = await supabase
+      .from('suggestions')
+      .select('title, body, insight, source, category')
+      .eq('id', parsed.data.id)
+      .single()
+
+    if (fetchError || !suggestion) {
+      return { success: false, error: 'Vorschlag nicht gefunden.' }
+    }
+
+    try {
+      const { boardId, groups } = await getOrCreateMondayBoard(supabase, mondayApiKey)
+      const groupId = await ensureGroup(mondayApiKey, boardId, groups, suggestion.category as string)
+      const item = await createTask(mondayApiKey, boardId, groupId, suggestion.title as string)
+      await addUpdate(
+        mondayApiKey,
+        item.id,
+        suggestion.body as string,
+        suggestion.insight as string | null,
+        suggestion.source as string | null
+      )
+
+      // Monday succeeded — now persist approval in Supabase
+      const { error: updateError } = await supabase
+        .from('suggestions')
+        .update({ status: 'approved', reviewed_at: new Date().toISOString() })
+        .eq('id', parsed.data.id)
+
+      if (updateError) {
+        return { success: false, error: updateError.message }
+      }
+
+      return { success: true, monday_task_url: item.url }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Monday.com nicht erreichbar — bitte erneut versuchen.'
+      return { success: false, error: message }
+    }
+  }
+
+  // rejected / pending — just update Supabase
   const { error } = await supabase
     .from('suggestions')
     .update({
