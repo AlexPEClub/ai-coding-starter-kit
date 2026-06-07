@@ -1,0 +1,92 @@
+# PROJ-4: Monday.com Task Auto-Creation
+
+## Status: Planned
+**Created:** 2026-06-07
+**Last Updated:** 2026-06-07
+
+## Dependencies
+- Requires: PROJ-1 (Supabase Infrastructure) — Auth + `suggestions`-Tabelle
+- Requires: PROJ-3 (Review & Approval Dashboard) — Bestätigen-Button + Server Action `updateSuggestionStatus`
+
+## User Stories
+- Als Stefan möchte ich, dass ein Monday.com-Task automatisch angelegt wird, wenn ich einen NORA-Vorschlag bestätige, damit ich keine manuelle Nacharbeit habe.
+- Als Stefan möchte ich, dass der Task in der richtigen Gruppe (Marketing / Produkt / Operations) landet, damit mein Monday-Board strukturiert bleibt.
+- Als Stefan möchte ich den vollen Vorschlagsinhalt (Body, Insight, Quelle) direkt im Monday-Task sehen, damit ich den Kontext ohne Umweg ins Dashboard habe.
+- Als Stefan möchte ich nach der Task-Erstellung einen klickbaren Link zum Task sehen, damit ich ihn sofort in Monday öffnen kann.
+- Als Stefan möchte ich, dass ein Fehler klar kommuniziert wird und kein halbfertiger Zustand entsteht, damit ich vertrauensvoll erneut versuchen kann.
+- Als Stefan möchte ich das Monday-Board nicht manuell einrichten müssen, damit NORA sofort nach Eingabe des API-Keys einsatzbereit ist.
+
+## Out of Scope
+- **Retroaktive Task-Erstellung** — Vorschläge, die vor PROJ-4-Deployment bestätigt wurden, erhalten keinen Monday-Task nachträglich
+- **Abgelehnte Vorschläge** — nur bestätigte Vorschläge lösen eine Monday-Aktion aus; abgelehnte werden ignoriert
+- **Notion Document Auto-Creation** — deferred to PROJ-5
+- **Bearbeiten / Löschen von Monday-Tasks aus NORA** — Tasks werden nur erstellt, nie aus NORA heraus verändert
+- **Status-Sync von Monday → NORA** — wenn ein Monday-Task auf "Erledigt" gesetzt wird, ändert sich nichts in NORA
+- **Retry-Mechanismus für fehlgeschlagene Erstellungen** — kein automatischer Wiederholungsversuch; Stefan klickt erneut auf "Bestätigen"
+- **Multi-Workspace-Support** — ein API-Key, ein Workspace; keine Auswahl
+- **Implementation Tracking & History** — deferred to PROJ-6
+
+## Acceptance Criteria
+
+### Board Auto-Setup
+
+- [ ] Angenommen `MONDAY_API_KEY` ist gesetzt und noch kein "NORA BizDev"-Board existiert, wenn zum ersten Mal eine Bestätigung ausgelöst wird, dann erstellt NORA automatisch ein Board mit dem Namen "NORA BizDev" und drei Gruppen: "Marketing", "Produkt", "Operations" und speichert die Board-ID persistent (Supabase Config-Tabelle).
+- [ ] Angenommen das "NORA BizDev"-Board wurde bereits erstellt und die ID ist gespeichert, wenn Stefan erneut einen Vorschlag bestätigt, dann wird kein neues Board angelegt — die gespeicherte Board-ID wird direkt verwendet.
+- [ ] Angenommen das Board wurde in Monday.com manuell gelöscht, wenn Stefan einen Vorschlag bestätigt, dann erkennt NORA den 404-Fehler, erstellt das Board neu und speichert die neue Board-ID.
+
+### Task-Erstellung
+
+- [ ] Angenommen Stefan klickt auf "Bestätigen" und `MONDAY_API_KEY` ist gesetzt, wenn die Monday-API erreichbar ist, dann wird zuerst ein Task mit dem Vorschlagstitel als Name in der passenden Gruppe angelegt — und erst danach der Supabase-Status auf `approved` gesetzt.
+- [ ] Angenommen der Task wurde erfolgreich angelegt, wenn die Erstellung abgeschlossen ist, dann wird eine Update-Nachricht mit folgendem Inhalt im Task gespeichert: Body-Text, Insight (als "💡 Insight:"-Abschnitt) und Quelle (als "📎 Quelle:"-Abschnitt).
+- [ ] Angenommen der Task und das Update wurden erfolgreich erstellt, wenn Stefan die Bestätigung abschließt, dann erscheint ein Toast: *"✓ Task erstellt"* mit einem klickbaren Link, der die Monday-Task-URL im neuen Tab öffnet.
+- [ ] Angenommen der Vorschlag hat die Kategorie `marketing`, wenn der Task erstellt wird, dann landet er in der Gruppe "Marketing" im "NORA BizDev"-Board — analog für `product` → "Produkt" und `operations` → "Operations".
+
+### Fehlerbehandlung
+
+- [ ] Angenommen die Monday-API ist nicht erreichbar oder gibt einen Fehler zurück, wenn Stefan auf "Bestätigen" klickt, dann bleibt der Supabase-Status auf `pending`, es wird kein DB-Update durchgeführt, und ein Toast erscheint: *"Monday.com nicht erreichbar — bitte erneut versuchen."*
+- [ ] Angenommen `MONDAY_API_KEY` ist nicht als Umgebungsvariable gesetzt, wenn Stefan auf "Bestätigen" klickt, dann erscheint ein Toast: *"Monday.com nicht konfiguriert — API-Key fehlt."* und der Vorschlag bleibt auf `pending`.
+- [ ] Angenommen die Monday-API gibt HTTP 429 (Rate Limit) zurück, wenn Stefan einen Task erstellen will, dann erscheint ein Toast: *"Monday.com kurz überlastet — bitte in einer Minute erneut versuchen."* — kein Auto-Retry, kein DB-Update.
+
+## Edge Cases
+- **Sehr langer Titel (>255 Zeichen):** Wird auf 255 Zeichen gekürzt bevor er an die Monday-API gesendet wird (API-Limit).
+- **Fehlende Gruppe im Board:** Wenn die passende Gruppe (z. B. "Marketing") im Board nicht existiert, wird sie automatisch erstellt bevor der Task angelegt wird.
+- **Bereits bestätigte Vorschläge (vor PROJ-4):** Erhalten keinen Monday-Task — kein Retroaktiv-Mechanismus in MVP.
+- **Monday-API ändert Task-URL-Format:** Die Task-URL wird direkt aus der API-Antwort entnommen (nicht konstruiert) — robuster gegen API-Änderungen.
+- **Netzwerkausfall nach Task-Erstellung aber vor DB-Update:** Monday-Task existiert, aber Supabase-Status bleibt `pending` — Stefan sieht die Karte weiterhin, kann erneut bestätigen, was einen doppelten Monday-Task erzeugt. Für MVP akzeptabel (sehr seltener Fall).
+
+## Technical Requirements
+- **Reihenfolge:** Monday-Task zuerst, dann Supabase-Update — verhindert `approved`-Zustand ohne Monday-Task
+- **Sicherheit:** `MONDAY_API_KEY` ausschließlich server-seitig, nie mit `NEXT_PUBLIC_`-Prefix
+- **Performance:** Task-Erstellung inkl. Board-Check < 5 Sekunden (Vercel maxDuration auf 30s gesetzt)
+- **Persistenz:** Board-ID in Supabase `app_config`-Tabelle (Key-Value), nicht als Env-Var — damit kein Redeployment nach erster Board-Erstellung nötig
+
+## Open Questions
+- [ ] Soll der Monday-Task einen initialen Status (z. B. "Zu erledigen") bekommen, oder reicht der Monday-Standard-Status? — Empfehlung: Standard-Status, kein Extra-Setup
+- [ ] Soll bei einem Doppel-Task (Edge Case: Netzwerkausfall nach Monday-Erstellung) eine Deduplizierungslogik eingebaut werden? — Empfehlung: Nein für MVP, in PROJ-6 (History) adressieren
+
+## Decision Log
+
+### Product Decisions
+| Decision | Rationale | Date |
+|----------|-----------|------|
+| Task-Erstellung automatisch bei "Bestätigen" — kein separater Button | Eliminiert manuellen Schritt; PRD-Vision: "der Agent setzt sie selbständig als Monday-Tasks um" | 2026-06-07 |
+| Dediziertes "NORA BizDev"-Board, vollautomatisch erstellt | Kein manuelles Setup durch Stefan; sofort einsatzbereit nach API-Key-Eingabe | 2026-06-07 |
+| Drei Gruppen nach NORA-Kategorien (Marketing / Produkt / Operations) | Spiegelt die NORA-Struktur 1:1; Stefan findet Tasks intuitiv ohne Board-Umbau | 2026-06-07 |
+| Body + Insight + Quelle als erste Update-Nachricht (nicht als Spalten) | Kein aufwändiges Column-Setup; voller Kontext trotzdem direkt im Task sichtbar | 2026-06-07 |
+| Alles-oder-Nichts bei Fehler (kein DB-Update wenn Monday fehlschlägt) | Verhindert `approved`-Vorschläge ohne Monday-Task; einfachstes Fehlermodell | 2026-06-07 |
+| Erfolgs-Toast mit klickbarem Link zur Monday-Task-URL | Stefan kann sofort in Monday öffnen und Task ergänzen — weniger Kontextwechsel | 2026-06-07 |
+| Board-ID in Supabase `app_config` statt Env-Var | Kein Redeployment nach erster Board-Erstellung nötig; Board-ID ist Laufzeit-Zustand | 2026-06-07 |
+
+### Technical Decisions
+_To be added by /architecture_
+
+---
+
+## Tech Design (Solution Architect)
+_To be added by /architecture_
+
+## QA Test Results
+_To be added by /qa_
+
+## Deployment
+_To be added by /deploy_
