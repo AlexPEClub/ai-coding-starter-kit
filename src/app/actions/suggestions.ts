@@ -10,6 +10,7 @@ import {
   addUpdate,
   type MondayGroup,
 } from '@/lib/monday'
+import { fetchDatabase, createNoraBizDevDatabase, createPage } from '@/lib/notion'
 
 const VALID_STATUSES = ['approved', 'rejected', 'pending'] as const
 
@@ -18,7 +19,13 @@ const UpdateStatusSchema = z.object({
   status: z.enum(VALID_STATUSES),
 })
 
-type ActionResult = { success: boolean; error?: string; monday_task_url?: string }
+type ActionResult = {
+  success: boolean
+  error?: string
+  monday_task_url?: string
+  notion_page_url?: string
+  notion_warning?: string
+}
 
 async function getOrCreateMondayBoard(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -42,6 +49,30 @@ async function getOrCreateMondayBoard(
     { onConflict: 'key' }
   )
   return { boardId: newBoard.id, groups: newBoard.groups }
+}
+
+async function getOrCreateNotionDatabase(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  apiKey: string,
+  parentPageId: string
+): Promise<{ databaseId: string }> {
+  const { data: configRow } = await supabase
+    .from('app_config')
+    .select('value')
+    .eq('key', 'notion_database_id')
+    .maybeSingle()
+
+  if (configRow?.value) {
+    const db = await fetchDatabase(apiKey, configRow.value)
+    if (db) return { databaseId: db.id }
+  }
+
+  const newDb = await createNoraBizDevDatabase(apiKey, parentPageId)
+  await supabase.from('app_config').upsert(
+    { key: 'notion_database_id', value: newDb.id, updated_at: new Date().toISOString() },
+    { onConflict: 'key' }
+  )
+  return { databaseId: newDb.id }
 }
 
 export async function updateSuggestionStatus(
@@ -91,7 +122,37 @@ export async function updateSuggestionStatus(
         suggestion.source as string | null
       )
 
-      // Monday succeeded — now persist approval in Supabase
+      // Notion best-effort — failure must not block approval
+      let notion_page_url: string | undefined
+      let notion_warning: string | undefined
+
+      const notionApiKey = process.env.NOTION_API_KEY
+      const notionParentPageId = process.env.NOTION_PARENT_PAGE_ID
+
+      if (!notionApiKey) {
+        notion_warning = 'Monday-Task erstellt — Notion nicht konfiguriert.'
+      } else if (!notionParentPageId) {
+        notion_warning = 'Monday-Task erstellt — Notion Parent-Page nicht konfiguriert.'
+      } else {
+        try {
+          const { databaseId } = await getOrCreateNotionDatabase(supabase, notionApiKey, notionParentPageId)
+          const page = await createPage(notionApiKey, databaseId, {
+            title: suggestion.title as string,
+            category: suggestion.category as string,
+            mondayUrl: item.url ?? null,
+            body: suggestion.body as string,
+            insight: suggestion.insight as string | null,
+            source: suggestion.source as string | null,
+          })
+          notion_page_url = page.url
+        } catch (err) {
+          notion_warning = err instanceof Error
+            ? err.message
+            : 'Monday-Task erstellt — Notion nicht erreichbar.'
+        }
+      }
+
+      // Persist approval in Supabase
       const { error: updateError } = await supabase
         .from('suggestions')
         .update({ status: 'approved', reviewed_at: new Date().toISOString() })
@@ -101,7 +162,7 @@ export async function updateSuggestionStatus(
         return { success: false, error: updateError.message }
       }
 
-      return { success: true, monday_task_url: item.url }
+      return { success: true, monday_task_url: item.url, notion_page_url, notion_warning }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Monday.com nicht erreichbar — bitte erneut versuchen.'
       return { success: false, error: message }

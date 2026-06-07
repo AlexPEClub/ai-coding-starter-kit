@@ -1,6 +1,6 @@
 # PROJ-5: Notion Document Auto-Creation
 
-## Status: Architected
+## Status: In Progress
 **Created:** 2026-06-07
 **Last Updated:** 2026-06-07
 
@@ -188,6 +188,24 @@ Body-Text                  ← Paragraph-Block
 ### Abhängigkeiten
 
 Keine neuen npm-Pakete. Notion REST API wird mit Standard-`fetch` aufgerufen — konsistent mit `monday.ts`.
+
+## Implementation Notes
+
+### Neue Dateien
+- `src/lib/notion.ts` — Notion REST API-Client (raw fetch, kein SDK). Funktionen: `fetchDatabase`, `createNoraBizDevDatabase`, `createPage`
+- `src/lib/notion.test.ts` — 26 Unit-Tests (alle grün)
+
+### Geänderte Dateien
+- `src/app/actions/suggestions.ts` — `ActionResult` um `notion_page_url?` + `notion_warning?` erweitert; `getOrCreateNotionDatabase`-Hilfsfunktion; Notion best-effort Block nach Monday-Erfolg
+- `src/app/dashboard/dashboard-client.tsx` — Zweiter Success-Toast "✓ Notion-Seite erstellt" + Warn-Toast für `notion_warning`
+- `src/app/actions/suggestions.test.ts` — 5 neue Notion-Integrationstests; Notion-Mock hinzugefügt (70 Tests total, alle grün)
+
+### Neue Umgebungsvariablen (in Vercel setzen)
+- `NOTION_API_KEY` — Internal Integration Token von notion.so/my-integrations
+- `NOTION_PARENT_PAGE_ID` — ID der Notion-Seite, unter der die "NORA BizDev"-Datenbank erstellt wird
+
+### Abweichungen vom Design
+Keine — Implementierung entspricht exakt dem Architecture-Design.
 
 ## QA Test Results
 _To be added by /qa_

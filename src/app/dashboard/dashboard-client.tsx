@@ -47,15 +47,30 @@ export function DashboardClient({ initialSuggestions }: DashboardClientProps) {
         return next
       })
 
-      if (status === 'approved' && result.monday_task_url) {
-        const url = result.monday_task_url
-        toast.success('✓ Task erstellt', {
-          action: {
-            label: 'In Monday öffnen ↗',
-            onClick: () => window.open(url, '_blank', 'noopener,noreferrer'),
-          },
-          duration: 8000,
-        })
+      if (status === 'approved') {
+        if (result.monday_task_url) {
+          const mondayUrl = result.monday_task_url
+          toast.success('✓ Task erstellt', {
+            action: {
+              label: 'In Monday öffnen ↗',
+              onClick: () => window.open(mondayUrl, '_blank', 'noopener,noreferrer'),
+            },
+            duration: 8000,
+          })
+        }
+
+        if (result.notion_page_url) {
+          const notionUrl = result.notion_page_url
+          toast.success('✓ Notion-Seite erstellt', {
+            action: {
+              label: 'In Notion öffnen ↗',
+              onClick: () => window.open(notionUrl, '_blank', 'noopener,noreferrer'),
+            },
+            duration: 8000,
+          })
+        } else if (result.notion_warning) {
+          toast.warning(result.notion_warning, { duration: 6000 })
+        }
       }
     },
     []
