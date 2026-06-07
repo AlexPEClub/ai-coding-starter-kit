@@ -1,6 +1,6 @@
 # PROJ-5: Notion Document Auto-Creation
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-06-07
 **Last Updated:** 2026-06-07
 
@@ -280,4 +280,34 @@ Keine — Implementierung entspricht exakt dem Architecture-Design.
 **✅ PRODUCTION READY** — Keine Critical oder High Bugs. Zwei Low-Bugs sind dokumentiert und für MVP akzeptabel.
 
 ## Deployment
-_To be added by /deploy_
+
+**Status:** ✅ Deployed
+**Production URL:** https://ai-coding-starter-kit-psi.vercel.app
+**Deployed:** 2026-06-07
+**Git Tag:** v1.2.0-PROJ-5
+**Deploy-Methode:** Vercel Auto-Deploy von `main`
+
+### Pre-Deployment Checks
+- ✅ `npm run build` erfolgreich (TypeScript-Typprüfung grün)
+- ✅ QA Approved — keine Critical/High Bugs
+- ✅ Keine hartcodierten Secrets im Code (git grep verifiziert)
+- ✅ Alle Änderungen committed und gepusht
+- ⚠️ `npm run lint` nicht ausführbar (`next lint` in Next.js 16 entfernt, kein eslint.config.js — projektweites Setup-Thema, nicht PROJ-5-bezogen)
+
+### Erforderliche Vercel Environment Variables (neu für PROJ-5)
+- `NOTION_API_KEY` — Internal Integration Token (server-seitig)
+- `NOTION_PARENT_PAGE_ID` — ID der Notion-Parent-Seite
+
+### Manuelle Nacharbeit
+- `.env.local.example` konnte nicht automatisch aktualisiert werden (Datei-Berechtigung gesperrt). Die neuen Variablen `NOTION_API_KEY` und `NOTION_PARENT_PAGE_ID` sollten dort dokumentiert werden.
+
+### Notion-Setup (einmalig, vom Nutzer durchgeführt)
+1. Internal Integration auf notion.so/my-integrations erstellt → Token als `NOTION_API_KEY`
+2. Parent-Seite in Notion angelegt und Integration über "Verbindungen" hinzugefügt
+3. Seiten-ID als `NOTION_PARENT_PAGE_ID` in Vercel gesetzt
+
+### Post-Deployment Verifikation
+- [ ] Vorschlag im Dashboard bestätigen → Notion-Toast "✓ Notion-Seite erstellt" erscheint
+- [ ] "In Notion öffnen ↗" öffnet die erstellte Seite
+- [ ] "NORA BizDev"-Datenbank in Notion enthält die Seite mit Kategorie, Datum, Monday-Link
+- [ ] Seiteninhalt enthält Body + 💡 Insight + 📎 Quelle
