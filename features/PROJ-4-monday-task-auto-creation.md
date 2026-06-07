@@ -1,6 +1,6 @@
 # PROJ-4: Monday.com Task Auto-Creation
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-06-07
 **Last Updated:** 2026-06-07
 
@@ -228,4 +228,19 @@ Keine neuen npm-Pakete. Monday.com GraphQL wird mit Standard-`fetch` aufgerufen.
 3. Ersten echten Test durchführen: Vorschlag bestätigen → Monday-Task prüfen → `url`-Feld verifizieren
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed am:** 2026-06-07
+**Production URL:** https://ai-coding-starter-kit-psi.vercel.app
+**Hosting:** Vercel (Hobby Plan), Auto-Deploy von `main`
+**Git Tag:** `v1.1.0-PROJ-4`
+
+### Deploy-Schritte (durchgeführt)
+- Pre-Deployment-Checks bestanden (`npm run build` ✓, QA Approved, 0 Critical/High-Bugs)
+- Code bereits auf `main` — Vercel Auto-Deploy ausgelöst
+- Neue Env-Var `MONDAY_API_KEY` muss in Vercel Settings → Environment Variables gesetzt werden
+
+### Offene Post-Deployment-Punkte
+- [ ] `MONDAY_API_KEY` in Vercel Environment Variables setzen (monday.com → Profil → Developer → My Access Tokens)
+- [ ] `app_config`-Migration in Supabase SQL Editor ausführen (SQL am Ende von `supabase/schema.sql`)
+- [ ] Ersten echten Test: Vorschlag bestätigen → Monday-Task prüfen → `url`-Feld verifizieren (QA Bug #2)
+- [ ] `.env.local.example` mit `MONDAY_API_KEY` ergänzen (Dateisystem-Einschränkung in Cloud-Session)
