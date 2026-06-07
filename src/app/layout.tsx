@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Sora } from 'next/font/google'
+import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
 const sora = Sora({
@@ -22,6 +23,7 @@ export default function RootLayout({
     <html lang="de" className={sora.variable}>
       <body className={`${sora.className} antialiased`} style={{ background: '#070B1E', color: '#FFFFFF' }}>
         {children}
+        <Toaster richColors theme="dark" />
       </body>
     </html>
   )
