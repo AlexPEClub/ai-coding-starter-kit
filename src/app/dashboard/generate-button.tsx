@@ -15,7 +15,8 @@ export function GenerateButton() {
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok) {
-        toast.error(data?.error ?? 'Generierung fehlgeschlagen. Bitte später erneut versuchen.')
+        const detail = data?.detail ?? data?.error ?? 'Generierung fehlgeschlagen.'
+        toast.error(detail)
         return
       }
 
