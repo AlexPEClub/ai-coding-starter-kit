@@ -45,7 +45,17 @@ async function handleGenerate(request: NextRequest) {
     return NextResponse.json({ error: 'Nicht autorisiert.' }, { status: 401 })
   }
 
-  const db = createServiceRoleClient()
+  let db: ReturnType<typeof createServiceRoleClient>
+  try {
+    db = createServiceRoleClient()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Service-Client konnte nicht initialisiert werden.'
+    return NextResponse.json(
+      { error: 'Generierung fehlgeschlagen.', detail: message },
+      { status: 500 }
+    )
+  }
+
   const today = todayUTC()
 
   // 1. Doppellauf-Schutz: existiert heute schon ein erfolgreicher Report?
