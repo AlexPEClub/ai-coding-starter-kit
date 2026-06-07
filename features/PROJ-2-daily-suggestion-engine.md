@@ -150,6 +150,24 @@ NORA befüllt pro Vorschlag: `title`, `body`, `insight`, `source`, `category`, `
 - `ANTHROPIC_API_KEY` — Claude-API-Schlüssel (server-seitig, nie `NEXT_PUBLIC_`)
 - `CRON_SECRET` — geheimer Token für den Cron-Aufruf des Endpunkts
 
+## Implementation Notes (Backend)
+**Gebaut am:** 2026-06-07
+
+- `src/lib/nora-context.ts` — Firmen-Briefing über Nexora AI (Erstentwurf aus PRD + Design-System; von Stefan jederzeit verfeinerbar)
+- `src/lib/anthropic.ts` — Claude-Aufruf via `@anthropic-ai/sdk` (v0.102), Modell `claude-opus-4-8`, adaptive thinking + effort `high`, Structured Outputs (`messages.parse` + `zodOutputFormat`). Retry bis 3× mit wachsender Pause. Ergebnis auf 3–5 Vorschläge begrenzt.
+- `src/app/api/generate-suggestions/route.ts` — geschützter Endpunkt (POST für Button, GET für Cron). Auth: Cron-Secret (Bearer) ODER eingeloggte Session. Doppellauf-Schutz über `daily_reports.generation_status='sent'`; `failed` erlaubt Retry. Schreibt via Service-Role-Client.
+- `vercel.json` — Cron `0 6 * * *` (06:00 UTC) auf `/api/generate-suggestions`
+- `src/app/dashboard/generate-button.tsx` — bereits in `/frontend` gebaut, ruft den Endpunkt auf
+
+**Schema-Änderung:** Neue Spalte `daily_reports.generation_status` (pending/sent/failed) — idempotent in `supabase/schema.sql` ergänzt. **Muss in Supabase neu ausgeführt werden** (Schema ist idempotent, gefahrlos).
+
+**Tests:** 7 Integrationstests in `src/app/api/generate-suggestions/route.test.ts` (Auth 401, Cron-Secret, Doppellauf-Skip, Retry nach failed, Happy Path, Generierungs-Fehler → 500, DB-Insert-Fehler → 500). Alle grün.
+
+**Offene Punkte vor Live-Betrieb:**
+- Env-Vars setzen (lokal + Vercel): `ANTHROPIC_API_KEY`, `CRON_SECRET`
+- `supabase/schema.sql` in Supabase neu ausführen (für `generation_status`)
+- `.env.local.example` um beide Vars ergänzen (Schreibzugriff in Session gesperrt — manuell)
+
 ## QA Test Results
 _To be added by /qa_
 

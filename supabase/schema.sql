@@ -103,3 +103,10 @@ CREATE POLICY "Eingeloggte Nutzer können Reports aktualisieren"
   USING (auth.uid() IS NOT NULL);
 
 CREATE INDEX IF NOT EXISTS idx_daily_reports_report_date ON daily_reports(report_date DESC);
+
+-- ─── PROJ-2: Generierungs-Status ────────────────────────────
+-- Separate Spalte für den Status des Vorschlags-Generierungslaufs.
+-- (email_status bleibt für das spätere E-Mail-Report-Feature reserviert.)
+ALTER TABLE daily_reports
+  ADD COLUMN IF NOT EXISTS generation_status TEXT NOT NULL DEFAULT 'pending'
+  CHECK (generation_status IN ('pending', 'sent', 'failed'));
