@@ -1,6 +1,6 @@
 # PROJ-3: Review & Approval Dashboard
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-06-06
 **Last Updated:** 2026-06-06
 
@@ -217,4 +217,22 @@ Alle 14 Acceptance Criteria auf Code-Ebene erfüllt, keine Critical/High-Bugs, S
 **Empfehlung vor Live-Gang:** Test-Nutzer in Supabase anlegen + Seed-Daten in `suggestions` einfügen, dann die 10 geskippten E2E-Tests aktivieren, um die Interaktionen (Bestätigen/Ablehnen/Rückgängig) gegen die echte DB zu verifizieren.
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed am:** 2026-06-07
+**Production URL:** https://ai-coding-starter-kit-psi.vercel.app
+**Hosting:** Vercel (Hobby Plan), Auto-Deploy von `main`
+**Git Tag:** `v1.0.0-PROJ-3`
+
+### Deploy-Schritte (durchgeführt)
+- Pre-Deployment-Checks bestanden (`npm run build` ✓, QA Approved, keine Critical/High-Bugs)
+- Production-Security-Headers in `next.config.ts` ergänzt (X-Frame-Options, HSTS, nosniff, Referrer-Policy)
+- PR #1 (`claude/business-dev-agent-GYj8l` → `main`) gemergt
+- Vercel-Projekt erstellt, GitHub-Repo verbunden, Auto-Deploy aktiv
+- Env-Vars in Vercel gesetzt: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+
+### Offene Post-Deployment-Punkte
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` in `.env.local.example` dokumentieren (Schreibzugriff in dieser Session durch Berechtigungen gesperrt)
+- [ ] Test-Nutzer + Seed-Daten in Supabase anlegen → 10 geskippte E2E-Tests aktivieren
+- [ ] Live-Smoke-Test: Login → Dashboard → Bestätigen/Ablehnen gegen echte DB
+- [ ] Optional: Error-Tracking (Sentry) gemäß `docs/production/error-tracking.md`
+- [ ] PROJ-2 (Daily Suggestion Engine) bauen — bis dahin zeigt das Dashboard nur den Empty State

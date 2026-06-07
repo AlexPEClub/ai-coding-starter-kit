@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase-server'
 import { LogoutButton } from './logout-button'
+import { GenerateButton } from './generate-button'
 import { DashboardClient } from './dashboard-client'
 import type { Suggestion } from './suggestion-card'
 
@@ -44,7 +45,10 @@ export default async function DashboardPage() {
             NORA
           </div>
         </div>
-        <LogoutButton />
+        <div className="flex items-center gap-2">
+          <GenerateButton />
+          <LogoutButton />
+        </div>
       </header>
 
       <DashboardClient initialSuggestions={suggestions} />
