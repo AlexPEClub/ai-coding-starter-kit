@@ -15,6 +15,7 @@ Der Nexora AI BizDev Agent ist ein täglicher KI-Assistent, der den aktuellen St
 | P0 (MVP) | Review & Approval Dashboard | Planned ✓ |
 | P1 | Monday.com Task Auto-Creation | Planned |
 | P1 | Notion Document Auto-Creation | Deployed ✓ |
+| P1 | Notion-Dokument-Ausarbeitung | Planned ✓ |
 | P1 | Implementation Tracking & History | Planned |
 | P2 | Context-Aware Suggestions (Live-Daten) | Planned |
 
