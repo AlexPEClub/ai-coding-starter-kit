@@ -1,6 +1,6 @@
 # PROJ-5: Notion Document Auto-Creation
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-06-07
 **Last Updated:** 2026-06-07
 
@@ -208,7 +208,76 @@ Keine neuen npm-Pakete. Notion REST API wird mit Standard-`fetch` aufgerufen —
 Keine — Implementierung entspricht exakt dem Architecture-Design.
 
 ## QA Test Results
-_To be added by /qa_
+
+**Datum:** 2026-06-07
+**Tester:** QA Engineer (automatisiert + Code-Review)
+**Status:** ✅ Approved — keine Critical/High Bugs
+
+### Acceptance Criteria
+
+#### Datenbank Auto-Setup
+| # | Kriterium | Status | Notiz |
+|---|-----------|--------|-------|
+| AC-1 | Neue Datenbank "NORA BizDev" mit Eigenschaften bei erster Bestätigung | ✅ Pass | Code-Review: `createNoraBizDevDatabase` korrekt implementiert, ID in `app_config` gespeichert |
+| AC-2 | Keine neue Datenbank wenn ID bereits in app_config | ✅ Pass | Code-Review: `fetchDatabase` prüft Existenz, `getOrCreateNotionDatabase` gibt gespeicherte ID zurück |
+| AC-3 | Neue Datenbank wenn Notion-DB manuell gelöscht (404) | ✅ Pass | Code-Review: `fetchDatabase` gibt null bei 404 zurück → neue DB wird erstellt |
+
+#### Seiten-Erstellung
+| # | Kriterium | Status | Notiz |
+|---|-----------|--------|-------|
+| AC-4 | Seite mit Titel, Kategorie, Datum, Monday-Link angelegt | ✅ Pass | Code-Review: alle Properties korrekt gesetzt; 26 Unit-Tests grün |
+| AC-5 | Seite enthält Body, 💡 Insight, 📎 Quelle als Blocks | ✅ Pass | Unit-Tests: optionale Blöcke werden bei null weggelassen |
+| AC-6 | Toast "✓ Notion-Seite erstellt" mit "In Notion öffnen ↗" | ✅ Pass | Code-Review: dashboard-client.tsx L34-44 |
+| AC-7 | Kategorie-Mapping: marketing→Marketing, product→Produkt, operations→Operations | ✅ Pass | Unit-Test: CATEGORY_TO_NOTION alle drei Werte geprüft |
+
+#### Fehlerbehandlung
+| # | Kriterium | Status | Notiz |
+|---|-----------|--------|-------|
+| AC-8 | Notion nicht erreichbar → Vorschlag approved + Warn-Toast | ✅ Pass | Code-Review + Unit-Test: best-effort try/catch, Supabase-Update läuft trotzdem |
+| AC-9 | NOTION_API_KEY fehlt → Warn-Toast "Monday-Task erstellt — Notion nicht konfiguriert." | ✅ Pass | Unit-Test: `setzt notion_warning wenn NOTION_API_KEY fehlt` |
+| AC-10 | NOTION_PARENT_PAGE_ID fehlt → Warn-Toast "Monday-Task erstellt — Notion Parent-Page nicht konfiguriert." | ✅ Pass | Unit-Test: `setzt notion_warning wenn NOTION_PARENT_PAGE_ID fehlt` |
+| AC-11 | HTTP 429 → Vorschlag approved + Warn-Toast "Monday-Task erstellt — Notion kurz überlastet." | ✅ Pass | Unit-Test: `wirft bei HTTP 429` + best-effort Catch |
+
+### Edge Cases
+| Edge Case | Status | Notiz |
+|-----------|--------|-------|
+| Titel > 2000 Zeichen | ✅ Pass | Unit-Test: `kürzt Titel auf 2000 Zeichen` |
+| Insight = null | ✅ Pass | Unit-Test: `lässt Insight-Blöcke weg wenn insight null ist` |
+| Quelle = null | ✅ Pass | Unit-Test: `lässt Quellen-Blöcke weg wenn source null ist` |
+| Monday schlägt fehl → Notion wird gar nicht aufgerufen | ✅ Pass | Code-Review: Notion-Block liegt im Monday-try-Block, nach `addUpdate()` |
+| mondayUrl = null → Monday-Task-Link Property wird weggelassen | ✅ Pass | Unit-Test: `lässt Monday-Task-Link weg wenn mondayUrl null ist` |
+| 403 bei Parent-Seite ohne Integration | ✅ Pass | Code-Review: wirft spezifische Meldung "Zugriff verweigert — Integration zur Parent-Seite hinzufügen." |
+| Kategorie-Property in Notion manuell gelöscht | ⚠️ Low | Notion gibt 400 zurück → best-effort zeigt Warn-Toast statt Seite ohne Eigenschaft (akzeptabel für MVP) |
+
+### Automated Tests
+- **Unit-Tests (Vitest):** 70/70 ✅ — inkl. 26 neue notion.ts-Tests, 5 neue suggestions.ts Notion-Tests
+- **E2E-Tests (Playwright):** Route-Schutz-Test aktiv; Integrationstests `test.skip` (benötigen echte Credentials — in Produktion auszuführen)
+
+### Security Audit
+| Prüfpunkt | Status | Detail |
+|-----------|--------|--------|
+| NOTION_API_KEY nie mit NEXT_PUBLIC_ | ✅ Pass | Grep über /src — kein Match |
+| NOTION_API_KEY nie im Client-Bundle | ✅ Pass | `'use server'` Direktive in suggestions.ts |
+| Auth-Check vor allen DB-Operationen | ✅ Pass | `auth.getUser()` vor jeder Aktion |
+| Zod-Input-Validierung | ✅ Pass | UUID + enum-Validierung |
+| Keine Injection-Möglichkeiten | ✅ Pass | Alle API-Calls verwenden strukturiertes JSON, kein String-Building |
+| Keine sensiblen Daten in API-Response | ✅ Pass | ActionResult gibt nur URLs zurück |
+
+### Gefundene Bugs
+| ID | Schwere | Beschreibung | Reproduzierbar | Empfehlung |
+|----|---------|-------------|----------------|------------|
+| BUG-L001 | Low | Wenn die "Kategorie"-Property in Notion manuell gelöscht wird, schlägt `createPage` mit 400 fehl statt die Seite ohne Eigenschaft anzulegen | Nur wenn Stefan die DB-Struktur manuell ändert | Akzeptabel für MVP; Warn-Toast informiert Stefan |
+| BUG-L002 | Low | Kein explizites fetch-Timeout für Notion/Monday API-Calls | Tritt auf wenn API hängt | Next.js Server Action Timeout (Standard: 30s) greift trotzdem |
+
+### Responsiveness
+- Code-Review: Keine neuen UI-Komponenten — vollständig backend-seitig, keine Responsive-Änderungen nötig
+
+### Regression
+- ✅ PROJ-4 Monday-Flow: Toast-Logik refactored aber funktional identisch (Code-Review bestätigt)
+- ✅ PROJ-3 Ablehnen/Rückgängig: Kein PROJ-5-Code involviert
+
+### Produktionsempfehlung
+**✅ PRODUCTION READY** — Keine Critical oder High Bugs. Zwei Low-Bugs sind dokumentiert und für MVP akzeptabel.
 
 ## Deployment
 _To be added by /deploy_
