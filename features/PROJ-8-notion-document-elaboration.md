@@ -1,8 +1,9 @@
 # PROJ-8: Notion-Dokument-Ausarbeitung (Voll-Generierung)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-06-07
 **Last Updated:** 2026-06-07
+**Deployed:** 2026-06-07
 
 ## Dependencies
 - Requires: PROJ-5 (Notion Document Auto-Creation) — die Notion-Seite, Datenbank und der `createPage`-Pfad existieren bereits; dieses Feature reichert den Seiteninhalt an.
