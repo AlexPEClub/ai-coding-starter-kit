@@ -1,6 +1,6 @@
 # PROJ-5: Notion Document Auto-Creation
 
-## Status: Planned
+## Status: Architected
 **Created:** 2026-06-07
 **Last Updated:** 2026-06-07
 
@@ -81,12 +81,113 @@
 | Datenbank-ID in `app_config` gespeichert — wie Monday Board-ID | Kein Redeployment nach erster Erstellung; konsistentes Muster mit PROJ-4 | 2026-06-07 |
 
 ### Technical Decisions
-_To be added by /architecture_
+| Decision | Rationale | Date |
+|----------|-----------|------|
+| Raw `fetch` statt `@notionhq/client` SDK | Notion REST ist einfach genug; konsistent mit `monday.ts`; kein zusätzliches npm-Paket | 2026-06-07 |
+| Notion-Datenbank-ID in `app_config` (Key: `notion_database_id`) | Konsistentes Muster mit PROJ-4 (Monday Board-ID); kein Redeployment nach erster Erstellung | 2026-06-07 |
+| Notion best-effort nach Monday-Erfolg, vor Supabase-Update | Monday ist primär; Notion-Fehler darf Approval nicht blockieren; Supabase-Update bleibt letzter Schritt | 2026-06-07 |
+| Neues `notion_warning`-Feld im Action-Rückgabewert | Ermöglicht spezifischen Warn-Toast ohne den `success`-Status zu kompromittieren | 2026-06-07 |
+| Neue `src/lib/notion.ts` — eigene Datei, nicht in `suggestions.ts` | Klare Trennung der externen Dienste; gleiche Struktur wie `monday.ts`; leichter testbar | 2026-06-07 |
+| `Notion-Version: 2022-06-28` Header — aktuelle stabile Version | Stabile API-Version; schützt vor Breaking Changes bei neuen Notion-API-Versionen | 2026-06-07 |
 
 ---
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Komponenten-Struktur
+
+Keine neuen UI-Seiten oder -Komponenten. Änderungen sind vollständig backend-seitig — nur `dashboard-client.tsx` bekommt den zweiten Toast.
+
+```
+Dashboard (bestehend — unverändert)
+└── SuggestionCard (bestehend — unverändert)
+    └── "Bestätigen"-Button
+        └── updateSuggestionStatus() [Server Action — ERWEITERT]
+            ├── 1. Monday: Task erstellen (PROJ-4 — unverändert)
+            ├── 2. Notion: Datenbank suchen oder erstellen (best-effort)
+            │       └── app_config-Tabelle (Key: notion_database_id)
+            ├── 3. Notion: Seite mit Properties + Inhalts-Blöcken anlegen
+            ├── 4. Supabase: suggestions.status → 'approved'
+            └── Rückgabe: { monday_task_url, notion_page_url?, notion_warning? }
+```
+
+### Neue Dateien
+
+| Datei | Zweck |
+|---|---|
+| `src/lib/notion.ts` | Notion REST API-Client — Datenbank + Seiten erstellen |
+
+### Geänderte Dateien
+
+| Datei | Änderung |
+|---|---|
+| `src/app/actions/suggestions.ts` | Nach Monday-Erfolg: Notion best-effort, dann DB-Update; erweiterter Rückgabe-Typ |
+| `src/app/dashboard/dashboard-client.tsx` | Zweiter Toast mit "In Notion öffnen ↗" + Warn-Toast bei notion_warning |
+
+### Rückgabe-Typ der Server Action
+
+```
+{
+  success: boolean
+  error?: string             — Monday-Fehler (Vorschlag bleibt pending)
+  monday_task_url?: string
+  notion_page_url?: string   — URL der erstellten Notion-Seite
+  notion_warning?: string    — Warn-Text wenn Notion fehlschlug aber Approval durchging
+}
+```
+
+### Ablauf
+
+```
+Stefan klickt "Bestätigen"
+       │
+       ├─ Monday: Task erstellen (wie PROJ-4)
+       │   └─ Fehler → Abbruch, Vorschlag bleibt pending
+       │
+       ├─ Notion (best-effort):
+       │   ├─ NOTION_API_KEY fehlt → notion_warning setzen, überspringen
+       │   ├─ NOTION_PARENT_PAGE_ID fehlt → notion_warning setzen, überspringen
+       │   ├─ Datenbank-ID aus app_config → existiert noch? → sonst neu erstellen
+       │   ├─ Seite anlegen (Kategorie, Datum, Monday-Link als Properties)
+       │   ├─ Seiten-Blöcke hinzufügen (Body, 💡 Insight, 📎 Quelle)
+       │   └─ Fehler → notion_warning setzen, weitermachen
+       │
+       ├─ Supabase: status → 'approved'
+       │
+       └─ Toast 1: "✓ Task erstellt — In Monday öffnen ↗" (immer)
+          Toast 2: "✓ Notion-Seite erstellt — In Notion öffnen ↗" (bei Erfolg)
+          ODER: Warn-Toast mit notion_warning (bei Fehler)
+```
+
+### Seitenstruktur in Notion
+
+```
+[Vorschlagstitel]          ← Seiten-Titel (Datenbankzeile)
+Properties:
+  Kategorie: Marketing     ← Select
+  Datum: 2026-06-07        ← Date
+  Monday-Task: [URL]       ← URL
+
+─────────────────────────
+Body-Text                  ← Paragraph-Block
+
+💡 Insight                 ← Heading 3-Block
+[Insight-Text]             ← Paragraph-Block
+
+📎 Quelle                  ← Heading 3-Block
+[Quellen-Text]             ← Paragraph-Block
+```
+
+### Neue Umgebungsvariablen
+
+| Variable | Zweck |
+|---|---|
+| `NOTION_API_KEY` | Internal Integration Token — nur server-seitig, nie `NEXT_PUBLIC_` |
+| `NOTION_PARENT_PAGE_ID` | Notion-Seiten-ID, unter der die Datenbank erstellt wird |
+
+### Abhängigkeiten
+
+Keine neuen npm-Pakete. Notion REST API wird mit Standard-`fetch` aufgerufen — konsistent mit `monday.ts`.
 
 ## QA Test Results
 _To be added by /qa_
