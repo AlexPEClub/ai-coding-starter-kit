@@ -1,6 +1,6 @@
 # PROJ-3: Review & Approval Dashboard
 
-## Status: Planned
+## Status: Architected
 **Created:** 2026-06-06
 **Last Updated:** 2026-06-06
 
@@ -89,12 +89,73 @@
 | Responsive mobile-first | Stefan reviewt auch unterwegs; 2-Minuten-Ziel erfordert mobilen Zugriff | 2026-06-06 |
 
 ### Technical Decisions
-_To be added by /architecture_
+| Decision | Rationale | Date |
+|----------|-----------|------|
+| Server Component für Datenladen | Seite erscheint sofort ohne Lade-Spinner; kein useEffect + fetch nötig | 2026-06-07 |
+| Next.js Server Actions statt API-Route | Kein separater Endpunkt; TypeScript von UI bis DB; Next.js 16 Best Practice | 2026-06-07 |
+| useState in DashboardClient für UI-Zustand | Kein globaler State nötig — eine Seite, eine Komponente | 2026-06-07 |
+| Zähler als Ableitung aus lokalem Zustand | Bleibt immer synchron mit dem, was Stefan sieht; kein zweiter DB-Call | 2026-06-07 |
+| Alle Vorschläge laden (nicht nur pending) | Ermöglicht Zähler für approved/rejected ohne zweiten Query | 2026-06-07 |
+| Sonner für Toast + Collapsible für Details | Beide shadcn-Komponenten bereits installiert — kein neues Package | 2026-06-07 |
+| Toaster in layout.tsx einmalig ergänzen | Zentrale Stelle für Toast-Rendering, einmal für alle zukünftigen Features | 2026-06-07 |
 
 ---
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Komponenten-Struktur
+
+```
+src/app/dashboard/
+  page.tsx                   (Server Component — lädt alle Vorschläge aus Supabase)
+  dashboard-client.tsx       (Client Component — verwaltet interaktiven Zustand)
+  suggestion-card.tsx        (Client Component — einzelne Karte mit Aktionen)
+  stats-bar.tsx              (Client Component — Zähler offen/bestätigt/abgelehnt)
+
+src/app/actions/
+  suggestions.ts             (Server Actions — updateSuggestionStatus)
+```
+
+### Visueller Baum
+
+```
+/dashboard (Server Component)
+  └── DashboardClient (Client — hält den Zustand aller Vorschläge)
+      ├── StatsBar (leitet Zahlen aus dem Zustand ab)
+      ├── CategorySection "Marketing"
+      │   └── SuggestionCard (×N)
+      │       ├── Kategorie-Badge (farbig)
+      │       ├── Titel + Body-Text
+      │       ├── Collapsible — Insight & Source
+      │       └── Bestätigen / Ablehnen / Rückgängig-Buttons
+      ├── CategorySection "Produkt"
+      │   └── SuggestionCard (×N)
+      ├── CategorySection "Operations"
+      │   └── SuggestionCard (×N)
+      └── EmptyState (wenn keine pending Vorschläge)
+```
+
+### Datenfluss
+
+```
+1. Seitenaufruf
+   Server Component → Supabase (ein Query, alle Vorschläge) → an DashboardClient übergeben
+
+2. Stefan klickt „Bestätigen"
+   Button → Lade-Zustand → Server Action → Supabase Update
+   ↓ Erfolg: Karte wechselt zu „bestätigt", Rückgängig-Link erscheint
+   ↓ Fehler: Toast-Meldung, Karte bleibt „pending"
+
+3. Stefan klickt „Rückgängig"
+   Rückgängig-Link → Server Action → Supabase Update zurück auf „pending"
+   ↓ Erfolg: Karte kehrt zu normalem pending-Zustand zurück
+
+4. Seiten-Reload
+   Bearbeitete Karten verschwinden aus der Liste (nur noch pending werden angezeigt)
+```
+
+### Neue Packages
+Keine. Alle shadcn-Komponenten bereits installiert: `Badge`, `Card`, `Button`, `Collapsible`, `Skeleton`, `Sonner`. Einzige Ergänzung: `<Toaster />` in `src/app/layout.tsx`.
 
 ## QA Test Results
 _To be added by /qa_
