@@ -1,6 +1,6 @@
 # PROJ-8: Notion-Dokument-Ausarbeitung (Voll-Generierung)
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-06-07
 **Last Updated:** 2026-06-07
 
