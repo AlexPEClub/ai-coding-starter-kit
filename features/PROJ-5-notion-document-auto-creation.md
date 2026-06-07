@@ -207,6 +207,12 @@ Keine neuen npm-Pakete. Notion REST API wird mit Standard-`fetch` aufgerufen —
 ### Abweichungen vom Design
 Keine — Implementierung entspricht exakt dem Architecture-Design.
 
+### Post-Deployment Fix (2026-06-07)
+- **Problem:** `NOTION_PARENT_PAGE_ID` wurde als volle Notion-URL gesetzt → Notion-API lehnte `parent.page_id` ab ("should be a valid uuid").
+- **Fix:** `normalizeNotionId()` in `src/lib/notion.ts` extrahiert die 32-stellige Hex-ID aus jedem Format (rohe ID, gestrichelte UUID, volle URL mit Query-Parametern) und formatiert sie als UUID. 7 neue Unit-Tests.
+- **Commit:** `fix(PROJ-5): Accept full Notion URL or raw ID for NOTION_PARENT_PAGE_ID`
+- **Verifiziert:** Notion-Seiten-Erstellung in Produktion erfolgreich.
+
 ## QA Test Results
 
 **Datum:** 2026-06-07
