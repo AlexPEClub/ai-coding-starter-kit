@@ -1,6 +1,6 @@
 # PROJ-7: Context-Aware Suggestions (Live-Daten)
 
-## Status: Planned
+## Status: Architected
 **Created:** 2026-06-08
 **Last Updated:** 2026-06-08
 
@@ -64,9 +64,9 @@ Alle Quellen sind **best-effort**: fällt eine aus, läuft die Generierung still
 - Keine neuen Env-Vars nötig: nutzt bestehende `NOTION_API_KEY` und Supabase-Verbindung
 
 ## Open Questions
-- [ ] Wie wird der QualiPilot Living Spec initial erstellt — legt NORA automatisch eine Vorlage an (bei erster Generierung, falls `notion_qualipilot_page_id` nicht in `app_config`), oder erstellen Stefan und Claude ihn manuell als ersten Schritt? → Architecture-Entscheidung
-- [ ] Wie viel vom Living Spec-Inhalt soll in den Prompt? Voller Text (kann lang werden) oder nur erste N Zeichen? → Architecture-Entscheidung
-- [ ] Soll NORA explizit im Vorschlag referenzieren, dass sie auf einem Live-Datum basiert (z.B. „basierend auf deiner QualiPilot-Spec vom…")? → UX-Entscheidung, Stefan
+- [x] Wie wird der QualiPilot Living Spec initial erstellt? → **NORA erstellt automatisch eine Vorlage beim ersten Lauf** (Architecture 2026-06-08)
+- [x] Wie viel vom Living Spec-Inhalt soll in den Prompt? → **Max. 3.000 Zeichen** (Architecture 2026-06-08)
+- [x] Soll NORA explizit auf Live-Daten referenzieren? → **Nein** — Vorschläge klingen natürlich besser ohne technische Hinweise (Architecture 2026-06-08)
 
 ## Decision Log
 
@@ -85,12 +85,87 @@ Alle Quellen sind **best-effort**: fällt eine aus, läuft die Generierung still
 <!-- Added by /architecture -->
 | Decision | Rationale | Date |
 |----------|-----------|------|
+| Neues Modul `live-context.ts` statt Erweiterung von `route.ts` | Separation of concerns: Kontext-Aggregation ist eigenständige Verantwortung; leichter testbar | 2026-06-08 |
+| Alle drei Quellen parallel, jede mit eigenem try/catch | Maximale Geschwindigkeit; eine fehlerhafte Quelle blockiert die anderen nicht | 2026-06-08 |
+| 5s Timeout pro Notion-Quelle | Generierungslauf läuft im Cron-Job; 5s ist großzügig genug für Notion, klein genug um den maxDuration-Limit (60s) nicht zu gefährden | 2026-06-08 |
+| Max. 3.000 Zeichen aus Living Spec | Ausreichend für Produktkontext; verhindert Prompt-Überladung bei langen Seiten | 2026-06-08 |
+| Living Spec auto-erstellen bei erstem Lauf | Kein manueller Setup-Schritt für Stefan; sofort nützlich mit NORA_COMPANY_CONTEXT als Startinhalt | 2026-06-08 |
+| Explizite Living-Spec-Referenz im Vorschlag-Text: NEIN | Vorschläge klingen natürlich; kein technischer Hinweis stört die < 2-Min-UX | 2026-06-08 |
+| Supabase-Query erweitert: title + category + status | `status` nötig um approved vs. rejected zu unterscheiden; `category` für bessere Verteilung | 2026-06-08 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Datenfluss
+
+```
+Vercel Cron / Dashboard-Button
+         ↓
+GET/POST /api/generate-suggestions   (bestehend — PROJ-2)
+         ↓
+fetchLiveContext()                   (neu — src/lib/live-context.ts)
+    ├── Supabase: letzte 20 Vorschläge (title, category, status, letzte 30 Tage)
+    ├── Notion BizDev DB: letzte 30 Tage bestätigte Einträge (title, category, date)
+    │   └── liest notion_database_id aus app_config (existiert seit PROJ-5)
+    └── Notion Living Spec: Text-Inhalt (max. 3.000 Zeichen)
+        ├── liest notion_qualipilot_page_id aus app_config
+        └── existiert nicht → auto-erstellt Vorlage, speichert ID
+    [jede Quelle: try/catch + 5s Timeout → stiller Fallback auf null]
+         ↓
+generateSuggestions(liveContext)     (bestehend, neuer Parameter)
+         ↓
+buildPrompt(liveContext)             (erweiterter Prompt, 3 neue Abschnitte)
+         ↓
+Claude API (claude-opus-4-8)
+         ↓
+Insert → Supabase suggestions
+```
+
+### Prompt-Erweiterung
+
+`buildPrompt()` fügt bis zu drei neue Abschnitte ein (jeweils nur wenn Daten vorhanden):
+
+```
+## QualiPilot Aktueller Stand (aus Living Spec)
+[Inhalt der Notion-Seite, max. 3.000 Zeichen]
+
+## Bereits bestätigt (letzte 30 Tage) — darauf aufbauen:
+- [Titel] | [Kategorie] | [Datum]
+
+## Abgelehnt (letzte 30 Tage) — NICHT wiederholen:
+- [Titel] | [Kategorie]
+```
+
+### Notion Living Spec — Auto-Erstellung
+
+Beim ersten Generierungslauf: `app_config` enthält noch kein `notion_qualipilot_page_id`.
+NORA erstellt automatisch eine Vorlage-Seite unter der bestehenden Notion Parent-Page
+(gleiche `NOTION_PARENT_PAGE_ID` wie die BizDev-Datenbank), befüllt sie mit dem
+aktuellen `NORA_COMPANY_CONTEXT` als Startinhalt, speichert die ID in `app_config`.
+Stefan und Claude pflegen die Seite danach gemeinsam. Schlägt die Erstellung fehl →
+stiller Fallback, kein Fehler.
+
+### Datenmodell-Änderung
+
+Keine neuen Tabellen. Neuer Eintrag in der bestehenden `app_config`-Tabelle:
+
+| Schlüssel | Typ | Beschreibung |
+|---|---|---|
+| `notion_qualipilot_page_id` | string | Notion Page ID des QualiPilot Living Spec. Automatisch gesetzt beim ersten Lauf. |
+
+### Geänderte / neue Dateien
+
+| Datei | Änderung |
+|---|---|
+| `src/lib/live-context.ts` | **Neu** — fetcht alle drei Quellen parallel, gibt `LiveContext`-Objekt zurück |
+| `src/lib/notion.ts` | **Erweitert** — neue Funktionen: BizDev-Einträge lesen, Living Spec Inhalt lesen, Living Spec Seite erstellen |
+| `src/lib/anthropic.ts` | **Erweitert** — `buildPrompt()` nimmt optionalen `LiveContext`-Parameter, fügt neue Abschnitte ein |
+| `src/app/api/generate-suggestions/route.ts` | **Erweitert** — ruft `fetchLiveContext()` auf, übergibt Ergebnis an `generateSuggestions()` |
+| `.env.local.example` | **Erweitert** — dokumentiert optionale `GITHUB_TOKEN` + `QUALIPILOT_REPO` für späteren GitHub-Ausbau |
+
+**Keine neuen Packages** — nutzt ausschließlich bestehende Abhängigkeiten.
 
 ## QA Test Results
 _To be added by /qa_
