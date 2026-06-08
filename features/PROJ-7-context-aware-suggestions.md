@@ -1,6 +1,6 @@
 # PROJ-7: Context-Aware Suggestions (Live-Daten)
 
-## Status: Architected
+## Status: In Progress
 **Created:** 2026-06-08
 **Last Updated:** 2026-06-08
 
