@@ -28,7 +28,7 @@ Alle Quellen sind **best-effort**: fällt eine aus, läuft die Generierung still
 - Als Stefan möchte ich, dass fehlende oder nicht erreichbare Live-Quellen die Vorschlagsgenerierung niemals blockieren, damit mein täglicher Workflow zuverlässig bleibt.
 
 ## Out of Scope
-- **GitHub-Aktivität lesen** — deferred bis QualiPilot ein eigenes Repo hat; wird als optionale Quelle (Env-Vars `GITHUB_TOKEN` + `QUALIPILOT_REPO`) vorbereitet, aber noch nicht aktiviert
+- **GitHub-Aktivität lesen** — deferred für jetzt; Repo existiert (`billichstefan-ui/Qualipilot`), wird als optionale Quelle (Env-Vars `GITHUB_TOKEN` + `QUALIPILOT_REPO=billichstefan-ui/Qualipilot`) vorbereitet, aber erst aktiviert wenn Code vorhanden ist
 - **Web-Scraping** (Branchen-News, Competitor-Monitoring) — PRD-Constraint: kein bezahltes/externes API im MVP
 - **Manuelles Briefing-UI im Dashboard** — verworfen zugunsten automatischem Notion-Lesen; kein neues UI-Element nötig
 - **Echtzeit-Updates** — NORA liest Kontext einmal pro Generierungslauf, kein Continuous Polling
