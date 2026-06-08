@@ -1,6 +1,6 @@
 # PROJ-7: Context-Aware Suggestions (Live-Daten)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-06-08
 **Last Updated:** 2026-06-08
 
@@ -284,4 +284,10 @@ Bestehende Deployed-Features nach PROJ-7 Änderungen getestet:
 - Security audit: PASS
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed:** 2026-06-08
+**Branch:** main
+**Commit:** 094606f
+**Vercel:** Auto-deploy via GitHub push — grüner Build bestätigt
+
+Keine neuen Env-Vars erforderlich — nutzt bestehende `NOTION_API_KEY`, `NOTION_PARENT_PAGE_ID`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `CRON_SECRET`.
