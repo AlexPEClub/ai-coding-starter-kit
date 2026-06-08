@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 
 const mockGetUser = vi.hoisted(() => vi.fn())
 const mockGenerate = vi.hoisted(() => vi.fn())
+const mockFetchLiveContext = vi.hoisted(() => vi.fn())
 const dbConfig = vi.hoisted(() => ({ value: {} as Record<string, unknown> }))
 
 vi.mock('@/lib/supabase-server', () => ({
@@ -14,6 +15,10 @@ vi.mock('@/lib/supabase-server', () => ({
 
 vi.mock('@/lib/anthropic', () => ({
   generateSuggestions: mockGenerate,
+}))
+
+vi.mock('@/lib/live-context', () => ({
+  fetchLiveContext: mockFetchLiveContext,
 }))
 
 // Chainbarer Supabase-Mock: liefert konfigurierte Ergebnisse je Tabelle/Operation.
@@ -52,11 +57,18 @@ const SAMPLE = [
 describe('POST /api/generate-suggestions', () => {
   const ORIGINAL_ENV = { ...process.env }
 
+  const MOCK_LIVE_CONTEXT = {
+    supabaseHistory: [],
+    notionBizDevEntries: [],
+    livingSpecContent: null,
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     dbConfig.value = {}
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockGenerate.mockResolvedValue(SAMPLE)
+    mockFetchLiveContext.mockResolvedValue(MOCK_LIVE_CONTEXT)
     delete process.env.CRON_SECRET
   })
 

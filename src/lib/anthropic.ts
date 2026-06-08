@@ -3,6 +3,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod'
 import { NORA_COMPANY_CONTEXT } from './nora-context'
 import { type ElaboratedSection } from './notion'
+import { type LiveContext } from './live-context'
 
 // NORA nutzt Opus 4.8 — höchste strategische Qualität, 1 Lauf/Tag.
 const MODEL = 'claude-opus-4-8'
@@ -41,15 +42,42 @@ function getClient(): Anthropic {
   return new Anthropic({ apiKey })
 }
 
-function buildPrompt(recentTitles: string[]): string {
-  const historySection =
-    recentTitles.length > 0
-      ? `## Bereits vorgeschlagen (letzte 30 Tage) — NICHT wiederholen, darauf aufbauen oder Neues vorschlagen:\n${recentTitles.map(t => `- ${t}`).join('\n')}`
-      : '## Historie\nNoch keine früheren Vorschläge vorhanden — dies ist der erste Lauf.'
+function buildPrompt(liveContext: LiveContext): string {
+  const { supabaseHistory, notionBizDevEntries, livingSpecContent } = liveContext
+
+  const approved = supabaseHistory.filter(e => e.status === 'approved')
+  const rejected = supabaseHistory.filter(e => e.status === 'rejected')
+
+  const livingSpecSection = livingSpecContent
+    ? `## QualiPilot — Aktueller Stand (Living Spec)\n${livingSpecContent}`
+    : ''
+
+  const approvedLines = [
+    ...notionBizDevEntries.map(e => `- ${e.title} (${e.category}${e.date ? ', ' + e.date : ''})`),
+    ...approved.map(e => `- ${e.title} (${e.category})`),
+  ]
+  const approvedSection = approvedLines.length > 0
+    ? `## Bereits bestätigt (letzte 30 Tage) — Folge-Schritte darauf aufbauen:\n${approvedLines.join('\n')}`
+    : ''
+
+  const rejectedSection = rejected.length > 0
+    ? `## Abgelehnt (letzte 30 Tage) — Diese Richtungen NICHT wiederholen:\n${rejected.map(e => `- ${e.title} (${e.category})`).join('\n')}`
+    : ''
+
+  const allTitles = supabaseHistory.map(e => e.title)
+  const allTitlesSection = allTitles.length > 0 && !approvedSection && !rejectedSection
+    ? `## Bereits vorgeschlagen (letzte 30 Tage) — NICHT wiederholen:\n${allTitles.map(t => `- ${t}`).join('\n')}`
+    : ''
+
+  const contextSections = [livingSpecSection, approvedSection, rejectedSection, allTitlesSection]
+    .filter(Boolean)
+    .join('\n\n')
+
+  const contextBlock = contextSections || '## Historie\nNoch keine früheren Vorschläge vorhanden — dies ist der erste Lauf.'
 
   return `${NORA_COMPANY_CONTEXT}
 
-${historySection}
+${contextBlock}
 
 ## Deine Aufgabe
 Du bist NORA, der tägliche BizDev-Assistent von Nexora AI. Generiere ${MIN_SUGGESTIONS}–${MAX_SUGGESTIONS} konkrete, sofort umsetzbare Verbesserungsvorschläge für Stefan.
@@ -184,10 +212,10 @@ export async function elaborateDocument(params: {
  * MAX_RETRIES Mal mit kurzer, wachsender Pause. Wirft, wenn alle Versuche scheitern.
  */
 export async function generateSuggestions(
-  recentTitles: string[]
+  liveContext: LiveContext
 ): Promise<GeneratedSuggestion[]> {
   const client = getClient()
-  const prompt = buildPrompt(recentTitles)
+  const prompt = buildPrompt(liveContext)
 
   let lastError: unknown
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {

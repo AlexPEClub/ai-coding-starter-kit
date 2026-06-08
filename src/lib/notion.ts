@@ -1,5 +1,6 @@
 const NOTION_API_URL = 'https://api.notion.com/v1'
 const DB_NAME = 'NORA BizDev'
+const LIVING_SPEC_PAGE_TITLE = 'QualiPilot Living Spec'
 
 export const CATEGORY_TO_NOTION: Record<string, string> = {
   marketing: 'Marketing',
@@ -85,6 +86,110 @@ export async function createNoraBizDevDatabase(
     },
   })
   return { id: data.id }
+}
+
+export type BizDevEntry = {
+  title: string
+  category: string
+  date: string
+}
+
+type NotionQueryResponse = {
+  results: Array<{
+    properties: {
+      Name: { title: Array<{ text: { content: string } }> }
+      Kategorie: { select: { name: string } | null }
+      Datum: { date: { start: string } | null }
+    }
+  }>
+}
+
+type NotionBlocksResponse = {
+  results: Array<{
+    type: string
+    [key: string]: unknown
+  }>
+}
+
+export async function fetchBizDevEntries(
+  apiKey: string,
+  databaseId: string,
+  days: number
+): Promise<BizDevEntry[]> {
+  const since = new Date()
+  since.setUTCDate(since.getUTCDate() - days)
+  const sinceStr = since.toISOString().slice(0, 10)
+
+  const data = await notionPost<NotionQueryResponse>(apiKey, `/databases/${databaseId}/query`, {
+    filter: { property: 'Datum', date: { on_or_after: sinceStr } },
+    sorts: [{ property: 'Datum', direction: 'descending' }],
+    page_size: 30,
+  })
+
+  return data.results
+    .map(page => {
+      const p = page.properties
+      const title = p?.Name?.title?.[0]?.text?.content ?? ''
+      const category = p?.Kategorie?.select?.name ?? ''
+      const date = p?.Datum?.date?.start ?? ''
+      return { title, category, date }
+    })
+    .filter(e => e.title.length > 0)
+}
+
+export async function fetchPageContent(
+  apiKey: string,
+  pageId: string,
+  maxChars = 3000
+): Promise<string | null> {
+  const res = await fetch(`${NOTION_API_URL}/blocks/${pageId}/children?page_size=100`, {
+    headers: notionHeaders(apiKey),
+  })
+  if (!res.ok) return null
+
+  const data = await res.json() as NotionBlocksResponse
+  const parts: string[] = []
+  let total = 0
+
+  for (const block of data.results) {
+    if (total >= maxChars) break
+    const blockData = (block as Record<string, unknown>)[block.type] as { rich_text?: Array<{ text: { content: string } }> } | undefined
+    const richText = blockData?.rich_text
+    if (!richText) continue
+    const text = richText.map(rt => rt.text.content).join('')
+    if (!text.trim()) continue
+    parts.push(text)
+    total += text.length
+  }
+
+  if (parts.length === 0) return null
+  return parts.join('\n\n').slice(0, maxChars)
+}
+
+export async function createLivingSpecPage(
+  apiKey: string,
+  parentPageId: string,
+  templateContent: string
+): Promise<{ id: string; url: string }> {
+  const children: unknown[] = [
+    heading2Block('Aktueller Stand'),
+    ...contentToBlocks(templateContent.slice(0, 2000)),
+    heading2Block('Aktive Entwicklungsbereiche'),
+    paragraphBlock('Hier dokumentieren Stefan und Claude, woran QualiPilot gerade konkret entwickelt wird.'),
+    heading2Block('Nächste Meilensteine'),
+    paragraphBlock('Geplante Meilensteine und Ziele für QualiPilot.'),
+    heading2Block('Offene Fragen & Entscheidungen'),
+    paragraphBlock('Offene Fragen und anstehende Produktentscheidungen.'),
+  ]
+
+  const data = await notionPost<{ id: string; url: string }>(apiKey, '/pages', {
+    parent: { type: 'page_id', page_id: normalizeNotionId(parentPageId) },
+    properties: {
+      title: [{ type: 'text', text: { content: LIVING_SPEC_PAGE_TITLE } }],
+    },
+    children: children.slice(0, 100),
+  })
+  return { id: data.id, url: data.url }
 }
 
 export type ElaboratedSection = {
