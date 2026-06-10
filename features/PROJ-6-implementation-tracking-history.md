@@ -1,6 +1,6 @@
 # PROJ-6: Implementation Tracking & History
 
-## Status: In Progress
+## Status: Deployed
 **Created:** 2026-06-10
 **Last Updated:** 2026-06-10
 
@@ -239,4 +239,10 @@ Supabase-Migration: idempotente Schema-Änderung — bestehende Einträge bleibe
 **Pflicht vor Deploy:** Supabase-Migration ausführen (implemented-CHECK-Constraint, letzter Block in `supabase/schema.sql`) — sonst schlägt „Als umgesetzt markieren" mit Constraint-Fehler fehl (graceful: Fehler-Toast).
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed:** 2026-06-10
+**Branch:** main
+**Commit:** 895979b
+**Vercel:** Auto-deploy via GitHub push — grüner Build bestätigt
+**Supabase-Migration:** `implemented`-CHECK-Constraint von Stefan im SQL Editor ausgeführt
+**Mit deployt:** fix(PROJ-2) — Middleware-Matcher nimmt `/api` aus; Vercel-Cron erreicht den Generierungs-Endpunkt wieder
