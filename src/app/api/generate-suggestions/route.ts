@@ -1,21 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { generateSuggestions } from '@/lib/anthropic'
+import { fetchLiveContext } from '@/lib/live-context'
 
-// Generierung kann mehrere Sekunden dauern (Claude + Retries).
+// Generierung kann mehrere Sekunden dauern (Claude + Retries + Notion-Fetches).
 export const maxDuration = 60
-
-const HISTORY_DAYS = 30
-const HISTORY_LIMIT = 100
 
 function todayUTC(): string {
   return new Date().toISOString().slice(0, 10)
-}
-
-function daysAgoUTC(days: number): string {
-  const d = new Date()
-  d.setUTCDate(d.getUTCDate() - days)
-  return d.toISOString().slice(0, 10)
 }
 
 /**
@@ -69,19 +61,12 @@ async function handleGenerate(request: NextRequest) {
     return NextResponse.json({ skipped: true, reason: 'already_generated' })
   }
 
-  // 2. Letzte 30 Tage als Wiederholungs-Kontext laden.
-  const { data: recent } = await db
-    .from('suggestions')
-    .select('title')
-    .gte('report_date', daysAgoUTC(HISTORY_DAYS))
-    .order('report_date', { ascending: false })
-    .limit(HISTORY_LIMIT)
-
-  const recentTitles = (recent ?? []).map(r => r.title as string)
+  // 2. Live-Kontext laden (Supabase-Historie + Notion BizDev DB + QualiPilot Living Spec).
+  const liveContext = await fetchLiveContext(db)
 
   // 3. Generierung (Claude + Retry-Logik in generateSuggestions).
   try {
-    const suggestions = await generateSuggestions(recentTitles)
+    const suggestions = await generateSuggestions(liveContext)
 
     // 4a. Erfolg: Vorschläge speichern + Report auf "sent".
     const rows = suggestions.map(s => ({

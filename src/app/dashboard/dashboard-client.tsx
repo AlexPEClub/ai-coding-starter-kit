@@ -2,9 +2,11 @@
 
 import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { updateSuggestionStatus } from '@/app/actions/suggestions'
 import { SuggestionCard } from './suggestion-card'
 import { StatsBar } from './stats-bar'
+import { HistoryView } from './history-view'
 import type { Suggestion } from './suggestion-card'
 
 const CATEGORY_ORDER = ['marketing', 'product', 'operations'] as const
@@ -27,7 +29,7 @@ export function DashboardClient({ initialSuggestions }: DashboardClientProps) {
   const rejected = suggestions.filter(s => s.status === 'rejected').length
 
   const handleAction = useCallback(
-    async (id: string, status: 'approved' | 'rejected' | 'pending') => {
+    async (id: string, status: 'approved' | 'rejected' | 'pending' | 'implemented') => {
       const result = await updateSuggestionStatus(id, status)
 
       if (!result.success) {
@@ -46,6 +48,11 @@ export function DashboardClient({ initialSuggestions }: DashboardClientProps) {
         }
         return next
       })
+
+      if (status === 'implemented') {
+        toast.success('Vorschlag als umgesetzt markiert.')
+        return
+      }
 
       if (status === 'approved') {
         if (result.monday_task_url) {
@@ -79,12 +86,11 @@ export function DashboardClient({ initialSuggestions }: DashboardClientProps) {
     []
   )
 
-  // Pending suggestions + any acted-this-session (to allow undo)
+  // Hauptansicht: pending + approved (implementierte verschwinden), plus acted-this-session für Undo
   const visibleSuggestions = suggestions.filter(
-    s => s.status === 'pending' || actedIds.has(s.id)
+    s => s.status === 'pending' || s.status === 'approved' || (actedIds.has(s.id) && s.status === 'rejected')
   )
 
-  // Group by category, skip empty groups
   const grouped = CATEGORY_ORDER
     .map(cat => ({
       category: cat,
@@ -94,50 +100,76 @@ export function DashboardClient({ initialSuggestions }: DashboardClientProps) {
     .filter(g => g.items.length > 0)
 
   return (
-    <div className="flex-1 px-4 py-6 max-w-6xl mx-auto w-full space-y-6">
-      <StatsBar open={open} approved={approved} rejected={rejected} />
-
-      {visibleSuggestions.length === 0 ? (
-        <div
-          className="flex flex-col items-center justify-center py-24 text-center space-y-3"
-          role="status"
-          aria-live="polite"
+    <div className="flex-1 px-4 py-6 max-w-6xl mx-auto w-full">
+      <Tabs defaultValue="vorschlaege">
+        <TabsList
+          className="mb-6"
+          style={{ background: '#0E1430', border: '1px solid #1C2340' }}
         >
-          <div
-            className="w-14 h-14 rounded-full flex items-center justify-center text-2xl"
-            style={{ background: 'rgba(74, 222, 128, 0.1)', border: '1px solid rgba(74, 222, 128, 0.2)' }}
+          <TabsTrigger
+            value="vorschlaege"
+            style={{ fontFamily: 'var(--font-sora), sans-serif' }}
           >
-            ✓
-          </div>
-          <p className="text-base font-semibold" style={{ color: '#4ADE80' }}>
-            Alle Vorschläge bearbeitet
-          </p>
-          <p className="text-sm" style={{ color: '#8892B0' }}>
-            NORA arbeitet bereits am nächsten Report.
-          </p>
-        </div>
-      ) : (
-        grouped.map(({ category, label, items }) => (
-          <section key={category} aria-label={label}>
-            <h2
-              className="text-xs font-semibold uppercase tracking-widest mb-3"
-              style={{ color: '#8892B0' }}
+            Vorschläge
+          </TabsTrigger>
+          <TabsTrigger
+            value="verlauf"
+            style={{ fontFamily: 'var(--font-sora), sans-serif' }}
+          >
+            Verlauf
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="vorschlaege" className="space-y-6">
+          <StatsBar open={open} approved={approved} rejected={rejected} />
+
+          {visibleSuggestions.length === 0 ? (
+            <div
+              className="flex flex-col items-center justify-center py-24 text-center space-y-3"
+              role="status"
+              aria-live="polite"
             >
-              {label}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {items.map(suggestion => (
-                <SuggestionCard
-                  key={suggestion.id}
-                  suggestion={suggestion}
-                  isActed={actedIds.has(suggestion.id)}
-                  onAction={handleAction}
-                />
-              ))}
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center text-2xl"
+                style={{ background: 'rgba(74, 222, 128, 0.1)', border: '1px solid rgba(74, 222, 128, 0.2)' }}
+              >
+                ✓
+              </div>
+              <p className="text-base font-semibold" style={{ color: '#4ADE80' }}>
+                Alle Vorschläge bearbeitet
+              </p>
+              <p className="text-sm" style={{ color: '#8892B0' }}>
+                NORA arbeitet bereits am nächsten Report.
+              </p>
             </div>
-          </section>
-        ))
-      )}
+          ) : (
+            grouped.map(({ category, label, items }) => (
+              <section key={category} aria-label={label}>
+                <h2
+                  className="text-xs font-semibold uppercase tracking-widest mb-3"
+                  style={{ color: '#8892B0' }}
+                >
+                  {label}
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {items.map(suggestion => (
+                    <SuggestionCard
+                      key={suggestion.id}
+                      suggestion={suggestion}
+                      isActed={actedIds.has(suggestion.id)}
+                      onAction={handleAction}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="verlauf">
+          <HistoryView suggestions={suggestions} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { CheckCircle2, XCircle, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react'
+import { CheckCircle2, XCircle, ChevronDown, ChevronUp, RotateCcw, Rocket } from 'lucide-react'
 
 export type Suggestion = {
   id: string
@@ -14,7 +14,7 @@ export type Suggestion = {
   insight: string | null
   source: string | null
   category: 'marketing' | 'product' | 'operations'
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'implemented'
   report_date: string
 }
 
@@ -27,11 +27,11 @@ const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
 type SuggestionCardProps = {
   suggestion: Suggestion
   isActed: boolean
-  onAction: (id: string, status: 'approved' | 'rejected' | 'pending') => Promise<void>
+  onAction: (id: string, status: 'approved' | 'rejected' | 'pending' | 'implemented') => Promise<void>
 }
 
 export function SuggestionCard({ suggestion, isActed, onAction }: SuggestionCardProps) {
-  const [isLoading, setIsLoading] = useState<'approve' | 'reject' | 'undo' | null>(null)
+  const [isLoading, setIsLoading] = useState<'approve' | 'reject' | 'undo' | 'implement' | null>(null)
   const [isBodyExpanded, setIsBodyExpanded] = useState(false)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
 
@@ -43,8 +43,12 @@ export function SuggestionCard({ suggestion, isActed, onAction }: SuggestionCard
   const isApproved = isActed && suggestion.status === 'approved'
   const isRejected = isActed && suggestion.status === 'rejected'
 
-  async function handleAction(action: 'approve' | 'reject' | 'undo') {
-    const newStatus = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'pending'
+  async function handleAction(action: 'approve' | 'reject' | 'undo' | 'implement') {
+    const newStatus =
+      action === 'approve' ? 'approved' :
+      action === 'reject' ? 'rejected' :
+      action === 'implement' ? 'implemented' :
+      'pending'
     setIsLoading(action)
     try {
       await onAction(suggestion.id, newStatus)
@@ -184,8 +188,36 @@ export function SuggestionCard({ suggestion, isActed, onAction }: SuggestionCard
           </Collapsible>
         )}
 
-        {/* Action buttons — only shown for pending (non-acted) cards */}
-        {!isActed && (
+        {/* "Als umgesetzt markieren" — nur für approved Vorschläge */}
+        {suggestion.status === 'approved' && (
+          <Button
+            onClick={() => handleAction('implement')}
+            disabled={isLoading !== null}
+            size="sm"
+            variant="outline"
+            className="w-full text-xs font-medium h-8 transition-all hover:opacity-90"
+            style={{ borderColor: '#0E9594', color: '#0E9594', background: 'rgba(14,149,148,0.08)' }}
+            aria-label={`Vorschlag als umgesetzt markieren: ${suggestion.title}`}
+          >
+            {isLoading === 'implement' ? (
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="inline-block w-3 h-3 border-2 rounded-full animate-spin"
+                  style={{ borderColor: 'rgba(14,149,148,0.3)', borderTopColor: '#0E9594' }}
+                />
+                Speichere…
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <Rocket className="w-3.5 h-3.5" aria-hidden="true" />
+                Als umgesetzt markieren
+              </span>
+            )}
+          </Button>
+        )}
+
+        {/* Bestätigen/Ablehnen — nur für pending Karten die noch nicht acted sind */}
+        {!isActed && suggestion.status === 'pending' && (
           <div className="flex gap-2 pt-1">
             <Button
               onClick={() => handleAction('approve')}
