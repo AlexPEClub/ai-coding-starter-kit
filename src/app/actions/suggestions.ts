@@ -13,7 +13,7 @@ import {
 import { fetchDatabase, createNoraBizDevDatabase, createPage, type ElaboratedSection } from '@/lib/notion'
 import { elaborateDocument } from '@/lib/anthropic'
 
-const VALID_STATUSES = ['approved', 'rejected', 'pending'] as const
+const VALID_STATUSES = ['approved', 'rejected', 'pending', 'implemented'] as const
 
 const UpdateStatusSchema = z.object({
   id: z.string().uuid('Ungültige Vorschlag-ID.'),
@@ -79,7 +79,7 @@ async function getOrCreateNotionDatabase(
 
 export async function updateSuggestionStatus(
   id: string,
-  status: 'approved' | 'rejected' | 'pending'
+  status: 'approved' | 'rejected' | 'pending' | 'implemented'
 ): Promise<ActionResult> {
   const parsed = UpdateStatusSchema.safeParse({ id, status })
   if (!parsed.success) {
@@ -187,6 +187,22 @@ export async function updateSuggestionStatus(
       const message = err instanceof Error ? err.message : 'Monday.com nicht erreichbar — bitte erneut versuchen.'
       return { success: false, error: message }
     }
+  }
+
+  // implemented — einfacher Statuswechsel ohne Monday/Notion
+  if (parsed.data.status === 'implemented') {
+    const { error } = await supabase
+      .from('suggestions')
+      .update({
+        status: 'implemented',
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', parsed.data.id)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+    return { success: true }
   }
 
   // rejected / pending — just update Supabase
