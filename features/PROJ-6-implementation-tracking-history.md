@@ -181,7 +181,63 @@ Supabase-Migration: idempotente Schema-Änderung — bestehende Einträge bleibe
 **Supabase-Pflichtschritt:** Migration in Supabase Dashboard → SQL Editor ausführen (letzter Block in `supabase/schema.sql`)
 
 ## QA Test Results
-_To be added by /qa_
+
+**Getestet:** 2026-06-10 | **Tester:** QA Engineer (Code-Review + Unit-Tests + E2E)
+
+### Akzeptanzkriterien: 10/10 bestanden
+
+| # | Kriterium | Ergebnis | Verifiziert durch |
+|---|-----------|----------|-------------------|
+| 1 | approved + Klick → implemented, verschwindet aus Hauptansicht | ✅ Pass | Code-Review: `visibleSuggestions`-Filter schließt `implemented` aus |
+| 2 | Button nicht sichtbar bei pending/rejected | ✅ Pass | Code-Review: Button nur bei `status === 'approved'` |
+| 3 | Erfolgs-Toast, kein Bestätigungsdialog | ✅ Pass | Code-Review: `toast.success`, kein Dialog im Pfad |
+| 4 | API-Fehler → Vorschlag bleibt + Fehler-Toast | ✅ Pass | Code-Review: `!result.success` → `toast.error` + early return |
+| 5 | History zeigt alle Statuses, Datum absteigend | ✅ Pass | Code-Review: page.tsx lädt alle, `report_date desc` |
+| 6 | Status-Filter zeigt nur gewählten Status | ✅ Pass | Code-Review: `activeFilter`-Logik |
+| 7 | Zähler Umgesetzt/Bestätigt/Abgelehnt (gesamt) | ✅ Pass | Code-Review: Zähler über ungefilterte Liste |
+| 8 | Leerer Zustand bei Filter ohne Treffer | ✅ Pass | Code-Review: Empty State mit filterspezifischem Text |
+| 9 | NORA-Prompt enthält „Bereits umgesetzt"-Abschnitt | ✅ Pass | Unit-Test: „enthält umgesetzte Vorschläge im Prompt" |
+| 10 | implemented-Abschnitt ÜBER approved-Abschnitt | ✅ Pass | Unit-Test (neu): „zeigt umgesetzte Vorschläge über den bestätigten" |
+
+### Edge Cases: 6/6 bestanden
+- **Doppelklick**: Button während Request deaktiviert (`isLoading`); Server-Update idempotent ✅
+- **Lange History**: `.slice(0, 50)` nach Filter; Seite lädt max. 500 ✅
+- **Alle umgesetzt**: Empty State der Hauptansicht greift ✅ (Text weicht leicht von Spec ab, siehe BUG-3)
+- **Race Condition**: Atomares Update, Single-User ✅
+- **History leer**: „Noch keine Vorschläge vorhanden — neue Generierung starten." ✅
+- **30-Tage-Fenster**: `live-context.ts` filtert auf `HISTORY_DAYS = 30` ✅
+
+### Automatisierte Tests
+- **Unit-Tests (Vitest):** 113/113 bestanden — inkl. 2 neue Tests für implementedSection (Inhalt + Reihenfolge)
+- **Build:** `npm run build` erfolgreich
+- **E2E (Playwright, Chromium):** 15 bestanden, 3 fehlgeschlagen (siehe BUG-1 — nicht PROJ-6), 59 übersprungen (benötigen Supabase-Credentials + Seed-Daten)
+- **E2E-Suite:** `tests/PROJ-6-implementation-tracking-history.spec.ts` neu — 1 aktiver Route-Schutz-Test, 9 credential-abhängige Tests (skip)
+
+### Security-Audit
+- ✅ Server Action: Zod-UUID-Validierung + Session-Pflicht (`auth.getUser()`)
+- ✅ RLS als zweite Verteidigungslinie (UPDATE-Policy verlangt `auth.uid()`)
+- ✅ Kein XSS-Risiko: React escaped alle Texte; keine `dangerouslySetInnerHTML`
+- ✅ Keine Secrets im Client; `implemented`-Pfad ruft keine externen APIs auf
+- ⚠️ BUG-1 (siehe unten): Middleware-Verhalten bei API-Routen entdeckt
+
+### Bugs
+
+| ID | Schwere | Beschreibung | Betrifft |
+|----|---------|--------------|----------|
+| BUG-1 | **High** | Middleware leitet ALLE nicht eingeloggten Anfragen — auch `/api/generate-suggestions` mit gültigem Cron-Bearer-Token — per 307 zu `/login` um. Der Cron-Secret-Check in der Route wird nie erreicht: **Vercel-Cron-Generierung ist in Produktion wirkungslos.** Verifiziert per curl: `GET /api/generate-suggestions` mit `Authorization: Bearer …` → 307 → /login. Fix: `/api/`-Pfade vom Middleware-Matcher ausnehmen (Routen machen eigene Auth). Betrifft PROJ-2/PROJ-1, nicht PROJ-6-Funktionalität. | PROJ-2 (Cron) |
+| BUG-2 | Low | History-Zähler basieren auf max. 500 geladenen Vorschlägen, nicht echten All-Time-Werten (Decision Log: „all-time"). Bei 3–5 Vorschlägen/Tag erst nach >100 Tagen relevant. | PROJ-6 |
+| BUG-3 | Low | Empty-State-Text der Hauptansicht („Alle Vorschläge bearbeitet") weicht vom Spec-Wortlaut („Alle Vorschläge umgesetzt — neue Generierung starten") ab — bestehender PROJ-3-Text, semantisch gleichwertig. | PROJ-6 |
+
+### Testumgebungs-Hinweise
+- Browser-Tests nur Chromium (WebKit-Download in dieser Umgebung durch Netzwerk-Allowlist blockiert)
+- Eingeloggte Flows ohne Supabase-Credentials nicht manuell testbar — durch Code-Review + Unit-Tests abgedeckt; E2E-Tests liegen bereit (skip) für Lauf mit `.env.local`
+- Responsive per Code-Review: `md:grid-cols-2 xl:grid-cols-3`, `flex-wrap` auf Stats/Filter — mobile-tauglich
+
+### Produktionsreife-Empfehlung
+**PROJ-6 selbst: READY** — alle 10 ACs bestanden, keine Critical/High-Bugs im Feature.
+**Aber:** BUG-1 (High, PROJ-2-Cron) sollte vor dem nächsten Deploy gefixt werden, da der tägliche Generierungslauf in Produktion nicht funktioniert.
+
+**Pflicht vor Deploy:** Supabase-Migration ausführen (implemented-CHECK-Constraint, letzter Block in `supabase/schema.sql`) — sonst schlägt „Als umgesetzt markieren" mit Constraint-Fehler fehl (graceful: Fehler-Toast).
 
 ## Deployment
 _To be added by /deploy_

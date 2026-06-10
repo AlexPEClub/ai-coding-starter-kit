@@ -204,4 +204,23 @@ describe('generateSuggestions', () => {
     expect(prompt).toContain('Umgesetzter Vorschlag')
     expect(prompt).toContain('umgesetzt')
   })
+
+  it('zeigt umgesetzte Vorschläge über den bestätigten (stärkeres Signal)', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockParse.mockResolvedValue({ parsed_output: { suggestions: [{ category: 'marketing', title: 'T', body: 'B', insight: 'I', source: 'S' }] } })
+    await generateSuggestions({
+      supabaseHistory: [
+        { title: 'Bestätigter Vorschlag', category: 'operations', status: 'approved' },
+        { title: 'Umgesetzter Vorschlag', category: 'product', status: 'implemented' },
+      ],
+      notionBizDevEntries: [],
+      livingSpecContent: null,
+    })
+    const prompt = mockParse.mock.calls[0][0].messages[0].content as string
+    const implementedIndex = prompt.indexOf('Bereits umgesetzt')
+    const approvedIndex = prompt.indexOf('Bereits bestätigt')
+    expect(implementedIndex).toBeGreaterThan(-1)
+    expect(approvedIndex).toBeGreaterThan(-1)
+    expect(implementedIndex).toBeLessThan(approvedIndex)
+  })
 })
