@@ -20,6 +20,9 @@ vi.mock('./nora-context', () => ({
 // notion.ts is imported for the ElaboratedSection type — no side effects
 vi.mock('./notion', () => ({}))
 
+// live-context.ts is imported for the LiveContext type only — no side effects needed
+vi.mock('./live-context', () => ({}))
+
 import { elaborateDocument, generateSuggestions } from './anthropic'
 
 const MOCK_SECTIONS = [
@@ -122,8 +125,83 @@ describe('elaborateDocument', () => {
   }, 15000)
 })
 
-describe('generateSuggestions (Smoke-Test)', () => {
+const EMPTY_LIVE_CONTEXT = {
+  supabaseHistory: [],
+  notionBizDevEntries: [],
+  livingSpecContent: null,
+}
+
+describe('generateSuggestions', () => {
+  beforeEach(() => vi.clearAllMocks())
+
   it('ist eine Funktion', () => {
     expect(typeof generateSuggestions).toBe('function')
+  })
+
+  it('wirft wenn ANTHROPIC_API_KEY fehlt', async () => {
+    delete process.env.ANTHROPIC_API_KEY
+    await expect(generateSuggestions(EMPTY_LIVE_CONTEXT)).rejects.toThrow('ANTHROPIC_API_KEY')
+  })
+
+  it('gibt Vorschläge zurück bei erfolgreichem Aufruf', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    const mockSuggestions = [
+      { category: 'marketing', title: 'T1', body: 'B1', insight: 'I1', source: 'S1' },
+    ]
+    mockParse.mockResolvedValue({ parsed_output: { suggestions: mockSuggestions } })
+    const result = await generateSuggestions(EMPTY_LIVE_CONTEXT)
+    expect(result).toEqual(mockSuggestions)
+  })
+
+  it('enthält Living Spec im Prompt wenn vorhanden', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockParse.mockResolvedValue({ parsed_output: { suggestions: [{ category: 'marketing', title: 'T', body: 'B', insight: 'I', source: 'S' }] } })
+    await generateSuggestions({
+      supabaseHistory: [],
+      notionBizDevEntries: [],
+      livingSpecContent: 'QualiPilot Stand: IQ-Dokument automatisierung.',
+    })
+    const prompt = mockParse.mock.calls[0][0].messages[0].content as string
+    expect(prompt).toContain('QualiPilot Stand')
+    expect(prompt).toContain('Living Spec')
+  })
+
+  it('enthält abgelehnte Vorschläge im Prompt', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockParse.mockResolvedValue({ parsed_output: { suggestions: [{ category: 'marketing', title: 'T', body: 'B', insight: 'I', source: 'S' }] } })
+    await generateSuggestions({
+      supabaseHistory: [{ title: 'Alter Vorschlag', category: 'marketing', status: 'rejected' }],
+      notionBizDevEntries: [],
+      livingSpecContent: null,
+    })
+    const prompt = mockParse.mock.calls[0][0].messages[0].content as string
+    expect(prompt).toContain('Alter Vorschlag')
+    expect(prompt).toContain('Abgelehnt')
+  })
+
+  it('enthält bestätigte Vorschläge im Prompt', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockParse.mockResolvedValue({ parsed_output: { suggestions: [{ category: 'marketing', title: 'T', body: 'B', insight: 'I', source: 'S' }] } })
+    await generateSuggestions({
+      supabaseHistory: [{ title: 'Bestätigter Vorschlag', category: 'operations', status: 'approved' }],
+      notionBizDevEntries: [],
+      livingSpecContent: null,
+    })
+    const prompt = mockParse.mock.calls[0][0].messages[0].content as string
+    expect(prompt).toContain('Bestätigter Vorschlag')
+    expect(prompt).toContain('bestätigt')
+  })
+
+  it('enthält umgesetzte Vorschläge im Prompt', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockParse.mockResolvedValue({ parsed_output: { suggestions: [{ category: 'marketing', title: 'T', body: 'B', insight: 'I', source: 'S' }] } })
+    await generateSuggestions({
+      supabaseHistory: [{ title: 'Umgesetzter Vorschlag', category: 'product', status: 'implemented' }],
+      notionBizDevEntries: [],
+      livingSpecContent: null,
+    })
+    const prompt = mockParse.mock.calls[0][0].messages[0].content as string
+    expect(prompt).toContain('Umgesetzter Vorschlag')
+    expect(prompt).toContain('umgesetzt')
   })
 })

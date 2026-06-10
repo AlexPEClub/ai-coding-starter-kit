@@ -111,6 +111,13 @@ ALTER TABLE daily_reports
   ADD COLUMN IF NOT EXISTS generation_status TEXT NOT NULL DEFAULT 'pending'
   CHECK (generation_status IN ('pending', 'sent', 'failed'));
 
+-- ─── PROJ-6: implemented-Status für suggestions ────────────
+-- Erweitert die CHECK-Constraint um den neuen 'implemented'-Status.
+-- Idempotent: DROP IF EXISTS + ADD CONSTRAINT.
+ALTER TABLE suggestions DROP CONSTRAINT IF EXISTS suggestions_status_check;
+ALTER TABLE suggestions ADD CONSTRAINT suggestions_status_check
+  CHECK (status IN ('pending', 'approved', 'rejected', 'implemented'));
+
 -- ─── PROJ-4: app_config ─────────────────────────────────────
 -- Key-Value-Store für Laufzeitkonfiguration (z.B. monday_board_id).
 CREATE TABLE IF NOT EXISTS app_config (
