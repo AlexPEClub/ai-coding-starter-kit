@@ -1,6 +1,6 @@
 # PROJ-2: Daily Suggestion Engine
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-06-07
 **Last Updated:** 2026-06-07
 
@@ -282,4 +282,12 @@ NORA befüllt pro Vorschlag: `title`, `body`, `insight`, `source`, `category`, `
 - Security Audit: PASS
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed:** 2026-06-10
+**Branch:** main
+**Commit:** 038e650
+**Vercel:** Auto-deploy via GitHub push — grüner Build bestätigt
+
+Benötigte Env-Vars (bereits in Vercel gesetzt): `ANTHROPIC_API_KEY`, `CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+Cron-Job aktiv: täglich 06:00 UTC via `vercel.json`.
