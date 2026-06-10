@@ -1,6 +1,6 @@
 # PROJ-6: Implementation Tracking & History
 
-## Status: Planned
+## Status: Architected
 **Created:** 2026-06-10
 **Last Updated:** 2026-06-10
 
@@ -81,13 +81,92 @@ Dieses Feature schließt die Lücke: Stefan kann genehmigte Vorschläge manuell 
 | Zähler zeigen Gesamtzahlen (all-time) | Langfristiger BizDev-Fortschritt ist motivierender als nur aktuelle Woche | 2026-06-10 |
 
 ### Technical Decisions
-<!-- Added by /architecture -->
+| Decision | Rationale | Date |
+|----------|-----------|------|
+| Bestehende Server Action erweitern statt neuer API-Endpunkt | `updateSuggestionStatus` deckt bereits alle Status-Wechsel ab; konsistentes Muster zu PROJ-3 | 2026-06-10 |
+| `implemented` in CHECK-Constraint statt neue Tabelle | Minimale Änderung; kein neues Datenbankschema nötig | 2026-06-10 |
+| History-Filter client-seitig (nicht via API) | Max. 50 Einträge werden vollständig geladen; client-seitiges Filtern ist performant genug und spart einen API-Call | 2026-06-10 |
+| shadcn/ui Tabs für Hauptansicht / Verlauf | Bereits installiert; konsistent mit bestehendem Design-System | 2026-06-10 |
+| `implemented` in `supabaseHistory` bereits mitgelesen (PROJ-7) | `live-context.ts` liest alle Statuses — kein zusätzlicher DB-Query nötig; nur `buildPrompt` anpassen | 2026-06-10 |
+| History max. 50 Einträge (kein Paging) | Ausreichend für MVP bei 1–5 Vorschlägen/Tag; Paginierung kommt wenn nötig | 2026-06-10 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Komponenten-Struktur
+
+```
+Dashboard Page (bestehend — page.tsx)
++-- Header (unverändert)
++-- Tabs (NEU — shadcn/ui Tabs, bereits installiert)
+    |
+    +-- Tab 1: "Vorschläge" (bestehende Hauptansicht)
+    |   +-- StatsBar (zeigt nur pending/approved)
+    |   +-- DashboardClient (gefiltert: nur pending + approved sichtbar)
+    |       +-- SuggestionCard
+    |           +-- [approved] "Als umgesetzt markieren"-Button (NEU)
+    |           +-- [approved] "Bestätigen"-Button (bestehend)
+    |           +-- [approved] "Ablehnen"-Button (bestehend)
+    |
+    +-- Tab 2: "Verlauf" (NEU)
+        +-- HistoryStats (Umgesetzt: X | Bestätigt: Y | Abgelehnt: Z)
+        +-- StatusFilter (Alle / Umgesetzt / Bestätigt / Abgelehnt)
+        +-- HistoryList (max. 50 Einträge, sortiert nach Datum desc)
+            +-- HistoryCard (read-only: Titel, Kategorie-Badge, Status-Badge, Datum)
+```
+
+### Datenfluss
+
+```
+"Als umgesetzt markieren"-Klick
+        ↓
+updateSuggestionStatus(id, 'implemented')    (bestehende Server Action, erweitert)
+        ↓
+Supabase: status = 'implemented', reviewed_at = jetzt
+        ↓
+DashboardClient: Vorschlag verschwindet aus Hauptansicht
+Toast: "Vorschlag als umgesetzt markiert"
+
+Verlauf-Tab öffnen
+        ↓
+Alle Vorschläge aus Supabase (Server Component — max. 50, alle Statuses)
+        ↓
+HistoryView: Zähler berechnen + Liste anzeigen + Filter anwenden (client-seitig)
+
+NORA Generierung (bestehend, erweitert)
+        ↓
+fetchLiveContext → supabaseHistory enthält implemented bereits (Status wird mitgelesen)
+        ↓
+buildPrompt: neuer Abschnitt "Bereits umgesetzt — nächste Schritte darauf aufbauen:"
+             erscheint über dem "Bereits bestätigt"-Abschnitt
+```
+
+### Datenmodell
+
+Keine neue Tabelle. Erweiterung der bestehenden `suggestions`-Tabelle:
+
+| Feld | Typ | Änderung |
+|---|---|---|
+| `status` | string | Neuer Wert `implemented` in CHECK-Constraint ergänzt |
+| `reviewed_at` | timestamp | Wird beim Markieren als umgesetzt befüllt (Feld existiert bereits) |
+
+Supabase-Migration: idempotente Schema-Änderung — bestehende Einträge bleiben unverändert.
+
+### Geänderte / neue Dateien
+
+| Datei | Änderung |
+|---|---|
+| `src/app/actions/suggestions.ts` | **Erweitert** — `implemented` zu `VALID_STATUSES`; neuer Fall: nur DB-Update (kein Monday/Notion) |
+| `src/app/dashboard/dashboard-client.tsx` | **Erweitert** — `implemented` aus Hauptansicht filtern; Tab-Wrapper |
+| `src/app/dashboard/suggestion-card.tsx` | **Erweitert** — „Als umgesetzt markieren"-Button nur für `approved` |
+| `src/app/dashboard/history-view.tsx` | **Neu** — HistoryStats + StatusFilter + HistoryList + HistoryCard |
+| `src/app/dashboard/page.tsx` | **Erweitert** — alle Suggestions (inkl. `implemented`) laden |
+| `src/lib/anthropic.ts` | **Erweitert** — `buildPrompt` um „Bereits umgesetzt"-Abschnitt |
+| `supabase/schema.sql` | **Erweitert** — `implemented` in CHECK-Constraint von `suggestions.status` |
+
+**Keine neuen Packages** — shadcn/ui `Tabs` bereits installiert.
 
 ## QA Test Results
 _To be added by /qa_
