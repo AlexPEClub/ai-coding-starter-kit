@@ -210,7 +210,7 @@ Supabase-Migration: idempotente Schema-Änderung — bestehende Einträge bleibe
 ### Automatisierte Tests
 - **Unit-Tests (Vitest):** 113/113 bestanden — inkl. 2 neue Tests für implementedSection (Inhalt + Reihenfolge)
 - **Build:** `npm run build` erfolgreich
-- **E2E (Playwright, Chromium):** 15 bestanden, 3 fehlgeschlagen (siehe BUG-1 — nicht PROJ-6), 59 übersprungen (benötigen Supabase-Credentials + Seed-Daten)
+- **E2E (Playwright, Chromium):** 18/18 aktive Tests bestanden (nach BUG-1-Fix), 59 übersprungen (benötigen Supabase-Credentials + Seed-Daten)
 - **E2E-Suite:** `tests/PROJ-6-implementation-tracking-history.spec.ts` neu — 1 aktiver Route-Schutz-Test, 9 credential-abhängige Tests (skip)
 
 ### Security-Audit
@@ -224,7 +224,7 @@ Supabase-Migration: idempotente Schema-Änderung — bestehende Einträge bleibe
 
 | ID | Schwere | Beschreibung | Betrifft |
 |----|---------|--------------|----------|
-| BUG-1 | **High** | Middleware leitet ALLE nicht eingeloggten Anfragen — auch `/api/generate-suggestions` mit gültigem Cron-Bearer-Token — per 307 zu `/login` um. Der Cron-Secret-Check in der Route wird nie erreicht: **Vercel-Cron-Generierung ist in Produktion wirkungslos.** Verifiziert per curl: `GET /api/generate-suggestions` mit `Authorization: Bearer …` → 307 → /login. Fix: `/api/`-Pfade vom Middleware-Matcher ausnehmen (Routen machen eigene Auth). Betrifft PROJ-2/PROJ-1, nicht PROJ-6-Funktionalität. | PROJ-2 (Cron) |
+| BUG-1 | **High** → **GEFIXT** | Middleware leitete ALLE nicht eingeloggten Anfragen — auch `/api/generate-suggestions` mit gültigem Cron-Bearer-Token — per 307 zu `/login` um. Der Cron-Secret-Check in der Route wurde nie erreicht: Vercel-Cron-Generierung war in Produktion wirkungslos. **Fix (2026-06-10):** `/api`-Pfade vom Middleware-Matcher ausgenommen — API-Routen machen eigene Auth. Verifiziert per curl (401 statt 307) + 3 vorher fehlschlagende E2E-Tests jetzt grün. | PROJ-2 (Cron) |
 | BUG-2 | Low | History-Zähler basieren auf max. 500 geladenen Vorschlägen, nicht echten All-Time-Werten (Decision Log: „all-time"). Bei 3–5 Vorschlägen/Tag erst nach >100 Tagen relevant. | PROJ-6 |
 | BUG-3 | Low | Empty-State-Text der Hauptansicht („Alle Vorschläge bearbeitet") weicht vom Spec-Wortlaut („Alle Vorschläge umgesetzt — neue Generierung starten") ab — bestehender PROJ-3-Text, semantisch gleichwertig. | PROJ-6 |
 
@@ -234,8 +234,7 @@ Supabase-Migration: idempotente Schema-Änderung — bestehende Einträge bleibe
 - Responsive per Code-Review: `md:grid-cols-2 xl:grid-cols-3`, `flex-wrap` auf Stats/Filter — mobile-tauglich
 
 ### Produktionsreife-Empfehlung
-**PROJ-6 selbst: READY** — alle 10 ACs bestanden, keine Critical/High-Bugs im Feature.
-**Aber:** BUG-1 (High, PROJ-2-Cron) sollte vor dem nächsten Deploy gefixt werden, da der tägliche Generierungslauf in Produktion nicht funktioniert.
+**READY** — alle 10 ACs bestanden, keine offenen Critical/High-Bugs. BUG-1 (High, PROJ-2-Cron) wurde im Rahmen dieser QA gefixt und mit curl + E2E verifiziert; der Fix wird zusammen mit PROJ-6 deployt.
 
 **Pflicht vor Deploy:** Supabase-Migration ausführen (implemented-CHECK-Constraint, letzter Block in `supabase/schema.sql`) — sonst schlägt „Als umgesetzt markieren" mit Constraint-Fehler fehl (graceful: Fehler-Toast).
 

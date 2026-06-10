@@ -56,7 +56,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // /api ausgenommen: API-Routen machen eigene Auth (Session ODER Cron-Secret).
+  // Ein Redirect zu /login würde den Vercel-Cron blockieren, der nie Cookies hat.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
