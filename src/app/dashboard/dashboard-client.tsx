@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { updateSuggestionStatus } from '@/app/actions/suggestions'
@@ -26,12 +26,11 @@ export function DashboardClient({ initialSuggestions, allTimeCounts }: Dashboard
 
   // Suggestions beyond the 500-row limit that exist in DB but weren't loaded.
   // Added to the local computed counts so the history stats bar is truly all-time.
-  const extraCounts = {
+  const extraCounts = useMemo(() => ({
     implemented: allTimeCounts.implemented - initialSuggestions.filter(s => s.status === 'implemented').length,
     approved: allTimeCounts.approved - initialSuggestions.filter(s => s.status === 'approved').length,
     rejected: allTimeCounts.rejected - initialSuggestions.filter(s => s.status === 'rejected').length,
-  }
-  const [actedIds, setActedIds] = useState<Set<string>>(new Set())
+  }), [allTimeCounts, initialSuggestions])
 
   const open = suggestions.filter(s => s.status === 'pending').length
   const approved = suggestions.filter(s => s.status === 'approved').length
@@ -47,16 +46,6 @@ export function DashboardClient({ initialSuggestions, allTimeCounts }: Dashboard
       }
 
       setSuggestions(prev => prev.map(s => (s.id === id ? { ...s, status } : s)))
-
-      setActedIds(prev => {
-        const next = new Set(prev)
-        if (status === 'pending') {
-          next.delete(id)
-        } else {
-          next.add(id)
-        }
-        return next
-      })
 
       if (status === 'implemented') {
         toast.success('Vorschlag als umgesetzt markiert.')
@@ -95,10 +84,8 @@ export function DashboardClient({ initialSuggestions, allTimeCounts }: Dashboard
     []
   )
 
-  // Hauptansicht: pending + approved (implementierte verschwinden), plus acted-this-session für Undo
-  const visibleSuggestions = suggestions.filter(
-    s => s.status === 'pending' || s.status === 'approved' || (actedIds.has(s.id) && s.status === 'rejected')
-  )
+  // Hauptansicht: nur offene Vorschläge; bestätigte und abgelehnte verschwinden sofort in den Verlauf
+  const visibleSuggestions = suggestions.filter(s => s.status === 'pending')
 
   const grouped = CATEGORY_ORDER
     .map(cat => ({
@@ -165,7 +152,6 @@ export function DashboardClient({ initialSuggestions, allTimeCounts }: Dashboard
                     <SuggestionCard
                       key={suggestion.id}
                       suggestion={suggestion}
-                      isActed={actedIds.has(suggestion.id)}
                       onAction={handleAction}
                     />
                   ))}
@@ -176,7 +162,7 @@ export function DashboardClient({ initialSuggestions, allTimeCounts }: Dashboard
         </TabsContent>
 
         <TabsContent value="verlauf">
-          <HistoryView suggestions={suggestions} extraCounts={extraCounts} />
+          <HistoryView suggestions={suggestions} extraCounts={extraCounts} onAction={handleAction} />
         </TabsContent>
       </Tabs>
     </div>

@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { CheckCircle2, XCircle, ChevronDown, ChevronUp, RotateCcw, Rocket } from 'lucide-react'
+import { CheckCircle2, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
 
 export type Suggestion = {
   id: string
@@ -26,12 +26,11 @@ const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
 
 type SuggestionCardProps = {
   suggestion: Suggestion
-  isActed: boolean
   onAction: (id: string, status: 'approved' | 'rejected' | 'pending' | 'implemented') => Promise<void>
 }
 
-export function SuggestionCard({ suggestion, isActed, onAction }: SuggestionCardProps) {
-  const [isLoading, setIsLoading] = useState<'approve' | 'reject' | 'undo' | 'implement' | null>(null)
+export function SuggestionCard({ suggestion, onAction }: SuggestionCardProps) {
+  const [isLoading, setIsLoading] = useState<'approve' | 'reject' | null>(null)
   const [isBodyExpanded, setIsBodyExpanded] = useState(false)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
 
@@ -40,15 +39,8 @@ export function SuggestionCard({ suggestion, isActed, onAction }: SuggestionCard
   const showDate = suggestion.report_date !== today
   const hasDetails = suggestion.insight || suggestion.source
 
-  const isApproved = isActed && suggestion.status === 'approved'
-  const isRejected = isActed && suggestion.status === 'rejected'
-
-  async function handleAction(action: 'approve' | 'reject' | 'undo' | 'implement') {
-    const newStatus =
-      action === 'approve' ? 'approved' :
-      action === 'reject' ? 'rejected' :
-      action === 'implement' ? 'implemented' :
-      'pending'
+  async function handleAction(action: 'approve' | 'reject') {
+    const newStatus = action === 'approve' ? 'approved' : 'rejected'
     setIsLoading(action)
     try {
       await onAction(suggestion.id, newStatus)
@@ -59,77 +51,35 @@ export function SuggestionCard({ suggestion, isActed, onAction }: SuggestionCard
 
   return (
     <Card
-      className="relative overflow-hidden transition-all duration-300"
-      style={{
-        background: isApproved
-          ? 'rgba(74, 222, 128, 0.05)'
-          : isRejected
-          ? 'rgba(255, 255, 255, 0.02)'
-          : '#0E1430',
-        border: isApproved
-          ? '1px solid rgba(74, 222, 128, 0.3)'
-          : isRejected
-          ? '1px solid rgba(255, 255, 255, 0.06)'
-          : '1px solid #1C2340',
-      }}
+      className="relative overflow-hidden"
+      style={{ background: '#0E1430', border: '1px solid #1C2340' }}
     >
       <CardContent className="p-4 space-y-3">
-        {/* Header row: category badge + date + undo */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge
-              variant="outline"
-              className="text-xs font-medium"
-              style={{
-                color: category.color,
-                borderColor: category.color + '40',
-                background: category.color + '15',
-              }}
-            >
-              {category.label}
-            </Badge>
-            {showDate && (
-              <span className="text-xs" style={{ color: '#8892B0' }}>
-                {new Date(suggestion.report_date + 'T12:00:00').toLocaleDateString('de-DE', {
-                  day: '2-digit',
-                  month: '2-digit',
-                })}
-              </span>
-            )}
-          </div>
-          {isActed && (
-            <button
-              onClick={() => handleAction('undo')}
-              disabled={isLoading !== null}
-              className="flex items-center gap-1 text-xs transition-opacity hover:opacity-80 shrink-0"
-              style={{ color: '#8892B0' }}
-              aria-label="Aktion rückgängig machen"
-            >
-              <RotateCcw className="w-3 h-3" />
-              {isLoading === 'undo' ? '…' : 'Rückgängig'}
-            </button>
+        {/* Header row: category badge + date */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge
+            variant="outline"
+            className="text-xs font-medium"
+            style={{
+              color: category.color,
+              borderColor: category.color + '40',
+              background: category.color + '15',
+            }}
+          >
+            {category.label}
+          </Badge>
+          {showDate && (
+            <span className="text-xs" style={{ color: '#8892B0' }}>
+              {new Date(suggestion.report_date + 'T12:00:00').toLocaleDateString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+              })}
+            </span>
           )}
         </div>
 
-        {/* Acted state indicator */}
-        {isApproved && (
-          <div className="flex items-center gap-1.5 text-sm font-medium" style={{ color: '#4ADE80' }}>
-            <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
-            Bestätigt
-          </div>
-        )}
-        {isRejected && (
-          <div className="flex items-center gap-1.5 text-sm" style={{ color: '#4A5568' }}>
-            <XCircle className="w-4 h-4" aria-hidden="true" />
-            Abgelehnt
-          </div>
-        )}
-
         {/* Title */}
-        <h3
-          className="font-semibold text-sm leading-snug"
-          style={{ color: isRejected ? '#4A5568' : '#FFFFFF' }}
-        >
+        <h3 className="font-semibold text-sm leading-snug" style={{ color: '#FFFFFF' }}>
           {suggestion.title}
         </h3>
 
@@ -137,7 +87,7 @@ export function SuggestionCard({ suggestion, isActed, onAction }: SuggestionCard
         <div>
           <p
             className={`text-sm leading-relaxed ${!isBodyExpanded ? 'line-clamp-3' : ''}`}
-            style={{ color: isRejected ? '#4A5568' : '#8892B0' }}
+            style={{ color: '#8892B0' }}
           >
             {suggestion.body}
           </p>
@@ -188,86 +138,56 @@ export function SuggestionCard({ suggestion, isActed, onAction }: SuggestionCard
           </Collapsible>
         )}
 
-        {/* "Als umgesetzt markieren" — nur für approved Vorschläge */}
-        {suggestion.status === 'approved' && (
+        {/* Bestätigen / Ablehnen */}
+        <div className="flex gap-2 pt-1">
           <Button
-            onClick={() => handleAction('implement')}
+            onClick={() => handleAction('approve')}
             disabled={isLoading !== null}
             size="sm"
-            variant="outline"
-            className="w-full text-xs font-medium h-8 transition-all hover:opacity-90"
-            style={{ borderColor: '#0E9594', color: '#0E9594', background: 'rgba(14,149,148,0.08)' }}
-            aria-label={`Vorschlag als umgesetzt markieren: ${suggestion.title}`}
+            className="flex-1 text-xs font-medium h-9 transition-all hover:opacity-90"
+            style={{ background: '#0078FF', color: '#FFFFFF', border: 'none' }}
+            aria-label={`Vorschlag bestätigen: ${suggestion.title}`}
           >
-            {isLoading === 'implement' ? (
+            {isLoading === 'approve' ? (
               <span className="flex items-center gap-1.5">
                 <span
                   className="inline-block w-3 h-3 border-2 rounded-full animate-spin"
-                  style={{ borderColor: 'rgba(14,149,148,0.3)', borderTopColor: '#0E9594' }}
+                  style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }}
                 />
                 Speichere…
               </span>
             ) : (
               <span className="flex items-center gap-1.5">
-                <Rocket className="w-3.5 h-3.5" aria-hidden="true" />
-                Als umgesetzt markieren
+                <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+                Bestätigen
               </span>
             )}
           </Button>
-        )}
-
-        {/* Bestätigen/Ablehnen — nur für pending Karten die noch nicht acted sind */}
-        {!isActed && suggestion.status === 'pending' && (
-          <div className="flex gap-2 pt-1">
-            <Button
-              onClick={() => handleAction('approve')}
-              disabled={isLoading !== null}
-              size="sm"
-              className="flex-1 text-xs font-medium h-9 transition-all hover:opacity-90"
-              style={{ background: '#0078FF', color: '#FFFFFF', border: 'none' }}
-              aria-label={`Vorschlag bestätigen: ${suggestion.title}`}
-            >
-              {isLoading === 'approve' ? (
-                <span className="flex items-center gap-1.5">
-                  <span
-                    className="inline-block w-3 h-3 border-2 rounded-full animate-spin"
-                    style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }}
-                  />
-                  Speichere…
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-                  Bestätigen
-                </span>
-              )}
-            </Button>
-            <Button
-              onClick={() => handleAction('reject')}
-              disabled={isLoading !== null}
-              size="sm"
-              variant="outline"
-              className="flex-1 text-xs font-medium h-9 transition-all hover:opacity-80"
-              style={{ background: 'transparent', borderColor: '#1C2340', color: '#8892B0' }}
-              aria-label={`Vorschlag ablehnen: ${suggestion.title}`}
-            >
-              {isLoading === 'reject' ? (
-                <span className="flex items-center gap-1.5">
-                  <span
-                    className="inline-block w-3 h-3 border-2 rounded-full animate-spin"
-                    style={{ borderColor: 'rgba(255,255,255,0.15)', borderTopColor: 'rgba(255,255,255,0.6)' }}
-                  />
-                  Speichere…
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  <XCircle className="w-3.5 h-3.5" aria-hidden="true" />
-                  Ablehnen
-                </span>
-              )}
-            </Button>
-          </div>
-        )}
+          <Button
+            onClick={() => handleAction('reject')}
+            disabled={isLoading !== null}
+            size="sm"
+            variant="outline"
+            className="flex-1 text-xs font-medium h-9 transition-all hover:opacity-80"
+            style={{ background: 'transparent', borderColor: '#1C2340', color: '#8892B0' }}
+            aria-label={`Vorschlag ablehnen: ${suggestion.title}`}
+          >
+            {isLoading === 'reject' ? (
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="inline-block w-3 h-3 border-2 rounded-full animate-spin"
+                  style={{ borderColor: 'rgba(255,255,255,0.15)', borderTopColor: 'rgba(255,255,255,0.6)' }}
+                />
+                Speichere…
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <XCircle className="w-3.5 h-3.5" aria-hidden="true" />
+                Ablehnen
+              </span>
+            )}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )

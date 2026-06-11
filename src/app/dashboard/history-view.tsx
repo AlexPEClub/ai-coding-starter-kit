@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Rocket, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import type { Suggestion } from './suggestion-card'
@@ -48,9 +49,10 @@ const FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
 type HistoryViewProps = {
   suggestions: Suggestion[]
   extraCounts?: { implemented: number; approved: number; rejected: number }
+  onAction?: (id: string, status: 'approved' | 'rejected' | 'pending' | 'implemented') => Promise<void>
 }
 
-export function HistoryView({ suggestions, extraCounts }: HistoryViewProps) {
+export function HistoryView({ suggestions, extraCounts, onAction }: HistoryViewProps) {
   const [activeFilter, setActiveFilter] = useState<StatusFilter>('all')
 
   const implemented = suggestions.filter(s => s.status === 'implemented').length + (extraCounts?.implemented ?? 0)
@@ -121,7 +123,7 @@ export function HistoryView({ suggestions, extraCounts }: HistoryViewProps) {
       ) : (
         <div className="space-y-2">
           {filtered.map(suggestion => (
-            <HistoryCard key={suggestion.id} suggestion={suggestion} />
+            <HistoryCard key={suggestion.id} suggestion={suggestion} onAction={onAction} />
           ))}
         </div>
       )}
@@ -129,54 +131,96 @@ export function HistoryView({ suggestions, extraCounts }: HistoryViewProps) {
   )
 }
 
-function HistoryCard({ suggestion }: { suggestion: Suggestion }) {
+function HistoryCard({
+  suggestion,
+  onAction,
+}: {
+  suggestion: Suggestion
+  onAction?: (id: string, status: 'approved' | 'rejected' | 'pending' | 'implemented') => Promise<void>
+}) {
+  const [isLoading, setIsLoading] = useState(false)
   const status = STATUS_CONFIG[suggestion.status] ?? STATUS_CONFIG.pending
   const category = CATEGORY_CONFIG[suggestion.category] ?? { label: suggestion.category, color: '#8892B0' }
 
+  async function handleImplement() {
+    if (!onAction) return
+    setIsLoading(true)
+    try {
+      await onAction(suggestion.id, 'implemented')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
-    <Card
-      style={{
-        background: '#0E1430',
-        border: '1px solid #1C2340',
-      }}
-    >
-      <CardContent className="px-4 py-3 flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0 space-y-1">
-          <p
-            className="text-sm font-medium leading-snug truncate"
-            style={{ color: suggestion.status === 'rejected' ? '#4A5568' : '#FFFFFF' }}
-            title={suggestion.title}
-          >
-            {suggestion.title}
-          </p>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge
-              variant="outline"
-              className="text-xs"
-              style={{
-                color: category.color,
-                borderColor: category.color + '40',
-                background: category.color + '15',
-              }}
+    <Card style={{ background: '#0E1430', border: '1px solid #1C2340' }}>
+      <CardContent className="px-4 py-3 space-y-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0 space-y-1">
+            <p
+              className="text-sm font-medium leading-snug truncate"
+              style={{ color: suggestion.status === 'rejected' ? '#4A5568' : '#FFFFFF' }}
+              title={suggestion.title}
             >
-              {category.label}
-            </Badge>
-            <span className="text-xs" style={{ color: '#4A5568' }}>
-              {new Date(suggestion.report_date + 'T12:00:00').toLocaleDateString('de-DE', {
-                day: '2-digit',
-                month: '2-digit',
-                year: '2-digit',
-              })}
-            </span>
+              {suggestion.title}
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge
+                variant="outline"
+                className="text-xs"
+                style={{
+                  color: category.color,
+                  borderColor: category.color + '40',
+                  background: category.color + '15',
+                }}
+              >
+                {category.label}
+              </Badge>
+              <span className="text-xs" style={{ color: '#4A5568' }}>
+                {new Date(suggestion.report_date + 'T12:00:00').toLocaleDateString('de-DE', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: '2-digit',
+                })}
+              </span>
+            </div>
+          </div>
+          <div
+            className="flex items-center gap-1 text-xs font-medium shrink-0"
+            style={{ color: status.color }}
+          >
+            {status.icon}
+            <span>{status.label}</span>
           </div>
         </div>
-        <div
-          className="flex items-center gap-1 text-xs font-medium shrink-0"
-          style={{ color: status.color }}
-        >
-          {status.icon}
-          <span>{status.label}</span>
-        </div>
+
+        {/* "Als umgesetzt markieren" nur für bestätigte Einträge */}
+        {suggestion.status === 'approved' && onAction && (
+          <Button
+            onClick={handleImplement}
+            disabled={isLoading}
+            size="sm"
+            variant="outline"
+            className="w-full text-xs font-medium h-8 transition-all hover:opacity-90"
+            style={{ borderColor: '#0E9594', color: '#0E9594', background: 'rgba(14,149,148,0.08)' }}
+            aria-label={`Vorschlag als umgesetzt markieren: ${suggestion.title}`}
+          >
+            {isLoading ? (
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="inline-block w-3 h-3 border-2 rounded-full animate-spin"
+                  style={{ borderColor: 'rgba(14,149,148,0.3)', borderTopColor: '#0E9594' }}
+                />
+                Speichere…
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <Rocket className="w-3.5 h-3.5" aria-hidden="true" />
+                Als umgesetzt markieren
+              </span>
+            )}
+          </Button>
+        )}
       </CardContent>
     </Card>
   )
