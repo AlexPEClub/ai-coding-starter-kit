@@ -18,10 +18,19 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 type DashboardClientProps = {
   initialSuggestions: Suggestion[]
+  allTimeCounts: { implemented: number; approved: number; rejected: number }
 }
 
-export function DashboardClient({ initialSuggestions }: DashboardClientProps) {
+export function DashboardClient({ initialSuggestions, allTimeCounts }: DashboardClientProps) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>(initialSuggestions)
+
+  // Suggestions beyond the 500-row limit that exist in DB but weren't loaded.
+  // Added to the local computed counts so the history stats bar is truly all-time.
+  const extraCounts = {
+    implemented: allTimeCounts.implemented - initialSuggestions.filter(s => s.status === 'implemented').length,
+    approved: allTimeCounts.approved - initialSuggestions.filter(s => s.status === 'approved').length,
+    rejected: allTimeCounts.rejected - initialSuggestions.filter(s => s.status === 'rejected').length,
+  }
   const [actedIds, setActedIds] = useState<Set<string>>(new Set())
 
   const open = suggestions.filter(s => s.status === 'pending').length
@@ -167,7 +176,7 @@ export function DashboardClient({ initialSuggestions }: DashboardClientProps) {
         </TabsContent>
 
         <TabsContent value="verlauf">
-          <HistoryView suggestions={suggestions} />
+          <HistoryView suggestions={suggestions} extraCounts={extraCounts} />
         </TabsContent>
       </Tabs>
     </div>

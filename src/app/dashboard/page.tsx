@@ -7,14 +7,24 @@ import type { Suggestion } from './suggestion-card'
 export default async function DashboardPage() {
   const supabase = await createClient()
 
-  const { data } = await supabase
-    .from('suggestions')
-    .select('id, title, body, insight, source, category, status, report_date')
-    .order('report_date', { ascending: false })
-    .order('created_at', { ascending: true })
-    .limit(500)
+  const [listResult, implCount, appCount, rejCount] = await Promise.all([
+    supabase
+      .from('suggestions')
+      .select('id, title, body, insight, source, category, status, report_date')
+      .order('report_date', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(500),
+    supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('status', 'implemented'),
+    supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
+    supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('status', 'rejected'),
+  ])
 
-  const suggestions = (data ?? []) as Suggestion[]
+  const suggestions = (listResult.data ?? []) as Suggestion[]
+  const allTimeCounts = {
+    implemented: implCount.count ?? 0,
+    approved: appCount.count ?? 0,
+    rejected: rejCount.count ?? 0,
+  }
 
   return (
     <div
@@ -51,7 +61,7 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <DashboardClient initialSuggestions={suggestions} />
+      <DashboardClient initialSuggestions={suggestions} allTimeCounts={allTimeCounts} />
     </div>
   )
 }

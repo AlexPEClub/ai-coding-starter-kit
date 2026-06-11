@@ -47,14 +47,15 @@ const FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
 
 type HistoryViewProps = {
   suggestions: Suggestion[]
+  extraCounts?: { implemented: number; approved: number; rejected: number }
 }
 
-export function HistoryView({ suggestions }: HistoryViewProps) {
+export function HistoryView({ suggestions, extraCounts }: HistoryViewProps) {
   const [activeFilter, setActiveFilter] = useState<StatusFilter>('all')
 
-  const implemented = suggestions.filter(s => s.status === 'implemented').length
-  const approved = suggestions.filter(s => s.status === 'approved').length
-  const rejected = suggestions.filter(s => s.status === 'rejected').length
+  const implemented = suggestions.filter(s => s.status === 'implemented').length + (extraCounts?.implemented ?? 0)
+  const approved = suggestions.filter(s => s.status === 'approved').length + (extraCounts?.approved ?? 0)
+  const rejected = suggestions.filter(s => s.status === 'rejected').length + (extraCounts?.rejected ?? 0)
 
   const filtered = suggestions
     .filter(s => activeFilter === 'all' || s.status === activeFilter)
