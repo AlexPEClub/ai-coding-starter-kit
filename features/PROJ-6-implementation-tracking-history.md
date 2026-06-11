@@ -225,7 +225,7 @@ Supabase-Migration: idempotente Schema-Änderung — bestehende Einträge bleibe
 | ID | Schwere | Beschreibung | Betrifft |
 |----|---------|--------------|----------|
 | BUG-1 | **High** → **GEFIXT** | Middleware leitete ALLE nicht eingeloggten Anfragen — auch `/api/generate-suggestions` mit gültigem Cron-Bearer-Token — per 307 zu `/login` um. Der Cron-Secret-Check in der Route wurde nie erreicht: Vercel-Cron-Generierung war in Produktion wirkungslos. **Fix (2026-06-10):** `/api`-Pfade vom Middleware-Matcher ausgenommen — API-Routen machen eigene Auth. Verifiziert per curl (401 statt 307) + 3 vorher fehlschlagende E2E-Tests jetzt grün. | PROJ-2 (Cron) |
-| BUG-2 | Low | History-Zähler basieren auf max. 500 geladenen Vorschlägen, nicht echten All-Time-Werten (Decision Log: „all-time"). Bei 3–5 Vorschlägen/Tag erst nach >100 Tagen relevant. | PROJ-6 |
+| BUG-2 | Low → **GEFIXT** | History-Zähler basierten auf max. 500 geladenen Vorschlägen, nicht echten All-Time-Werten (Decision Log: „all-time"). **Fix (2026-06-11):** `page.tsx` holt 3 parallele COUNT-Queries (head-only); `extraCounts` (DB-Gesamt minus geladener Batch) wird in `HistoryView` zu den lokal berechneten Zählern addiert. Commit `2eac786`. | PROJ-6 |
 | BUG-3 | Low | Empty-State-Text der Hauptansicht („Alle Vorschläge bearbeitet") weicht vom Spec-Wortlaut („Alle Vorschläge umgesetzt — neue Generierung starten") ab — bestehender PROJ-3-Text, semantisch gleichwertig. | PROJ-6 |
 
 ### Testumgebungs-Hinweise
@@ -246,3 +246,7 @@ Supabase-Migration: idempotente Schema-Änderung — bestehende Einträge bleibe
 **Vercel:** Auto-deploy via GitHub push — grüner Build bestätigt
 **Supabase-Migration:** `implemented`-CHECK-Constraint von Stefan im SQL Editor ausgeführt
 **Mit deployt:** fix(PROJ-2) — Middleware-Matcher nimmt `/api` aus; Vercel-Cron erreicht den Generierungs-Endpunkt wieder
+
+### Nachträgliche Updates (2026-06-11, Commits `2eac786` + `9b9e59b`, deployed & grün bestätigt)
+- **BUG-2 gefixt:** All-Time-Zähler im Verlauf (siehe Bugs-Tabelle)
+- **Design-Änderung (Stefan):** Bestätigte und abgelehnte Karten verschwinden sofort aus dem Vorschläge-Tab und erscheinen nur noch im Verlauf. Der „Als umgesetzt markieren"-Button ist von der SuggestionCard in die HistoryCard (Verlauf, nur `approved`-Einträge) umgezogen. `actedIds`-Tracking und Undo-Link entfernt.

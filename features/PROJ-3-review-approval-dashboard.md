@@ -44,9 +44,9 @@
 
 - [ ] Angenommen Stefan klickt auf „Bestätigen", wenn der Button gedrückt wird, dann wechselt der Button in einen Lade-Zustand und die Karte ändert sich erst, nachdem die Datenbank den Status-Wechsel auf `approved` bestätigt hat.
 - [ ] Angenommen Stefan klickt auf „Ablehnen", wenn der Button gedrückt wird, dann wechselt der Button in einen Lade-Zustand und die Karte ändert sich erst, nachdem die Datenbank den Status-Wechsel auf `rejected` bestätigt hat.
-- [ ] Angenommen eine Aktion erfolgreich war, wenn die Karte ihren neuen Zustand zeigt (grün für bestätigt, ausgegraut für abgelehnt), dann erscheint kurz ein „Rückgängig"-Link auf der Karte.
-- [ ] Angenommen Stefan klickt auf „Rückgängig", wenn der Link sichtbar ist, dann wird der Status der Karte zurück auf `pending` gesetzt (pessimistisch — erst nach DB-Bestätigung).
-- [ ] Angenommen die Karte zeigt ihren neuen Zustand, wenn Stefan die Seite neu lädt, dann ist die bearbeitete Karte nicht mehr in der Liste.
+- [ ] ~~Angenommen eine Aktion erfolgreich war, wenn die Karte ihren neuen Zustand zeigt (grün für bestätigt, ausgegraut für abgelehnt), dann erscheint kurz ein „Rückgängig"-Link auf der Karte.~~ *(Ersetzt 2026-06-11, siehe Design-Änderung unten)*
+- [ ] ~~Angenommen Stefan klickt auf „Rückgängig", wenn der Link sichtbar ist, dann wird der Status der Karte zurück auf `pending` gesetzt (pessimistisch — erst nach DB-Bestätigung).~~ *(Ersetzt 2026-06-11)*
+- [ ] Angenommen eine Aktion erfolgreich war, wenn die Datenbank den Status-Wechsel bestätigt hat, dann verschwindet die Karte sofort aus dem Vorschläge-Tab und erscheint im Verlauf-Tab. *(Geändert 2026-06-11)*
 
 ### Fehlerbehandlung
 
@@ -236,3 +236,10 @@ Alle 14 Acceptance Criteria auf Code-Ebene erfüllt, keine Critical/High-Bugs, S
 - [ ] Live-Smoke-Test: Login → Dashboard → Bestätigen/Ablehnen gegen echte DB
 - [ ] Optional: Error-Tracking (Sentry) gemäß `docs/production/error-tracking.md`
 - [ ] PROJ-2 (Daily Suggestion Engine) bauen — bis dahin zeigt das Dashboard nur den Empty State
+
+### Design-Änderung (2026-06-11, Commit `9b9e59b`, deployed & grün bestätigt)
+Auf Stefans Wunsch: Bestätigte und abgelehnte Karten verschwinden **sofort** aus dem Vorschläge-Tab und sind nur noch im Verlauf-Tab (PROJ-6) sichtbar. Der Vorschläge-Tab zeigt ausschließlich `pending`-Karten.
+
+**Entfallen dadurch:** Undo-Link auf der Karte, Zustandsanzeige „Bestätigt"/„Abgelehnt" auf der Karte, `actedIds`-Session-Tracking in `dashboard-client.tsx`. Der „Als umgesetzt markieren"-Button lebt jetzt in der HistoryCard im Verlauf (nur bei `approved`).
+
+**Rückgängig-Ersatz:** Aktuell kein Undo mehr möglich — bei Fehlklick müsste der Status direkt in Supabase korrigiert werden. Kandidat für PROJ-9 („Status ändern im Verlauf").
