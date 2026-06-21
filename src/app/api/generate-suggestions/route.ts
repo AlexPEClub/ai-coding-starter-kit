@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient, createServiceRoleClient } from '@/lib/supabase-server'
-import { generateSuggestions } from '@/lib/anthropic'
+import { generateSuggestions, generateProductOpportunity } from '@/lib/anthropic'
 import { fetchLiveContext } from '@/lib/live-context'
 
 // Generierung kann mehrere Sekunden dauern (Claude + Retries + Notion-Fetches).
@@ -68,7 +68,7 @@ async function handleGenerate(request: NextRequest) {
   try {
     const suggestions = await generateSuggestions(liveContext)
 
-    // 4a. Erfolg: Vorschläge speichern + Report auf "sent".
+    // 4a. Kern-Vorschläge speichern.
     const rows = suggestions.map(s => ({
       report_date: today,
       category: s.category,
@@ -84,16 +84,40 @@ async function handleGenerate(request: NextRequest) {
       throw new Error(`DB-Insert fehlgeschlagen: ${insertError.message}`)
     }
 
+    // 4b. PROJ-9: zusätzlich genau eine Produkt-Chance (best-effort).
+    // Bewusst SEPARATER Insert: scheitert er (z.B. weil die category-Migration
+    // noch nicht angewendet wurde), bleibt der bereits gespeicherte Kern-Batch
+    // unberührt — die 4. Kategorie darf den Tageslauf nie mitreißen.
+    let opportunityCount = 0
+    const productOpportunity = await generateProductOpportunity(liveContext)
+    if (productOpportunity) {
+      const { error: oppError } = await db.from('suggestions').insert([
+        {
+          report_date: today,
+          category: productOpportunity.category,
+          title: productOpportunity.title,
+          body: productOpportunity.body,
+          insight: productOpportunity.insight,
+          source: productOpportunity.source,
+          status: 'pending',
+        },
+      ])
+      if (!oppError) opportunityCount = 1
+      // oppError wird bewusst verschluckt (best-effort) — Kern-Batch ist sicher.
+    }
+
+    const totalCount = rows.length + opportunityCount
+
     await db.from('daily_reports').upsert(
       {
         report_date: today,
-        suggestions_count: rows.length,
+        suggestions_count: totalCount,
         generation_status: 'sent',
       },
       { onConflict: 'report_date' }
     )
 
-    return NextResponse.json({ success: true, count: rows.length })
+    return NextResponse.json({ success: true, count: totalCount })
   } catch (error) {
     // 4b. Endgültiger Fehler: kein halber Report, Status "failed" protokollieren.
     await db.from('daily_reports').upsert(

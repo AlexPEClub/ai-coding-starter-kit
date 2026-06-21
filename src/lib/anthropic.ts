@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod'
 import { NORA_COMPANY_CONTEXT } from './nora-context'
+import { DIGITAL_PRODUCT_RESEARCH } from './digital-product-research'
 import { type ElaboratedSection } from './notion'
 import { type LiveContext } from './live-context'
 
@@ -14,8 +15,11 @@ const MAX_SUGGESTIONS = 5
 export const CATEGORIES = ['marketing', 'product', 'operations'] as const
 export type Category = (typeof CATEGORIES)[number]
 
+// PROJ-9: separate 4. Kategorie, NICHT Teil der Haupt-Generierung (eigener Call).
+export const DIGITAL_PRODUCT_CATEGORY = 'digital_product' as const
+
 export type GeneratedSuggestion = {
-  category: Category
+  category: Category | typeof DIGITAL_PRODUCT_CATEGORY
   title: string
   body: string
   insight: string
@@ -256,4 +260,126 @@ export async function generateSuggestions(
       lastError instanceof Error ? lastError.message : String(lastError)
     }`
   )
+}
+
+// ─── PROJ-9: Produkt-Chance (Digital Product Research) ──────────────────────
+
+// Strukturierte Felder, die Claude liefert. Aus diesen wird deterministisch
+// title/body/insight/source einer normalen Suggestion zusammengesetzt — so sind
+// die geforderten Detailfelder (AC) garantiert sichtbar.
+const ProductOpportunitySchema = z.object({
+  title: z.string(),
+  format: z.string(),
+  price_range: z.string(),
+  promise: z.string(),
+  target_customer: z.string(),
+  problem: z.string(),
+  platforms: z.string(),
+  demand_evidence: z.string(),
+  proven_format: z.string(),
+})
+
+function buildProductOpportunityPrompt(liveContext: LiveContext): string {
+  // Dedup: bereits vorgeschlagene Produkt-Chancen (egal welcher Status) nicht wiederholen.
+  const priorOpportunities = liveContext.supabaseHistory
+    .filter(e => e.category === DIGITAL_PRODUCT_CATEGORY)
+    .map(e => `- ${e.title} (${e.status})`)
+
+  const dedupSection = priorOpportunities.length > 0
+    ? `## Bereits vorgeschlagene Produkt-Chancen — NICHT wiederholen (auch keine sehr ähnliche Idee):\n${priorOpportunities.join('\n')}`
+    : '## Bereits vorgeschlagene Produkt-Chancen\nNoch keine — dies ist die erste Produkt-Chance.'
+
+  return `${DIGITAL_PRODUCT_RESEARCH}
+
+${dedupSection}
+
+## Deine Aufgabe
+Du bist NORA. Leite aus der obigen Research-Sheet GENAU EINE konkrete, sofort angehbare
+**Produkt-Chance** für ein digitales Produkt ab, das Stefan als zusätzliche Einnahmequelle
+aufbauen könnte. Die Idee muss nachfrage-validiert sein: Sie MUSS auf mindestens einem der
+oben gelisteten, bereits verkauften Formate aufbauen — nenne dieses Format als Beleg.
+
+Die Produkt-Chance ist nischenoffen (jedes bewährte Format ist erlaubt) und muss für einen
+Solo-Gründer realistisch allein erstellbar sein. Wiederhole keine bereits vorgeschlagene Idee.
+
+Liefere diese Felder:
+- **title**: prägnanter Produktname (z. B. „Notion-Template: Freelancer-Finanz-OS")
+- **format**: das konkrete Produktformat (z. B. „Notion-Template", „Printable Planner-Bundle")
+- **price_range**: realistischer Preisrahmen (z. B. „19–39 $"), abgeleitet aus dem Beleg-Format
+- **promise**: das zentrale Versprechen / die Transformation (ein Satz)
+- **target_customer**: die konkrete Zielgruppe
+- **problem**: das gelöste Problem aus Kundensicht (ein bis zwei Sätze)
+- **platforms**: Verkaufsplattformen, auf denen das Format nachweislich läuft
+- **demand_evidence**: WARUM es Nachfrage gibt — der konkrete Beleg aus der Sheet (Suchvolumen, GMV, Verkäufer-Einnahmen etc.)
+- **proven_format**: das belegende, bereits verkaufte Format aus der Research-Sheet (Name + kurze Begründung)
+
+Sprache: Deutsch. Sei konkret und spezifisch — kein generisches Geschwätz.`
+}
+
+/**
+ * PROJ-9: erzeugt GENAU EINE nachfrage-validierte Produkt-Chance, gegroundet in der
+ * Research-Sheet. Best-effort: fehlt die Sheet oder scheitert Claude, wird `null`
+ * zurückgegeben (kein Wurf) — der tägliche Hauptlauf darf dadurch NIE blockiert werden.
+ */
+export async function generateProductOpportunity(
+  liveContext: LiveContext
+): Promise<GeneratedSuggestion | null> {
+  // Best-effort: ohne Wissensbasis keine Produkt-Chance.
+  if (!DIGITAL_PRODUCT_RESEARCH.trim()) return null
+
+  let client: Anthropic
+  try {
+    client = getClient()
+  } catch {
+    return null
+  }
+
+  const prompt = buildProductOpportunityPrompt(liveContext)
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await client.messages.parse({
+        model: MODEL,
+        max_tokens: 4000,
+        thinking: { type: 'adaptive' },
+        output_config: {
+          effort: 'high',
+          format: zodOutputFormat(ProductOpportunitySchema),
+        },
+        messages: [{ role: 'user', content: prompt }],
+      })
+
+      const p = response.parsed_output
+      if (!p || !p.title) {
+        throw new Error('Claude lieferte keine verwertbare Produkt-Chance.')
+      }
+
+      // Klartext-Labels (kein Markdown): die Dashboard-Card rendert den body als
+      // reinen Text mit whitespace-pre-line — Zeilenumbrüche bleiben, ** würde
+      // literal erscheinen.
+      const body = [
+        `Format: ${p.format}`,
+        `Preisrahmen: ${p.price_range}`,
+        `Versprechen: ${p.promise}`,
+        `Zielgruppe: ${p.target_customer}`,
+        `Gelöstes Problem: ${p.problem}`,
+        `Verkaufsplattformen: ${p.platforms}`,
+      ].join('\n')
+
+      return {
+        category: DIGITAL_PRODUCT_CATEGORY,
+        title: p.title,
+        body,
+        insight: p.demand_evidence,
+        source: `Belegt durch: ${p.proven_format}`,
+      }
+    } catch {
+      if (attempt < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 1000))
+      }
+    }
+  }
+
+  // Alle Versuche gescheitert → best-effort: still überspringen.
+  return null
 }

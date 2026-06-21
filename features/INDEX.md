@@ -23,7 +23,8 @@
 | PROJ-6 | Implementation Tracking & History | Deployed | [Spec](PROJ-6-implementation-tracking-history.md) | 2026-06-05 |
 | PROJ-7 | Context-Aware Suggestions (Live-Daten) | Deployed | [Spec](PROJ-7-context-aware-suggestions.md) | 2026-06-05 |
 | PROJ-8 | Notion-Dokument-Ausarbeitung | Deployed | [Spec](PROJ-8-notion-document-elaboration.md) | 2026-06-07 |
+| PROJ-9 | Digital Product Research (Demand Validation) | Approved | [Spec](PROJ-9-digital-product-research.md) | 2026-06-17 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-9
+## Next Available ID: PROJ-10

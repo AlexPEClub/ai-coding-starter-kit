@@ -17,13 +17,17 @@ vi.mock('./nora-context', () => ({
   NORA_COMPANY_CONTEXT: 'MOCK_CONTEXT',
 }))
 
+vi.mock('./digital-product-research', () => ({
+  DIGITAL_PRODUCT_RESEARCH: 'MOCK_RESEARCH_SHEET mit bewährten Formaten',
+}))
+
 // notion.ts is imported for the ElaboratedSection type — no side effects
 vi.mock('./notion', () => ({}))
 
 // live-context.ts is imported for the LiveContext type only — no side effects needed
 vi.mock('./live-context', () => ({}))
 
-import { elaborateDocument, generateSuggestions } from './anthropic'
+import { elaborateDocument, generateSuggestions, generateProductOpportunity } from './anthropic'
 
 const MOCK_SECTIONS = [
   { heading: 'LinkedIn-Post-Entwurf', content: 'Fertiger Post-Text.' },
@@ -223,4 +227,77 @@ describe('generateSuggestions', () => {
     expect(approvedIndex).toBeGreaterThan(-1)
     expect(implementedIndex).toBeLessThan(approvedIndex)
   })
+})
+
+const PRODUCT_OPP_OUTPUT = {
+  title: 'Notion-Template: Freelancer-Finanz-OS',
+  format: 'Notion-Template',
+  price_range: '19–39 $',
+  promise: 'Führe deine Finanzen aus einem Workspace',
+  target_customer: 'Freelancer und Solopreneure',
+  problem: 'Verstreute Finanz-Tools, keine Übersicht',
+  platforms: 'Gumroad, Notion-Gallery',
+  demand_evidence: 'Top-Creator verdienen 500–10.000 $/Monat',
+  proven_format: 'Notion Business-/Creator-OS-Template',
+}
+
+describe('generateProductOpportunity', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('gibt null zurück wenn ANTHROPIC_API_KEY fehlt (best-effort, kein Wurf)', async () => {
+    delete process.env.ANTHROPIC_API_KEY
+    const result = await generateProductOpportunity(EMPTY_LIVE_CONTEXT)
+    expect(result).toBeNull()
+  })
+
+  it('liefert eine zusammengesetzte Produkt-Chance mit Kategorie digital_product', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockParse.mockResolvedValue({ parsed_output: PRODUCT_OPP_OUTPUT })
+    const result = await generateProductOpportunity(EMPTY_LIVE_CONTEXT)
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe('digital_product')
+    expect(result!.title).toBe('Notion-Template: Freelancer-Finanz-OS')
+    // Detailfelder im body sichtbar (AC)
+    expect(result!.body).toContain('Notion-Template')
+    expect(result!.body).toContain('19–39 $')
+    expect(result!.body).toContain('Freelancer und Solopreneure')
+    // insight = Nachfrage-Beleg, source = belegendes Format
+    expect(result!.insight).toContain('500–10.000')
+    expect(result!.source).toContain('Belegt durch')
+    expect(result!.source).toContain('Notion Business-/Creator-OS-Template')
+  })
+
+  it('enthält die Research-Sheet im Prompt', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockParse.mockResolvedValue({ parsed_output: PRODUCT_OPP_OUTPUT })
+    await generateProductOpportunity(EMPTY_LIVE_CONTEXT)
+    const prompt = mockParse.mock.calls[0][0].messages[0].content as string
+    expect(prompt).toContain('MOCK_RESEARCH_SHEET')
+  })
+
+  it('listet bereits vorgeschlagene Produkt-Chancen zur Deduplizierung', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockParse.mockResolvedValue({ parsed_output: PRODUCT_OPP_OUTPUT })
+    await generateProductOpportunity({
+      supabaseHistory: [
+        { title: 'Budget-Planner Bundle', category: 'digital_product', status: 'rejected' },
+        { title: 'LinkedIn-Post', category: 'marketing', status: 'approved' },
+      ],
+      notionBizDevEntries: [],
+      livingSpecContent: null,
+    })
+    const prompt = mockParse.mock.calls[0][0].messages[0].content as string
+    expect(prompt).toContain('NICHT wiederholen')
+    expect(prompt).toContain('Budget-Planner Bundle')
+    // Nur digital_product-Historie, keine Marketing-Einträge
+    expect(prompt).not.toContain('LinkedIn-Post')
+  })
+
+  it('gibt null zurück wenn Claude wiederholt fehlschlägt (best-effort)', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockParse.mockRejectedValue(new Error('API down'))
+    const result = await generateProductOpportunity(EMPTY_LIVE_CONTEXT)
+    expect(result).toBeNull()
+    expect(mockParse).toHaveBeenCalledTimes(3)
+  }, 15000)
 })

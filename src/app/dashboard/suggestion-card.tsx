@@ -13,7 +13,7 @@ export type Suggestion = {
   body: string
   insight: string | null
   source: string | null
-  category: 'marketing' | 'product' | 'operations'
+  category: 'marketing' | 'product' | 'operations' | 'digital_product'
   status: 'pending' | 'approved' | 'rejected' | 'implemented'
   report_date: string
 }
@@ -22,6 +22,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
   marketing: { label: 'Marketing', color: '#38E5FF' },
   product: { label: 'Produkt', color: '#0078FF' },
   operations: { label: 'Operations', color: '#A720FF' },
+  digital_product: { label: 'Produkt-Chance', color: '#7B81FF' },
 }
 
 type SuggestionCardProps = {
@@ -86,7 +87,7 @@ export function SuggestionCard({ suggestion, onAction }: SuggestionCardProps) {
         {/* Body */}
         <div>
           <p
-            className={`text-sm leading-relaxed ${!isBodyExpanded ? 'line-clamp-3' : ''}`}
+            className={`text-sm leading-relaxed whitespace-pre-line ${!isBodyExpanded ? 'line-clamp-3' : ''}`}
             style={{ color: '#8892B0' }}
           >
             {suggestion.body}
