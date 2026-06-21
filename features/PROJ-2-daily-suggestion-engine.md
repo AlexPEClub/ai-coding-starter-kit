@@ -10,7 +10,7 @@
 
 ## User Stories
 - Als Stefan möchte ich, dass NORA jeden Morgen automatisch frische Vorschläge generiert, damit ich BizDev vorantreibe, ohne selbst Ideen produzieren zu müssen.
-- Als Stefan möchte ich, dass die Vorschläge auf dem Kontext von Nexora AI basieren, damit sie relevant für mein Unternehmen und meine Zielgruppe (Pharma/Healthcare) sind.
+- Als Stefan möchte ich, dass die Vorschläge auf dem Kontext von Kordix AI basieren, damit sie relevant für mein Unternehmen und meine Zielgruppe (Pharma/Healthcare) sind.
 - Als Stefan möchte ich, dass sich die Vorschläge nicht täglich wiederholen, damit ich kontinuierlich neue Impulse bekomme.
 - Als Stefan möchte ich die Generierung per Button manuell auslösen können, damit ich sie testen oder einen ausgefallenen Tag nachholen kann.
 - Als Stefan möchte ich, dass ein fehlgeschlagener Lauf protokolliert wird und mein Dashboard trotzdem funktioniert, damit ein API-Ausfall nichts kaputt macht.
@@ -35,7 +35,7 @@
 
 ### Kontext & Wiederholungsvermeidung
 
-- [ ] Angenommen ein Firmen-Kontext über Nexora AI ist hinterlegt, wenn NORA generiert, dann basieren die Vorschläge auf diesem Kontext (Produkt QualiPilot, Zielgruppe Pharma/Healthcare, Positionierung).
+- [ ] Angenommen ein Firmen-Kontext über Kordix AI ist hinterlegt, wenn NORA generiert, dann basieren die Vorschläge auf diesem Kontext (Produkt QualiPilot, Zielgruppe Pharma/Healthcare, Positionierung).
 - [ ] Angenommen es existieren Vorschläge aus den letzten ~30 Tagen, wenn NORA generiert, dann bekommt Claude diese als Kontext mit der Anweisung, Wiederholungen zu vermeiden und auf bisherigen Ideen aufzubauen.
 
 ### Doppellauf-Schutz
@@ -114,7 +114,7 @@ src/app/api/generate-suggestions/
 
 src/lib/
   anthropic.ts             (Claude-Client + Generierungs-Logik mit Retry)
-  nora-context.ts          (Fester Firmen-Kontext über Nexora AI — die "Wissensbasis")
+  nora-context.ts          (Fester Firmen-Kontext über Kordix AI — die "Wissensbasis")
 
 src/app/dashboard/
   generate-button.tsx      ("Jetzt generieren"-Button, oben rechts neben Logout)
@@ -153,7 +153,7 @@ NORA befüllt pro Vorschlag: `title`, `body`, `insight`, `source`, `category`, `
 ## Implementation Notes (Backend)
 **Gebaut am:** 2026-06-07
 
-- `src/lib/nora-context.ts` — Firmen-Briefing über Nexora AI (Erstentwurf aus PRD + Design-System; von Stefan jederzeit verfeinerbar)
+- `src/lib/nora-context.ts` — Firmen-Briefing über Kordix AI (Erstentwurf aus PRD + Design-System; von Stefan jederzeit verfeinerbar)
 - `src/lib/anthropic.ts` — Claude-Aufruf via `@anthropic-ai/sdk` (v0.102), Modell `claude-opus-4-8`, adaptive thinking + effort `high`, Structured Outputs (`messages.parse` + `zodOutputFormat`). Retry bis 3× mit wachsender Pause. Ergebnis auf 3–5 Vorschläge begrenzt.
 - `src/app/api/generate-suggestions/route.ts` — geschützter Endpunkt (POST für Button, GET für Cron). Auth: Cron-Secret (Bearer) ODER eingeloggte Session. Doppellauf-Schutz über `daily_reports.generation_status='sent'`; `failed` erlaubt Retry. Schreibt via Service-Role-Client.
 - `vercel.json` — Cron `0 6 * * *` (06:00 UTC) auf `/api/generate-suggestions`
@@ -193,7 +193,7 @@ NORA befüllt pro Vorschlag: `title`, `body`, `insight`, `source`, `category`, `
 | AC2 | Erfolgreicher Lauf → `daily_reports` Eintrag `sent` | ✅ PASS | Route upsert `generation_status: 'sent'`; Unit-Test "speichert Vorschläge bei Erfolg" |
 | AC3 | Alle Pflichtfelder befüllt, category valide | ✅ PASS | Zod-Schema `ResponseSchema` + `SuggestionSchema`; Route mapped alle Felder |
 | AC4 | Flexible Kategorieverteilung | ✅ PASS | Prompt instruiert Claude explizit zur flexiblen Verteilung ohne feste Quote |
-| AC5 | Firmen-Kontext in Vorschlägen | ✅ PASS | `nora-context.ts` mit vollständigem Nexora-AI-Briefing; Unit-Test prüft MOCK_CONTEXT |
+| AC5 | Firmen-Kontext in Vorschlägen | ✅ PASS | `nora-context.ts` mit vollständigem Kordix-AI-Briefing; Unit-Test prüft MOCK_CONTEXT |
 | AC6 | 30-Tage-Kontext für Wiederholungsvermeidung | ✅ PASS | `fetchLiveContext` (PROJ-7) liefert History; `buildPrompt` trennt approved/rejected |
 | AC7 | Doppellauf-Schutz: `sent` → überspringen | ✅ PASS | Route prüft `generation_status === 'sent'`; Unit-Test "überspringt bei vorhandenem Report" |
 | AC8 | `failed` Report → erneuter Versuch erlaubt | ✅ PASS | Route überspringt nur bei `sent`, nicht bei `failed`; Unit-Test "erlaubt erneuten Versuch" |

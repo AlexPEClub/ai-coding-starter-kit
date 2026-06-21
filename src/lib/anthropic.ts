@@ -12,7 +12,7 @@ const MAX_RETRIES = 3
 const MIN_SUGGESTIONS = 3
 const MAX_SUGGESTIONS = 5
 
-export const CATEGORIES = ['marketing', 'product', 'operations'] as const
+export const CATEGORIES = ['marketing', 'product', 'operations', 'design'] as const
 export type Category = (typeof CATEGORIES)[number]
 
 // PROJ-9: separate 4. Kategorie, NICHT Teil der Haupt-Generierung (eigener Call).
@@ -89,25 +89,27 @@ function buildPrompt(liveContext: LiveContext): string {
 ${contextBlock}
 
 ## Deine Aufgabe
-Du bist NORA, der tägliche BizDev-Assistent von Nexora AI. Generiere ${MIN_SUGGESTIONS}–${MAX_SUGGESTIONS} konkrete, sofort umsetzbare Verbesserungsvorschläge für Stefan.
+Du bist NORA, der tägliche BizDev-Assistent von Kordix AI. Generiere ${MIN_SUGGESTIONS}–${MAX_SUGGESTIONS} konkrete, sofort umsetzbare Verbesserungsvorschläge für Stefan.
 
-Verteile sie flexibel auf die drei Kategorien (marketing, product, operations) — wähle die heute relevantesten Bereiche, keine feste Quote. Jeder Vorschlag muss für einen Solo-Gründer in begrenzter Zeit realistisch allein umsetzbar sein.
+Verteile sie flexibel auf die vier Kategorien (marketing, product, operations, design) — wähle die heute relevantesten Bereiche, keine feste Quote (an manchen Tagen passt z. B. kein Design-Vorschlag — das ist völlig in Ordnung). Jeder Vorschlag muss für einen Solo-Gründer in begrenzter Zeit realistisch allein umsetzbar sein.
 
 Für jeden Vorschlag:
-- **category**: einer von "marketing", "product", "operations"
+- **category**: einer von "marketing", "product", "operations", "design"
 - **title**: knackige, konkrete Überschrift (z. B. "LinkedIn-Post: QualiPilot spart 80% Validierungszeit")
 - **body**: der konkrete Vorschlag + erste Umsetzungsschritte (2–4 Sätze)
 - **insight**: das WARUM — die Begründung/Logik dahinter (1–2 Sätze)
-- **source**: NORAs Denkgrundlage (z. B. "Abgeleitet aus Nexora-Positionierung + GMP-Zielgruppe")
+- **source**: NORAs Denkgrundlage (z. B. "Abgeleitet aus Kordix-Positionierung + GMP-Zielgruppe")
 
-Vermeide generisches Marketing-Geschwätz. Sei fachlich, GMP-/Pharma-kompetent und spezifisch für Nexora AI.`
+**Kategorie "design" (Design & Brand):** Maßnahmen zur visuellen Identität und Markenkonsistenz von Kordix AI — Logo-Einsatz, Farb- und Typografie-Konsistenz, Wiedererkennbarkeit über Touchpoints (Website, LinkedIn-Grafiken, Pitch-Deck, Doku-Templates). Beziehe dich konkret auf den Kordix AI Brand Guide (Sora-Font, Dark-Premium-Stil, Primärfarbe Electric Blue #0078FF, Signature-Gradient Cyan→Violet #38E5FF→#A720FF auf Navy #070B1E) statt generischer Design-Tipps. Keine Bild-/Grafikgenerierung — nur textuelle Maßnahmen-Entwürfe.
+
+Vermeide generisches Marketing-Geschwätz. Sei fachlich, GMP-/Pharma-kompetent und spezifisch für Kordix AI.`
 }
 
 const CATEGORY_PROMPTS: Record<string, string> = {
   marketing: `Schreibe einen fertigen LinkedIn-Post oder Blogpost-Entwurf (~200–250 Wörter) auf Basis dieses Marketing-Vorschlags.
 
 Gliedere das Dokument in folgende Abschnitte:
-1. "LinkedIn-Post-Entwurf" — Der komplett fertig formulierte Post: Hook, Hauptaussage mit konkretem Bezug auf QualiPilot/Nexora AI, Call-to-Action.
+1. "LinkedIn-Post-Entwurf" — Der komplett fertig formulierte Post: Hook, Hauptaussage mit konkretem Bezug auf QualiPilot/Kordix AI, Call-to-Action.
 2. "Hintergrund & Strategie" — Warum dieser Post jetzt? Für wen genau? Welchen Mehrwert bringt er für Stefans Zielgruppe?
 3. "Nächste Aktion" — Konkrete erste Schritte für Stefan (z. B. Hashtags, bester Veröffentlichungszeitpunkt).`,
 
@@ -125,12 +127,20 @@ Gliedere das Dokument in folgende Abschnitte:
 1. "Kontext & Ziel" — Warum dieser Prozess? Was soll er für Stefan als Solo-Gründer erreichen?
 2. "Schritte" — Nummerierte Schritt-für-Schritt-Anleitung zum direkten Umsetzen.
 3. "Hinweise & Stolpersteine" — Was zu beachten ist; typische Fehler und wie man sie vermeidet.`,
+
+  design: `Schreibe ein markenkonformes Design-/Brand-Konzept (~300–400 Wörter) auf Basis dieses Design-Vorschlags.
+
+Gliedere das Dokument in folgende Abschnitte:
+1. "Ausgangslage" — Aktueller visueller/markenbezogener Stand und das konkrete Problem (Inkonsistenz, fehlende Wiedererkennbarkeit o. Ä.).
+2. "Markenkonforme Lösung" — Wie die Maßnahme aussieht, mit konkretem Bezug auf den Kordix AI Brand Guide (Sora-Font, Dark-Premium-Stil, Electric Blue #0078FF, Signature-Gradient Cyan→Violet #38E5FF→#A720FF, Navy #070B1E).
+3. "Umsetzungsschritte" — Konkrete, allein umsetzbare Schritte (Tools, Vorlagen, Reihenfolge).
+4. "Erfolgskriterium" — Woran Stefan erkennt, dass die Marke konsistenter und wiedererkennbarer wirkt.`,
 }
 
 const DEFAULT_ELABORATION_PROMPT = `Schreibe ein strategisches Umsetzungs-Dokument (~300 Wörter) auf Basis dieses BizDev-Vorschlags.
 
 Gliedere das Dokument in folgende Abschnitte:
-1. "Kontext" — Hintergrund und Relevanz des Vorschlags für Nexora AI.
+1. "Kontext" — Hintergrund und Relevanz des Vorschlags für Kordix AI.
 2. "Ziel" — Was konkret erreicht werden soll.
 3. "Maßnahmen" — Konkrete Umsetzungsschritte.
 4. "Nächste Aktion" — Der erste konkrete Schritt für Stefan.`
@@ -167,7 +177,7 @@ function buildElaborationPrompt(params: {
 
 ${categoryInstruction}
 
-Schreibe in der Markenstimme von Nexora AI: premium, fachlich fundiert, GMP-/Pharma-kompetent. Kein generisches Marketing-Geschwätz — konkret und auf Augenhöhe mit Fachentscheidern.
+Schreibe in der Markenstimme von Kordix AI: premium, fachlich fundiert, GMP-/Pharma-kompetent. Kein generisches Marketing-Geschwätz — konkret und auf Augenhöhe mit Fachentscheidern.
 Sprache: Deutsch.`
 }
 

@@ -1,5 +1,5 @@
 -- ============================================================
--- NORA — Nexora AI BizDev Agent
+-- NORA — Kordix AI BizDev Agent
 -- Datenbankschema für Supabase (PROJ-1)
 --
 -- Ausführen in: Supabase Dashboard → SQL Editor → New Query
@@ -118,12 +118,12 @@ ALTER TABLE suggestions DROP CONSTRAINT IF EXISTS suggestions_status_check;
 ALTER TABLE suggestions ADD CONSTRAINT suggestions_status_check
   CHECK (status IN ('pending', 'approved', 'rejected', 'implemented'));
 
--- ─── PROJ-9: digital_product-Kategorie für suggestions ─────
--- Erweitert die category-CHECK-Constraint um die 4. Kategorie 'digital_product'
--- (Produkt-Chance / Digital Product Research). Idempotent: DROP IF EXISTS + ADD.
+-- ─── PROJ-9 / PROJ-10: zusätzliche Kategorien für suggestions ─────
+-- Erweitert die category-CHECK-Constraint um 'digital_product' (PROJ-9, Produkt-Chance)
+-- und 'design' (PROJ-10, Design & Brand). Idempotent: DROP IF EXISTS + ADD.
 ALTER TABLE suggestions DROP CONSTRAINT IF EXISTS suggestions_category_check;
 ALTER TABLE suggestions ADD CONSTRAINT suggestions_category_check
-  CHECK (category IN ('marketing', 'product', 'operations', 'digital_product'));
+  CHECK (category IN ('marketing', 'product', 'operations', 'digital_product', 'design'));
 
 -- ─── PROJ-4: app_config ─────────────────────────────────────
 -- Key-Value-Store für Laufzeitkonfiguration (z.B. monday_board_id).

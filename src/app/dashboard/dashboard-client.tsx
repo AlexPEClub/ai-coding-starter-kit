@@ -9,11 +9,12 @@ import { StatsBar } from './stats-bar'
 import { HistoryView } from './history-view'
 import type { Suggestion } from './suggestion-card'
 
-const CATEGORY_ORDER = ['marketing', 'product', 'operations', 'digital_product'] as const
+const CATEGORY_ORDER = ['marketing', 'product', 'operations', 'design', 'digital_product'] as const
 const CATEGORY_LABELS: Record<string, string> = {
   marketing: 'Marketing',
   product: 'Produkt',
   operations: 'Operations',
+  design: 'Design & Brand',
   digital_product: 'Produkt-Chance',
 }
 

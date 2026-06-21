@@ -20,7 +20,7 @@ Die Ausarbeitung passiert **on-demand bei der Bestätigung** (kein Vorab-Lauf f�
 - Als Stefan möchte ich bei Bestätigung eines Marketing-Vorschlags einen **fertigen LinkedIn-Post-/Blogpost-Entwurf** in Notion erhalten, damit ich nur noch prüfen und posten muss, statt selbst zu texten.
 - Als Stefan möchte ich bei einem Produkt-Vorschlag ein **strukturiertes Feature-/Spec-Konzept** (Problem, Lösung, Umsetzungsschritte) in Notion bekommen, damit ich QualiPilot direkt weiterentwickeln kann.
 - Als Stefan möchte ich bei einem Operations-Vorschlag eine **Schritt-für-Schritt-Prozessbeschreibung / Checkliste** erhalten, damit ich den Prozess sofort umsetzen kann.
-- Als Stefan möchte ich, dass die Ausarbeitung in Nexora-Markenstimme und GMP-/Pharma-fachlich korrekt geschrieben ist, damit ich Inhalte ohne große Nacharbeit verwenden kann.
+- Als Stefan möchte ich, dass die Ausarbeitung in Kordix-Markenstimme und GMP-/Pharma-fachlich korrekt geschrieben ist, damit ich Inhalte ohne große Nacharbeit verwenden kann.
 - Als Stefan möchte ich, dass eine fehlgeschlagene Ausarbeitung meine Bestätigung niemals blockiert, damit mein < 2-Minuten-Tagesworkflow zuverlässig bleibt.
 
 ## Out of Scope
@@ -40,7 +40,7 @@ Die Ausarbeitung passiert **on-demand bei der Bestätigung** (kein Vorab-Lauf f�
 - [ ] Angenommen ein Marketing-Vorschlag liegt vor, wenn Stefan ihn bestätigt, dann erstellt NORA eine Notion-Seite mit einem ausgearbeiteten LinkedIn-Post-/Blogpost-Entwurf (mehrere Absätze, klare Struktur), nicht nur dem Kurztext.
 - [ ] Angenommen ein Produkt-Vorschlag liegt vor, wenn Stefan ihn bestätigt, dann enthält die Notion-Seite ein strukturiertes Feature-/Spec-Konzept mit erkennbaren Abschnitten (z. B. Problem, Lösung, Umsetzungsschritte).
 - [ ] Angenommen ein Operations-Vorschlag liegt vor, wenn Stefan ihn bestätigt, dann enthält die Notion-Seite eine Schritt-für-Schritt-Prozessbeschreibung bzw. Checkliste.
-- [ ] Angenommen ein Vorschlag wird ausgearbeitet, wenn das Dokument erzeugt wird, dann ist es in Nexora-Markenstimme (premium, fachlich, GMP-/Pharma-kompetent) und bezieht sich konkret auf Nexora AI / QualiPilot, nicht generisch.
+- [ ] Angenommen ein Vorschlag wird ausgearbeitet, wenn das Dokument erzeugt wird, dann ist es in Kordix-Markenstimme (premium, fachlich, GMP-/Pharma-kompetent) und bezieht sich konkret auf Kordix AI / QualiPilot, nicht generisch.
 - [ ] Angenommen die Voll-Ausarbeitung durch Claude schlägt fehl (Timeout/Fehler), wenn Stefan bestätigt, dann wird der Monday-Task erstellt, die Notion-Seite mit dem bisherigen Kurztext angelegt und ein Warnhinweis angezeigt — die Bestätigung schlägt nicht fehl.
 - [ ] Angenommen die Ausarbeitung war erfolgreich, wenn die Notion-Seite erstellt wurde, dann zeigt das Dashboard die Erfolgsmeldung mit Link zur Notion-Seite (wie bisher).
 - [ ] Angenommen ein Vorschlag wurde bereits bestätigt, wenn Stefan ihn erneut zu bestätigen versucht, dann wird keine zweite Ausarbeitung/Seite erzeugt (Idempotenz wie bei PROJ-4/PROJ-5).
@@ -180,7 +180,7 @@ Keine neuen Pakete — `@anthropic-ai/sdk` (Claude) und Raw-Fetch (Notion) sind 
 - [x] `CATEGORY_PROMPTS.operations` enthält "Checkliste" und "Schritte" (unit test ✅)
 - [ ] Manuelle Prüfung: erfordert Credentials
 
-#### AC-4: Nexora-Markenstimme / GMP-kompetent
+#### AC-4: Kordix-Markenstimme / GMP-kompetent
 - [x] `NORA_COMPANY_CONTEXT` ist im Prompt enthalten (alle unit tests schließen Context ein ✅)
 - [x] Prompt-Anweisung "premium, fachlich fundiert, GMP-/Pharma-kompetent" vorhanden ✅
 - [ ] Inhaltliche Prüfung der Ausgabe: erfordert echten Claude-Aufruf

@@ -31,9 +31,9 @@ async function login(page: import('@playwright/test').Page) {
 
 test.describe('PROJ-3: Dashboard (eingeloggt)', () => {
   // AC: Dashboard zeigt Branding-Header
-  test.skip('zeigt den Nexora AI Header mit NORA-Badge', async ({ page }) => {
+  test.skip('zeigt den Kordix AI Header mit NORA-Badge', async ({ page }) => {
     await login(page)
-    await expect(page.getByText('NEXORA AI')).toBeVisible()
+    await expect(page.getByText('KORDIX AI')).toBeVisible()
     await expect(page.getByText('NORA')).toBeVisible()
   })
 

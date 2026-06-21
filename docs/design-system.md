@@ -1,10 +1,10 @@
-# Nexora AI Design System
+# Kordix AI Design System
 
-> Source: Nexora_AI_Brand_Guide.md (Google Drive, 05.06.2026)
+> Source: Kordix_AI_Brand_Guide.md (Google Drive, 05.06.2026)
 
 ## Brand
 
-- **Name:** Nexora AI
+- **Name:** Kordix AI
 - **Tagline:** Intelligence. Compliance. Impact.
 - **Positioning:** AI-Powered Solutions for Pharma & Healthcare Excellence
 
@@ -34,7 +34,7 @@ Signature Look: **Dark Premium** mit Cyan→Violet-Verlauf auf tiefem Navy/Schwa
 ## Logo
 
 - **Bildmarke:** Hexagon-Netzwerk mit 3D-Kristall (Ikosaeder) im Blau-Violett-Verlauf
-- **Wortmarke:** „NEXORA" (weiß) + „AI" (Cyan/Blau-Akzent)
+- **Wortmarke:** „KORDIX" (weiß) + „AI" (Cyan/Blau-Akzent)
 
 ## Brand Values
 
@@ -49,6 +49,6 @@ Signature Look: **Dark Premium** mit Cyan→Violet-Verlauf auf tiefem Navy/Schwa
 
 ## Product Branding: QualiPilot
 
-QualiPilot ist **Produkt #1 von Nexora AI**. Co-Branding-Regel:
+QualiPilot ist **Produkt #1 von Kordix AI**. Co-Branding-Regel:
 
-> **QualiPilot** — *a Nexora AI product*
+> **QualiPilot** — *a Kordix AI product*

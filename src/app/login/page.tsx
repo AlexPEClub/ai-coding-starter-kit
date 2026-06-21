@@ -71,7 +71,7 @@ export default function LoginPage() {
                 backgroundClip: 'text',
               }}
             >
-              NEXORA AI
+              KORDIX AI
             </div>
             <div className="text-[10px] tracking-[3px] uppercase" style={{ color: '#7B81FF' }}>
               Intelligence · Compliance · Impact
@@ -119,7 +119,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="stefan@nexora.ai"
+                placeholder="stefan@kordix.ai"
                 required
                 autoComplete="email"
                 className="border text-white placeholder:text-[#3D4A6B] focus-visible:ring-1 focus-visible:ring-[#0078FF] focus-visible:ring-offset-0"

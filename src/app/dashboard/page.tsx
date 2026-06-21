@@ -45,7 +45,7 @@ export default async function DashboardPage() {
               backgroundClip: 'text',
             }}
           >
-            NEXORA AI
+            KORDIX AI
           </div>
           <div
             className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium"

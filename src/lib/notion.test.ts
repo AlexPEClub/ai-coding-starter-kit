@@ -160,7 +160,7 @@ describe('notion.ts — API Client', () => {
     const baseParams = {
       title: 'Testtitel',
       category: 'marketing',
-      mondayUrl: 'https://nexoraai.monday.com/boards/1/pulses/123',
+      mondayUrl: 'https://kordixai.monday.com/boards/1/pulses/123',
       body: 'Test Body',
       insight: 'Test Insight',
       source: 'Test Quelle',

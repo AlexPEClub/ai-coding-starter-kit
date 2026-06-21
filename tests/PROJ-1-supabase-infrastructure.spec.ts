@@ -27,9 +27,9 @@ test.describe('PROJ-1: Route-Schutz & Login', () => {
   })
 
   // Login-Seite rendert Branding + Formular
-  test('zeigt das Nexora AI Branding und NORA-Badge auf der Login-Seite', async ({ page }) => {
+  test('zeigt das Kordix AI Branding und NORA-Badge auf der Login-Seite', async ({ page }) => {
     await page.goto('/login')
-    await expect(page.getByText('NEXORA AI')).toBeVisible()
+    await expect(page.getByText('KORDIX AI')).toBeVisible()
     await expect(page.getByText('NORA ist bereit')).toBeVisible()
   })
 
@@ -47,7 +47,7 @@ test.describe('PROJ-1: Route-Schutz & Login', () => {
 
   test('Anmelden-Button wird aktiv, sobald beide Felder ausgefüllt sind', async ({ page }) => {
     await page.goto('/login')
-    await page.locator('#email').fill('stefan@nexora.ai')
+    await page.locator('#email').fill('stefan@kordix.ai')
     await page.locator('#password').fill('geheim123')
     await expect(page.getByRole('button', { name: 'Anmelden' })).toBeEnabled()
   })

@@ -10,7 +10,7 @@ const sora = Sora({
 })
 
 export const metadata: Metadata = {
-  title: 'NORA — Nexora AI BizDev Agent',
+  title: 'NORA — Kordix AI BizDev Agent',
   description: 'Daily BizDev suggestions powered by NORA',
 }
 

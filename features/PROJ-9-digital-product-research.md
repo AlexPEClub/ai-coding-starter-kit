@@ -17,7 +17,7 @@ Der Kern ist **Nachfrage-Validierung vor Erstellung**: NORA schlägt nichts „a
 
 Es werden **keine externen/bezahlten Datenquellen** angebunden und **nichts gescraped** (PRD-Constraint). Die Demand-Evidenz stammt ausschließlich aus der kuratierten Sheet plus Claudes Wissen. Stefan hält die Sheet über die Zeit aktuell; sie ist die einzige „Live"-Quelle für dieses Feature.
 
-Die Produkt-Chancen sind **breit / nischenoffen**: jedes marktbewährte digitale Produkt (Planner, Journals, Notion-/Canva-Templates, Prompt-Packs, eBooks, Printables …) ist erlaubt — nicht auf Nexoras Pharma-Nische beschränkt. Ziel ist eine eigenständige Nebenerlös-Quelle für Stefan.
+Die Produkt-Chancen sind **breit / nischenoffen**: jedes marktbewährte digitale Produkt (Planner, Journals, Notion-/Canva-Templates, Prompt-Packs, eBooks, Printables …) ist erlaubt — nicht auf Kordixs Pharma-Nische beschränkt. Ziel ist eine eigenständige Nebenerlös-Quelle für Stefan.
 
 ## User Stories
 - Als Stefan möchte ich täglich **eine** nachfrage-validierte Idee für ein digitales Produkt bekommen, damit ich eine zusätzliche Einnahmequelle aufbauen kann, ohne selbst stundenlang Marktrecherche zu betreiben.
@@ -30,7 +30,7 @@ Die Produkt-Chancen sind **breit / nischenoffen**: jedes marktbewährte digitale
 ## Out of Scope
 - **Live-Marktdaten / Facebook Ads Library / TikTok / Etsy-Scraping** — PRD-Constraint: kein bezahltes/externes API, kein Web-Scraping im MVP. Demand-Evidenz kommt nur aus der kuratierten Sheet.
 - **Web-Search-Datenquelle zur Generierungszeit** — bewusst verworfen (verletzt No-External-Data-Constraint); kann später als eigenes Feature evaluiert werden.
-- **Beschränkung auf Nexora-Pharma-Nische** — verworfen; Produkt-Chancen sind nischenoffen (Entscheidung 2026-06-17).
+- **Beschränkung auf Kordix-Pharma-Nische** — verworfen; Produkt-Chancen sind nischenoffen (Entscheidung 2026-06-17).
 - **Automatische Pflege/Aktualisierung der Research-Sheet durch NORA** — die Sheet ist von Stefan kuratiert; NORA liest sie nur. Auto-Anreicherung wäre ein eigenes Feature.
 - **Erstellung des fertigen Produkts** (Design, Datei, Verkaufsseite, Pricing-Engine) — NORA validiert und beschreibt die Chance; das Bauen/Verkaufen macht Stefan außerhalb von NORA.
 - **Eigene Erfolgs-/Umsatz-Tracking-Ansicht für verkaufte Produkte** — kein Sales-Dashboard; Tracking endet beim bestehenden Implementation-History-Flow (PROJ-6).

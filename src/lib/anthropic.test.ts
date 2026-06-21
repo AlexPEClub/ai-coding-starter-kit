@@ -86,6 +86,14 @@ describe('elaborateDocument', () => {
     expect(prompt).toContain('Checkliste')
   })
 
+  it('enthält "Markenkonforme Lösung" im Prompt für Design-Kategorie (PROJ-10)', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockSuccess()
+    await elaborateDocument({ title: 'T', body: 'B', insight: null, source: null, category: 'design' })
+    const prompt = mockParse.mock.calls[0][0].messages[0].content as string
+    expect(prompt).toContain('Markenkonforme Lösung')
+  })
+
   it('verwendet Default-Prompt für unbekannte Kategorie', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key'
     mockSuccess()
@@ -155,6 +163,18 @@ describe('generateSuggestions', () => {
     mockParse.mockResolvedValue({ parsed_output: { suggestions: mockSuggestions } })
     const result = await generateSuggestions(EMPTY_LIVE_CONTEXT)
     expect(result).toEqual(mockSuggestions)
+  })
+
+  it('bietet die vier Kategorien inkl. design im Generierungs-Prompt an (PROJ-10)', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockParse.mockResolvedValue({ parsed_output: { suggestions: [{ category: 'design', title: 'T', body: 'B', insight: 'I', source: 'S' }] } })
+    const result = await generateSuggestions(EMPTY_LIVE_CONTEXT)
+    const prompt = mockParse.mock.calls[0][0].messages[0].content as string
+    expect(prompt).toContain('vier Kategorien')
+    expect(prompt).toContain('design')
+    expect(prompt).toContain('Design & Brand')
+    // design ist eine gültige Kategorie im Output
+    expect(result[0].category).toBe('design')
   })
 
   it('enthält Living Spec im Prompt wenn vorhanden', async () => {

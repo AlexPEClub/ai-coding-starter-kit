@@ -36,6 +36,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
   marketing: { label: 'Marketing', color: '#38E5FF' },
   product: { label: 'Produkt', color: '#0078FF' },
   operations: { label: 'Operations', color: '#A720FF' },
+  design: { label: 'Design & Brand', color: '#0E9594' },
   digital_product: { label: 'Produkt-Chance', color: '#7B81FF' },
 }
 

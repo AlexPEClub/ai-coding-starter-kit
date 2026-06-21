@@ -90,7 +90,7 @@
 - **Middleware:** Next.js Middleware für Route Protection (alle Seiten außer `/login` erfordern Auth)
 
 ## Open Questions
-- [ ] Soll die initiale Supabase-Instanz auf dem EU-Server gehostet werden (DSGVO-Konformität für Nexora AI)?
+- [ ] Soll die initiale Supabase-Instanz auf dem EU-Server gehostet werden (DSGVO-Konformität für Kordix AI)?
 - [ ] Wird ein Service Role Key für Server-side Actions benötigt (für PROJ-2 Suggestion Engine)?
 
 ## Decision Log
@@ -109,7 +109,7 @@
 | `@supabase/ssr` statt `@supabase/auth-helpers-nextjs` | Offiziell empfohlen für Next.js App Router; verwaltet Sessions korrekt über Cookies (SSR + Middleware kompatibel) | 2026-06-06 |
 | Cookies statt localStorage für Sessions | `@supabase/ssr` verwendet Cookies — funktioniert in Middleware und Server Components; localStorage wäre nur clientseitig verfügbar | 2026-06-06 |
 | Next.js Middleware für Route-Schutz | Läuft auf dem Edge vor jedem Render — kein clientseitiges Flackern, kein kurzes Aufleuchten geschützter Seiten | 2026-06-06 |
-| EU-Region Frankfurt für Supabase | Nexora AI bedient Pharma/Healthcare im DACH-Raum — DSGVO erfordert EU-Hosting | 2026-06-06 |
+| EU-Region Frankfurt für Supabase | Kordix AI bedient Pharma/Healthcare im DACH-Raum — DSGVO erfordert EU-Hosting | 2026-06-06 |
 | RLS mit „nur Auth-Nutzer" Policy | Backend-Regeln fordern immer RLS. Policy erlaubt alle Operationen für eingeloggte Nutzer — schützt DB ohne Multi-Tenant-Komplexität | 2026-06-06 |
 | Service Role Key serverseitig | Für PROJ-2 Suggestion Engine nötig — schreibt ohne User-Context in die DB | 2026-06-06 |
 | Nutzer manuell im Supabase Dashboard anlegen | Single-User-App, kein Sign-up in der App. Stefan wird einmalig in der Supabase-Konsole angelegt | 2026-06-06 |
@@ -128,7 +128,7 @@ App (Next.js App Router)
 │
 ├── /login                             ← Öffentliche Route (kein Auth nötig)
 │   └── LoginPage
-│       ├── Branding (NEXORA AI Logo + NORA-Status-Badge)
+│       ├── Branding (KORDIX AI Logo + NORA-Status-Badge)
 │       └── LoginForm
 │           ├── Input — E-Mail         (shadcn/ui — bereits installiert)
 │           ├── Input — Passwort       (shadcn/ui — bereits installiert)

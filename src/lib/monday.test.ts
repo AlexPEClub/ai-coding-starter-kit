@@ -13,7 +13,7 @@ const TEST_KEY = 'test-api-key'
 const TEST_BOARD_ID = '123456789'
 const TEST_GROUP_ID = 'group_abc'
 const TEST_ITEM_ID = '987654321'
-const TEST_ITEM_URL = 'https://nexoraai.monday.com/boards/123456789/pulses/987654321'
+const TEST_ITEM_URL = 'https://kordixai.monday.com/boards/123456789/pulses/987654321'
 
 function mockFetch(response: unknown, status = 200) {
   return vi.spyOn(global, 'fetch').mockResolvedValue({
