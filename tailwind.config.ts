@@ -9,7 +9,26 @@ const config: Config = {
   ],
   theme: {
   	extend: {
+  		fontFamily: {
+  			sans: ['var(--font-archivo)', 'system-ui', 'sans-serif'],
+  		},
   		colors: {
+  			/* ZUSAMMEN raw tokens — use as bg-bg, text-ink, border-line, etc. */
+  			bg: 'var(--bg)',
+  			surface: 'var(--surface)',
+  			'surface-2': 'var(--surface-2)',
+  			ink: 'var(--ink)',
+  			'ink-2': 'var(--ink-2)',
+  			'ink-3': 'var(--ink-3)',
+  			line: 'var(--line)',
+  			'primary-soft': 'var(--primary-soft)',
+  			'secondary-soft': 'var(--secondary-soft)',
+  			'accent-soft': 'var(--accent-soft)',
+  			success: 'var(--success)',
+  			'success-soft': 'var(--success-soft)',
+  			error: 'var(--error)',
+  			'error-soft': 'var(--error-soft)',
+  			/* shadcn/ui semantic tokens */
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {
@@ -62,26 +81,26 @@ const config: Config = {
   			}
   		},
   		borderRadius: {
+  			'2xl': '18px',
+  			xl: 'calc(var(--radius) + 4px)',
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			sm: 'calc(var(--radius) - 4px)',
+  			pill: '999px',
+  		},
+  		boxShadow: {
+  			sm: 'var(--shadow-sm)',
+  			md: 'var(--shadow-md)',
+  			lg: 'var(--shadow-lg)',
   		},
   		keyframes: {
   			'accordion-down': {
-  				from: {
-  					height: '0'
-  				},
-  				to: {
-  					height: 'var(--radix-accordion-content-height)'
-  				}
+  				from: { height: '0' },
+  				to: { height: 'var(--radix-accordion-content-height)' }
   			},
   			'accordion-up': {
-  				from: {
-  					height: 'var(--radix-accordion-content-height)'
-  				},
-  				to: {
-  					height: '0'
-  				}
+  				from: { height: 'var(--radix-accordion-content-height)' },
+  				to: { height: '0' }
   			}
   		},
   		animation: {

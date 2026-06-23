@@ -11,7 +11,15 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+        },
+      },
+    },
     { name: 'Mobile Safari', use: { ...devices['iPhone 13'] } },
   ],
   webServer: {
