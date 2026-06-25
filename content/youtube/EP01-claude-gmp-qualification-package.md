@@ -174,10 +174,10 @@ Kordix AI. Build smarter. Validate faster. See you in the next one.
 
 ## 4. B-ROLL PLAN
 
-> **✅ Produced this session (faceless POC)** — in `assets/EP01/`:
-> - **`EP01-intro-clip-hero-5s.mp4`** — 5s cinematic image-to-video (Higgsfield Cinema Studio) animating the hero crystal: slow push-in, light refraction. Channel intro / hook visual. Silent (audio added in edit).
-> - **`EP01-hook-voiceover-sterling-16s.mp3`** — 16s ElevenLabs VO (voice *Sterling*, male/professional) of the EP01 hook. Lay over b-roll in CapCut.
-> - **Next:** generate 2–3 more b-roll clips to cover the 16s VO, then assemble into the full hook scene (no ffmpeg in this env → assemble via CapCut or Adobe quick-cut).
+> **✅ Produced this session (faceless hook scene — assembled)** — in `assets/EP01/`:
+> - **`EP01-hook-scene-julian.mp4`** ⭐ — finished **15.8s** hook video: 3 cinematic b-roll shots (crystal intro → document burden → traceability matrix) cut to the hook voiceover (voice *Julian*), 1280×720, with fades. Ready as the YouTube intro **and** a Short/TikTok base.
+> - Reusable source pieces: `EP01-intro-clip-hero-5s.mp4`, `EP01-broll-binders-5s.mp4`, `EP01-broll-matrix-5s.mp4`, `EP01-hook-voiceover-julian-16s.mp3`.
+> - Assembled with ffmpeg (scale → concat → end-pad → fade in/out → AAC mux). Voice swapped Sterling → **Julian** per direction.
 
 | # | Shot | Source | Use |
 |---|------|--------|-----|
