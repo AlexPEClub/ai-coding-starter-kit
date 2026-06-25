@@ -174,6 +174,11 @@ Kordix AI. Build smarter. Validate faster. See you in the next one.
 
 ## 4. B-ROLL PLAN
 
+> **✅ Produced this session (faceless POC)** — in `assets/EP01/`:
+> - **`EP01-intro-clip-hero-5s.mp4`** — 5s cinematic image-to-video (Higgsfield Cinema Studio) animating the hero crystal: slow push-in, light refraction. Channel intro / hook visual. Silent (audio added in edit).
+> - **`EP01-hook-voiceover-sterling-16s.mp3`** — 16s ElevenLabs VO (voice *Sterling*, male/professional) of the EP01 hook. Lay over b-roll in CapCut.
+> - **Next:** generate 2–3 more b-roll clips to cover the 16s VO, then assemble into the full hook scene (no ffmpeg in this env → assemble via CapCut or Adobe quick-cut).
+
 | # | Shot | Source | Use |
 |---|------|--------|-----|
 | 1 | Blinking cursor on empty "Validation Plan" doc | Screen capture | Hook |
