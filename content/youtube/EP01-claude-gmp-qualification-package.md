@@ -194,6 +194,8 @@ Kordix AI. Build smarter. Validate faster. See you in the next one.
 ## 5. HIGGSFIELD PROMPTS (brand-locked)
 
 > Global style suffix to append to every prompt: `— dark premium, deep navy #070B1E background, cyan-to-violet gradient accents (#38E5FF → #0078FF → #7B81FF → #A720FF), subtle volumetric glow, clean geometric, high detail, cinematic, 16:9, no text, no watermark.`
+>
+> **✅ Hero generated this session** (Recraft 4.1, 2688×1536) — `assets/EP01/EP01-hero-crystal-A.png` (+ `-B`): glowing crystal over a hexagonal grid in cyan→violet — on-brand with the Kordix logo motif. Reuse as title-card background, intro sting frame, and section dividers.
 
 1. **Title/hero (16:9):** "A glowing 3D crystalline icosahedron hovering above a hexagonal network grid, refracting cyan and violet light, floating in dark space, premium tech aesthetic."
 2. **Problem — document burden:** "Towering stacks of identical bureaucratic binders fading into darkness, a single thin beam of blue light cutting across, oppressive scale, cinematic depth."
@@ -228,6 +230,12 @@ Kordix AI. Build smarter. Validate faster. See you in the next one.
 ---
 
 ## 7. THUMBNAIL CONCEPTS (3 to A/B test)
+
+> **✅ Generated this session** (Recraft 4.1, brand palette locked, 2688×1536) — see `assets/EP01/`:
+> - **`EP01-thumbnail-A-recommended.png`** — Concept B executed: bold "3 WEEKS → 10 MIN" left, glowing book/binder stack right, cyan→violet gradient. Punchy, mobile-legible, **text rendered correctly** → recommended primary.
+> - **`EP01-thumbnail-B.png`** — same line, horizontal minimal layout, darker. Use as the A/B challenger.
+> - Both are **faceless** (correct for the channel). The face-based concepts below stay as options only if a host face is added later.
+> - **Final step in Canva:** drop the real **Sora** font over the text layer for brand consistency and set 1280×720 export. The AI text is a strong base, not the final type.
 
 **Concept A — "The Stamp" (recommended).**
 Left: founder's face, slightly skeptical/intrigued expression, lit blue. Right big text **"CLAUDE BUILT THIS?"** in Sora. A red **"483?"** stamp half-overlapping. Bottom strip: faint document/RTM grid glowing cyan→violet. High contrast, mobile-legible at 3 words.
