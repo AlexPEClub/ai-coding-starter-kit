@@ -236,6 +236,12 @@ Kordix AI. Build smarter. Validate faster. See you in the next one.
 > - **`EP01-thumbnail-B.png`** — same line, horizontal minimal layout, darker. Use as the A/B challenger.
 > - Both are **faceless** (correct for the channel). The face-based concepts below stay as options only if a host face is added later.
 > - **Final step in Canva:** drop the real **Sora** font over the text layer for brand consistency and set 1280×720 export. The AI text is a strong base, not the final type.
+>
+> **✅ Editable Canva design created** (`youtube_thumbnail`, 1280×720, real text layers, brand colours):
+> - **Edit:** https://www.canva.com/d/RXSbiR_50QEx4QP — **View:** https://www.canva.com/d/wfpq_UC4qCfkKeN (design id `DAHNkpFdTtA`)
+> - 3 alternative AI candidates from the same prompt: https://www.canva.com/d/65ZoXrPY66-zjzm · https://www.canva.com/d/3ERmJnoel67FJdR · https://www.canva.com/d/s-iw1i_Vw2w_fNR
+> - **To finalise (in the Canva editor — the API can't set font family):** select the headline → Font → **Sora** (Bold) → optionally Replace the binder image with `assets/EP01/EP01-thumbnail-A-recommended.png` → **Share ▸ Save as brand template** so every future episode reuses this layout.
+> - Export at **1280×720 PNG** (done once via API; re-export after the Sora swap).
 
 **Concept A — "The Stamp" (recommended).**
 Left: founder's face, slightly skeptical/intrigued expression, lit blue. Right big text **"CLAUDE BUILT THIS?"** in Sora. A red **"483?"** stamp half-overlapping. Bottom strip: faint document/RTM grid glowing cyan→violet. High contrast, mobile-legible at 3 words.
