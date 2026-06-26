@@ -184,6 +184,7 @@ Kordix AI. Build smarter. Validate faster. See you in the next one.
 > - **`EP01-voiceover-julian-72s.mp3`** — the full 72.6s VO (ElevenLabs, voice *Julian*). **`EP01-captions-72s.ass`** — editable caption timings (Sora, 22 cues). **`fonts/Sora.ttf`** — brand font for the burn-in.
 > - **`broll/`** — 8 native-vertical (720×1280) brand b-roll clips generated this session: 483 stamp · blank page · typing/data wall · V-model · neural core · EMS sensor · risk-warning table · crystal outro. Reusable for future episodes.
 > - **`EP01-vertical-build.sh`** — one-command rebuild from these sources (`bash EP01-vertical-build.sh`); re-time captions by editing the `.ass`. Total length ≥60s per channel requirement.
+> - **Variants (music + landscape):** `EP01-short-vertical-72s.mp4` ships with a subtle procedural **ambient music bed** (`EP01-music-bed.m4a` — Cm pad, reverb, ducked ~14 dB under the VO). **`EP01-landscape-16x9-72s.mp4`** is the 1920×1080 cut (landscape b-roll full-frame, vertical clips on a blurred pillarbox) for YouTube long-form / LinkedIn; its captions are `EP01-captions-169.ass`. Rebuild both with `EP01-variants-build.sh`. *Note: Higgsfield can't generate licensed music (speech-only here), so the bed is synthesised with ffmpeg — royalty-free and easy to swap for your own track.*
 
 | # | Shot | Source | Use |
 |---|------|--------|-----|
