@@ -1,0 +1,35 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Cap,Sora,52,&H00FFFFFF,&H000078FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,2,200,200,70,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:03.00,Cap,,0,0,0,,This normally takes three weeks.
+Dialogue: 0,0:00:03.00,0:00:06.00,Cap,,0,0,0,,First draft in under 10 minutes.
+Dialogue: 0,0:00:06.00,0:00:08.50,Cap,,0,0,0,,Without risking an FDA 483.
+Dialogue: 0,0:00:08.50,0:00:11.00,Cap,,0,0,0,,The AI didn't replace the validation.
+Dialogue: 0,0:00:11.00,0:00:13.00,Cap,,0,0,0,,It replaced the blank page.
+Dialogue: 0,0:00:13.00,0:00:18.00,Cap,,0,0,0,,If you've validated a computerized system...
+Dialogue: 0,0:00:18.00,0:00:22.00,Cap,,0,0,0,,The pain isn't thinking. It's the typing.
+Dialogue: 0,0:00:22.00,0:00:25.00,Cap,,0,0,0,,URS. Risk assessment.
+Dialogue: 0,0:00:25.00,0:00:28.00,Cap,,0,0,0,,IQ. OQ. PQ.
+Dialogue: 0,0:00:28.00,0:00:32.50,Cap,,0,0,0,,A traceability matrix linking every test.
+Dialogue: 0,0:00:32.50,0:00:35.50,Cap,,0,0,0,,I gave Claude a skill.
+Dialogue: 0,0:00:35.50,0:00:38.00,Cap,,0,0,0,,GAMP 5. ALCOA+. Part 11.
+Dialogue: 0,0:00:38.00,0:00:42.00,Cap,,0,0,0,,I described one system -- environmental monitoring.
+Dialogue: 0,0:00:42.00,0:00:45.00,Cap,,0,0,0,,It drafted the whole package.
+Dialogue: 0,0:00:45.00,0:00:48.00,Cap,,0,0,0,,Structured requirements. Risk assessment.
+Dialogue: 0,0:00:48.00,0:00:52.00,Cap,,0,0,0,,Test protocols. A matrix with no gaps.
+Dialogue: 0,0:00:52.00,0:00:55.00,Cap,,0,0,0,,But the AI only drafts.
+Dialogue: 0,0:00:55.00,0:00:58.50,Cap,,0,0,0,,It rated one risk wrong.
+Dialogue: 0,0:00:58.50,0:01:02.00,Cap,,0,0,0,,It didn't know we poll every 15 minutes.
+Dialogue: 0,0:01:02.00,0:01:04.50,Cap,,0,0,0,,I caught it in two seconds.
+Dialogue: 0,0:01:04.50,0:01:09.00,Cap,,0,0,0,,The specialist owns every approval.
+Dialogue: 0,0:01:09.00,0:01:12.59,Cap,,0,0,0,,AI kills the blank page. Follow for more.

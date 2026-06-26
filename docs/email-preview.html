@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background-color: #070B1E;
+    font-family: 'Sora', 'Segoe UI', Arial, sans-serif;
+    color: #FFFFFF;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 620px; margin: 0 auto; padding: 40px 20px; }
+
+  .header { text-align: center; padding-bottom: 32px; border-bottom: 1px solid #1C2340; margin-bottom: 32px; }
+  .logo {
+    font-size: 28px; font-weight: 800; letter-spacing: 6px; text-transform: uppercase;
+    background: linear-gradient(90deg, #38E5FF, #0078FF, #7B81FF, #A720FF);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .tagline { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: #7B81FF; margin-top: 4px; }
+  .report-meta { margin-top: 16px; font-size: 12px; color: #3D4A6B; letter-spacing: 1px; }
+  .report-meta strong { color: #FFFFFF; }
+
+  .intro { font-size: 14px; color: #8892B0; line-height: 1.8; margin-bottom: 32px; text-align: center; }
+
+  .status-row { display: flex; gap: 12px; margin-bottom: 36px; }
+  .status-pill { flex: 1; background: #0E1430; border: 1px solid #1C2340; border-radius: 10px; padding: 12px 10px; text-align: center; }
+  .pill-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: #3D4A6B; margin-bottom: 5px; }
+  .pill-val { font-size: 12px; font-weight: 600; }
+  .ok { color: #00C875; } .warn { color: #FFAA00; } .alert { color: #FF5AC4; }
+
+  .section { margin-bottom: 28px; }
+  .section-label { display: flex; align-items: center; gap: 10px; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 14px; }
+  .section-line { flex: 1; height: 1px; background: #1C2340; }
+  .lbl-marketing { color: #0078FF; } .lbl-product { color: #9B81FF; } .lbl-ops { color: #38E5FF; }
+
+  .card { background: #0E1430; border: 1px solid #1C2340; border-radius: 12px; padding: 20px; margin-bottom: 10px; border-left: 3px solid; }
+  .card-marketing { border-left-color: #0078FF; } .card-product { border-left-color: #9B81FF; } .card-ops { border-left-color: #38E5FF; }
+
+  .card-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 700; margin-right: 8px; vertical-align: middle; background: linear-gradient(135deg, #0078FF, #7B81FF); color: #fff; }
+  .card-title { font-size: 14px; font-weight: 700; color: #FFFFFF; margin-bottom: 8px; line-height: 1.5; }
+  .card-source { font-size: 10px; color: #3D4A6B; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+  .card-source span { color: #7B81FF; }
+  .card-body { font-size: 13px; color: #8892B0; line-height: 1.7; margin-bottom: 10px; }
+  .card-insight { background: #070B1E; border-left: 2px solid #38E5FF; padding: 8px 12px; border-radius: 0 6px 6px 0; font-size: 12px; color: #38E5FF; line-height: 1.6; margin-bottom: 10px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; letter-spacing: 0.5px; }
+  .t-monday { background: #0078FF18; color: #5B9FFF; border: 1px solid #0078FF44; }
+  .t-notion  { background: #9B81FF18; color: #B8A4FF; border: 1px solid #9B81FF44; }
+  .t-urgent  { background: #FF5AC418; color: #FF8DD9; border: 1px solid #FF5AC444; }
+  .t-done    { background: #00C87518; color: #00C875; border: 1px solid #00C87544; }
+
+  .summary { background: linear-gradient(135deg, #0E1430, #111840); border: 1px solid #1C2340; border-radius: 12px; padding: 20px 24px; margin: 28px 0; }
+  .summary-title { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #3D4A6B; margin-bottom: 14px; }
+  .summary-row { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; border-bottom: 1px solid #1C2340; }
+  .summary-row:last-child { border-bottom: none; }
+  .s-num { font-size: 11px; font-weight: 700; min-width: 18px; margin-top: 2px; }
+  .s-text { font-size: 13px; color: #8892B0; line-height: 1.5; }
+  .s-m { color: #5B9FFF; } .s-p { color: #B8A4FF; } .s-o { color: #38E5FF; }
+
+  .footer { text-align: center; padding-top: 24px; border-top: 1px solid #1C2340; }
+  .footer-logo { font-size: 14px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; background: linear-gradient(90deg, #38E5FF, #0078FF, #7B81FF, #A720FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 6px; }
+  .footer-text { font-size: 11px; color: #3D4A6B; line-height: 1.8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div class="logo">KORDIX AI</div>
+    <div class="tagline">Intelligence · Compliance · Impact</div>
+    <div class="report-meta"><strong>BizDev Agent</strong> &nbsp;·&nbsp; Daily Report #001 &nbsp;·&nbsp; 5. Juni 2026</div>
+  </div>
+
+  <p class="intro">Hallo Stefan — hier sind deine heutigen Vorschläge für Kordix AI.<br>Analysiert aus Google Drive, Monday.com und Notion.</p>
+
+  <div class="status-row">
+    <div class="status-pill"><div class="pill-label">QualiPilot</div><div class="pill-val ok">Phase 1 ✓</div></div>
+    <div class="status-pill"><div class="pill-label">Monday.com</div><div class="pill-val ok">Board aktiv ✓</div></div>
+    <div class="status-pill"><div class="pill-label">Notion</div><div class="pill-val ok">Struktur live ✓</div></div>
+    <div class="status-pill"><div class="pill-label">Homepage</div><div class="pill-val warn">Kein Domain</div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label"><span class="lbl-marketing">📣 &nbsp;Content &amp; Marketing</span><div class="section-line"></div></div>
+
+    <div class="card card-marketing">
+      <div class="card-source">Quelle: <span>Google Drive → QualiPilot / 05_Validierung /</span></div>
+      <div class="card-title"><span class="card-num">1</span>QualiPilot One-Pager verschicken — 5 Pilotkontakte festlegen</div>
+      <div class="card-body">Dein Validierungspaket ist komplett: One-Pager, Demo-Skript und Feedback-Fragebogen liegen fertig in 05_Validierung/. Das Material wartet auf Empfänger.</div>
+      <div class="card-insight">💡 Laut deinem eigenen README: „3–5 Personen aus dem Netzwerk — bevor weiter gebaut wird."</div>
+      <div class="tags"><span class="tag t-monday">Monday → Task erstellt ✓</span><span class="tag t-urgent">Priorität: Heute</span></div>
+    </div>
+
+    <div class="card card-marketing">
+      <div class="card-source">Quelle: <span>Google Drive → Kordix_AI / Homepage /</span></div>
+      <div class="card-title"><span class="card-num">2</span>Domain kordix.ai kaufen + Homepage live schalten</div>
+      <div class="card-body">Die Homepage existiert als vollständiges HTML/CSS/JS-Paket (78 KB) auf Netlify-Vorschau. Für erste Kundengespräche brauchst du eine echte Domain.</div>
+      <div class="card-insight">💡 kordix.ai ≈ $50/Jahr · kordix-ai.de ≈ €10 · Netlify-Deployment: 10 Minuten.</div>
+      <div class="tags"><span class="tag t-monday">Monday → Task erstellt ✓</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label"><span class="lbl-product">🧩 &nbsp;Produktentwicklung</span><div class="section-line"></div></div>
+
+    <div class="card card-product">
+      <div class="card-source">Quelle: <span>Google Drive → QualiPilot / README.md · Phase-2-Optionen</span></div>
+      <div class="card-title"><span class="card-num">3</span>Phase-2-Richtung QualiPilot entscheiden</div>
+      <div class="card-body">Drei Wege stehen offen: Marktvalidierung, Produkt vertiefen oder Business-Case. Ohne Entscheidung passiert keins davon.</div>
+      <div class="card-insight">💡 Empfehlung: Validierung zuerst — 5 Gespräche geben mehr Signal als 5 Wochen Coding.</div>
+      <div class="tags"><span class="tag t-notion">Notion → QualiPilot erstellt ✓</span><span class="tag t-monday">Monday → Task erstellt ✓</span></div>
+    </div>
+
+    <div class="card card-product">
+      <div class="card-source">Quelle: <span>Google Drive → QualiPilot / 01_Konzept /</span></div>
+      <div class="card-title"><span class="card-num">4</span>Preismodell v1 für Pilotkunden-Gespräche</div>
+      <div class="card-body">Das Pitch Deck ist fertig, aber ein Preismodell fehlt. Bei Pilotkunden wirst du gefragt: „Was kostet das?"</div>
+      <div class="card-insight">💡 GMP SaaS: €200–800/Monat/Nutzer üblich. Founder-Pilot: €0 gegen Feedback ist legitim.</div>
+      <div class="tags"><span class="tag t-notion">Notion → Strategie erstellt ✓</span><span class="tag t-monday">Monday → Task erstellt ✓</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label"><span class="lbl-ops">⚙️ &nbsp;Operations</span><div class="section-line"></div></div>
+
+    <div class="card card-ops">
+      <div class="card-source">Quelle: <span>Monday.com → Board angelegt ✓</span></div>
+      <div class="card-title"><span class="card-num">5</span>Monday.com Board „Kordix AI" anlegen</div>
+      <div class="card-body">3 Gruppen + Spalten Status / Fällig / Quelle. Alle 6 Tasks aus diesem Report sind eingetragen.</div>
+      <div class="card-insight">✅ Abgeschlossen — Board ist live.</div>
+      <div class="tags"><span class="tag t-done">Fertig ✓</span></div>
+    </div>
+
+    <div class="card card-ops">
+      <div class="card-source">Quelle: <span>Notion → Workspace strukturiert ✓</span></div>
+      <div class="card-title"><span class="card-num">6</span>Notion-Workspace für Kordix AI strukturieren</div>
+      <div class="card-body">Hauptseite + 4 Unterseiten: QualiPilot, Brand & Marketing, Strategie, Meeting-Notes.</div>
+      <div class="card-insight">✅ Abgeschlossen — Workspace ist live.</div>
+      <div class="tags"><span class="tag t-done">Fertig ✓</span></div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="summary-title">Zusammenfassung · Heute offen</div>
+    <div class="summary-row"><span class="s-num s-m">1</span><span class="s-text">One-Pager verschicken — 5 Pilotkontakte aus dem Netzwerk festlegen</span></div>
+    <div class="summary-row"><span class="s-num s-m">2</span><span class="s-text">Domain kordix.ai kaufen + Homepage deployen</span></div>
+    <div class="summary-row"><span class="s-num s-p">3</span><span class="s-text">Phase-2-Richtung QualiPilot entscheiden (Deadline: 12.06.)</span></div>
+    <div class="summary-row"><span class="s-num s-p">4</span><span class="s-text">Preismodell v1 entwickeln</span></div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-logo">KORDIX AI</div>
+    <div class="footer-text">BizDev Agent · Daily Report #001 · 5. Juni 2026<br>Daten aus: Google Drive · Monday.com · Notion</div>
+  </div>
+
+</div>
+</body>
+</html>
