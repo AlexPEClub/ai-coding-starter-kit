@@ -179,6 +179,12 @@ Kordix AI. Build smarter. Validate faster. See you in the next one.
 > - Reusable source pieces: `EP01-intro-clip-hero-5s.mp4`, `EP01-broll-binders-5s.mp4`, `EP01-broll-matrix-5s.mp4`, `EP01-hook-voiceover-julian-16s.mp3`.
 > - Assembled with ffmpeg (scale → concat → end-pad → fade in/out → AAC mux). Voice swapped Sterling → **Julian** per direction.
 
+> **✅ FINISHED VERTICAL SHORT — ready to post (this session)** — in `assets/EP01/`:
+> - **`EP01-short-vertical-72s.mp4`** ⭐⭐ — the **complete 72-second 9:16 Short** (1080×1920, H.264, burned-in **Sora** captions, full *Julian* voiceover, fade in/out). Covers the whole arc: hook → "the pain is the typing" problem → the GAMP 5 / ALCOA+ / Part 11 skill → the EMS draft → the deliberate **risk-rating mistake & SME override** → CTA "follow for more". Direct upload to YouTube Shorts / TikTok / Reels.
+> - **`EP01-voiceover-julian-72s.mp3`** — the full 72.6s VO (ElevenLabs, voice *Julian*). **`EP01-captions-72s.ass`** — editable caption timings (Sora, 22 cues). **`fonts/Sora.ttf`** — brand font for the burn-in.
+> - **`broll/`** — 8 native-vertical (720×1280) brand b-roll clips generated this session: 483 stamp · blank page · typing/data wall · V-model · neural core · EMS sensor · risk-warning table · crystal outro. Reusable for future episodes.
+> - **`EP01-vertical-build.sh`** — one-command rebuild from these sources (`bash EP01-vertical-build.sh`); re-time captions by editing the `.ass`. Total length ≥60s per channel requirement.
+
 | # | Shot | Source | Use |
 |---|------|--------|-----|
 | 1 | Blinking cursor on empty "Validation Plan" doc | Screen capture | Hook |
@@ -342,6 +348,8 @@ and approval remain mandatory under GAMP 5, 21 CFR Part 11 and EU Annex 11.
 ---
 
 ## 11. YOUTUBE SHORTS VERSIONS (9:16, <60s)
+
+> **✅ PRODUCED — `assets/EP01/EP01-short-vertical-72s.mp4`** (72s · 1080×1920 · Sora captions + Julian VO). A self-contained vertical that covers the full hook → problem → skill → draft → SME-override → CTA arc (not just the hook). YouTube Shorts now allows up to 3 min, so 72s qualifies; the same file posts directly to TikTok & Reels. Rebuild recipe: `EP01-vertical-build.sh`.
 
 **Short-1 (repurpose TT-1)** — vertical crop of the hook + RTM reveal, end card "Full video ↗". CTA: subscribe.
 **Short-2 — "ALCOA+ in one requirement":** Show URS-DI-014 and explain how one well-written requirement encodes Attributable / Legible / Contemporaneous / Original / Accurate. Pure value, no pitch. Great for niche authority.
