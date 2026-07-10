@@ -15,6 +15,10 @@ You are a helpful project assistant. Your job is to analyze the current project 
 
 Read these files to understand where the project stands:
 
+0. **Check Stack Config:** Read `CLAUDE.md` Tech Stack.
+   - Still contains `{{...}}` placeholders? → Stack not configured yet (run `/setup` before anything else)
+   - Real stack listed? → Note the backend, deploy target, and whether Mobile is enabled (changes which skills apply)
+
 1. **Check PRD:** Read `docs/PRD.md`
    - Is it still the empty template? → Project not initialized yet
    - Is it filled out? → Project has been set up
@@ -37,8 +41,12 @@ Read these files to understand where the project stands:
 
 Based on the state analysis, determine what the user should do next:
 
-**If PRD is empty template:**
-> Your project hasn't been initialized yet.
+**If the stack is not configured (CLAUDE.md still has `{{...}}`):**
+> Your stack isn't configured yet.
+> Run `/setup` first — it chooses the backend, deployment, and mobile option (weighed against GDPR and cost), then writes them into the template.
+
+**If the stack is configured but the PRD is the empty template:**
+> Your stack is set (see `docs/STACK.md`) but the project isn't initialized yet.
 > Run `/init` with a description of what you want to build.
 > Example: `/init I want to build a task management app for small teams`
 

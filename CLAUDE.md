@@ -1,41 +1,51 @@
 # AI Coding Starter Kit
 
-> A Next.js template with an AI-powered development workflow using specialized skills for Requirements, Architecture, Frontend, Backend, QA, and Deployment.
+> A stack-neutral template with an AI-powered development workflow using specialized skills for Setup, Requirements, Architecture, Frontend, Backend, QA, and Deployment.
+> **The tech stack below is chosen per project by `/setup`.** Placeholders in `{{...}}` are filled in when you run it.
 
 ## Tech Stack
 
-- **Framework:** Next.js 16 (App Router), TypeScript
-- **Styling:** Tailwind CSS + shadcn/ui (copy-paste components)
-- **Backend:** Supabase (PostgreSQL + Auth + Storage) - optional
-- **Deployment:** Vercel
+- **Framework:** Next.js (App Router), TypeScript
+- **Styling (web):** Tailwind CSS + shadcn/ui (copy-paste components)
+- **Backend:** {{BACKEND}}  <!-- e.g. PocketBase (self-hosted EU VPS) / Appwrite / Nhost / Supabase / none -->
+- **Deployment (web):** {{DEPLOY_TARGET}}  <!-- e.g. Cloudflare Pages / Vercel / Coolify on Hetzner -->
+- **Mobile:** {{MOBILE}}  <!-- React Native (Expo) / none -->
+- **Data protection:** {{DATA_RESIDENCY}}  <!-- e.g. self-hosted in EU (Hetzner), no CLOUD Act exposure -->
 - **Validation:** Zod + react-hook-form
 - **State:** React useState / Context API
+
+> Not configured yet? Run `/setup` first — it interviews you, weighs the options against GDPR and cost, and writes this section, the backend rules, and the deploy target. Full rationale lives in `docs/STACK.md`.
 
 ## Project Structure
 
 ```
-src/
+src/               (single-app layout — becomes web/ if a mobile app is added)
   app/              Pages (Next.js App Router)
   components/
     ui/             shadcn/ui components (NEVER recreate these)
   hooks/            Custom React hooks
-  lib/              Utilities (supabase.ts, utils.ts)
+  lib/              Utilities (backend client, utils.ts)
 features/           Feature specifications (PROJ-X-name.md)
   INDEX.md          Feature status overview
 docs/
   PRD.md            Product Requirements Document
-  production/       Production guides (Sentry, security, performance)
+  STACK.md          Chosen stack + rationale + data-residency note (written by /setup)
+  production/       Production guides (error tracking, security, performance)
 ```
+
+> If `/setup` enabled mobile, the repo is a monorepo: `web/`, `mobile/` (Expo), and `packages/shared` (types + API client). See `docs/STACK.md`.
 
 ## Development Workflow
 
-1. `/init` - Initialize the project: PRD + feature map (run once at the start)
-2. `/write-spec` - Create a full feature spec for one feature
-3. `/architecture` - Design tech architecture (PM-friendly, no code)
-4. `/frontend` - Build UI components (shadcn/ui first!)
-5. `/backend` - Build APIs, database, RLS policies
-6. `/qa` - Test against acceptance criteria + security audit
-7. `/deploy` - Deploy to Vercel + production-ready checks
+1. `/setup` - Configure the stack: backend, deployment, mobile (run once on a fresh clone, before /init)
+2. `/init` - Initialize the project: PRD + feature map (run once at the start)
+3. `/write-spec` - Create a full feature spec for one feature
+4. `/architecture` - Design tech architecture (PM-friendly, no code)
+5. `/frontend` - Build web UI components (shadcn/ui first!)
+6. `/mobile` - Build the Expo (React Native) UI (only if mobile is enabled)
+7. `/backend` - Build APIs, database, access rules
+8. `/qa` - Test against acceptance criteria + security audit
+9. `/deploy` - Deploy to the chosen target + production-ready checks
 
 Use `/refine PROJ-X` at any point to revisit and improve an existing feature spec.
 
