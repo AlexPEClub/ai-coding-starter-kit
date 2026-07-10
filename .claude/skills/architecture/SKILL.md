@@ -91,7 +91,7 @@ For every meaningful technical choice made during this session, add an entry to 
 **Format:**
 ```
 | Decision | Rationale | Date |
-| localStorage over Supabase | No user accounts needed; data is device-local | 2026-05-19 |
+| Local storage over a hosted database | No user accounts needed; data is device-local | 2026-05-19 |
 ```
 
 If any questions came up during the design that couldn't be resolved, add them to the **Open Questions** section as `- [ ]` items.
