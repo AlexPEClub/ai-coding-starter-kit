@@ -48,7 +48,7 @@
 <!-- Added by /architecture -->
 | Decision | Rationale | Date |
 |----------|-----------|------|
-| _Example: localStorage over Supabase_ | _No user accounts needed; data is device-local_ | YYYY-MM-DD |
+| _Example: local storage over a hosted database_ | _No user accounts needed; data is device-local_ | YYYY-MM-DD |
 
 ---
 <!-- Sections below are added by subsequent skills -->

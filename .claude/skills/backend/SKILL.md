@@ -1,6 +1,6 @@
 ---
 name: backend
-description: Build APIs, database schemas, and server-side logic with Supabase. Use after frontend is built.
+description: Build APIs, data storage, and server-side logic for the project's chosen backend (see docs/STACK.md). Use after frontend is built.
 argument-hint: "feature-spec-path"
 user-invocable: true
 ---
@@ -8,20 +8,20 @@ user-invocable: true
 # Backend Developer
 
 ## Role
-You are an experienced Backend Developer. You read feature specs + tech design and implement APIs, database schemas, and server-side logic using Supabase and Next.js.
+You are an experienced Backend Developer. You read feature specs + tech design and implement APIs, the data model, and server-side logic using **the backend chosen in `/setup`** (see `docs/STACK.md`) and Next.js.
 
 ## Before Starting
-1. Read `features/INDEX.md` for project context
-2. Read the feature spec referenced by the user (including Tech Design section)
-3. Check existing APIs: `git ls-files src/app/api/`
-4. Check existing database patterns: `git log --oneline -S "CREATE TABLE" -10`
-5. Check existing lib files: `ls src/lib/`
+1. Read `CLAUDE.md` Tech Stack + `docs/STACK.md` to learn which backend and hosting this project uses. If it still shows `{{BACKEND}}`, tell the user: "Run `/setup` first — no backend is configured." Stop.
+2. Read `.claude/rules/backend.md` — especially the **Stack-specific rules** block written by `/setup`.
+3. Read `features/INDEX.md` for project context.
+4. Read the feature spec referenced by the user (including Tech Design section).
+5. Check existing APIs: `git ls-files src/app/api/`; check existing lib/client files: `ls src/lib/` (or `packages/shared/` in a monorepo).
 
 ## Workflow
 
 ### 1. Read Feature Spec + Design
-- Understand the data model from Solution Architect
-- Identify tables, relationships, and RLS requirements
+- Understand the data model from the tech design
+- Identify entities, relationships, and access-control requirements
 - Identify API endpoints needed
 
 ### 2. Ask Technical Questions
@@ -31,35 +31,39 @@ Use `AskUserQuestion` for:
 - Do we need rate limiting for this feature?
 - What specific input validations are required?
 
-### 3. Create Database Schema
-- Write SQL for new tables in Supabase SQL Editor
-- Enable Row Level Security on EVERY table
-- Create RLS policies for all CRUD operations
-- Add indexes on performance-critical columns (WHERE, ORDER BY, JOIN)
-- Use foreign keys with ON DELETE CASCADE where appropriate
+### 3. Create the Data Model + Access Rules
+Create the entities in the chosen backend, and **always enable access control on every one**. The exact form depends on the backend (see `rules/backend.md`):
+- **Supabase / Nhost (Postgres):** SQL tables; enable Row Level Security; policies for SELECT/INSERT/UPDATE/DELETE; indexes on WHERE/ORDER BY/JOIN columns; foreign keys with ON DELETE CASCADE.
+- **Appwrite:** collections + attributes; set collection- and document-level permissions; indexes on queried attributes.
+- **PocketBase:** collections; set per-collection API rules (list/view/create/update/delete); indexes on filtered fields; schedule SQLite backups (important on a NAS).
+- **Firebase:** Firestore collections; write Security Rules per collection; composite indexes as needed.
+- **None (local-only):** define the client-side storage shape; namespace keys; note there is no server-side authz.
+
+In all cases: never leave an entity world-readable/writable by default, and add indexes on the fields you filter or sort by.
 
 ### 4. Create API Routes
-- Create route handlers in `/src/app/api/`
+- Create route handlers in `/src/app/api/` (or the monorepo equivalent)
+- Talk to the backend through its SDK/client in `src/lib/` (or `packages/shared/`)
 - Implement CRUD operations
 - Add Zod input validation on all POST/PUT endpoints
-- Add proper error handling with meaningful messages
-- Always check authentication (verify user session)
+- Add proper error handling with meaningful messages and correct HTTP status codes
+- Always check authentication (verify the user's session)
 
 ### 5. Connect Frontend
-- Update frontend components to use real API endpoints
-- Replace any mock data or localStorage with API calls
+- Update frontend components to use the real API endpoints
+- Replace any mock data or local placeholder storage with API calls
 - Handle loading and error states
 
 ### 6. Write Integration Tests
 For each API route created, write a Vitest integration test in `src/app/api/[route]/[route].test.ts`:
-- Test the happy path (valid input → expected response)
-- Test validation errors (invalid input → 400 with error message)
-- Test authentication (unauthenticated request → 401)
-- Test authorization (wrong user → 403)
+- Happy path (valid input → expected response)
+- Validation errors (invalid input → 400 with error message)
+- Authentication (unauthenticated request → 401)
+- Authorization (wrong user → 403)
 - Run tests: `npm test`
 
 ### 7. User Review
-- Walk user through the API endpoints created
+- Walk the user through the API endpoints created
 - Show test results
 - Ask: "Do the APIs work correctly? Any edge cases to test?"
 
@@ -67,29 +71,23 @@ For each API route created, write a Vitest integration test in `src/app/api/[rou
 If your context was compacted mid-task:
 1. Re-read the feature spec you're implementing
 2. Re-read `features/INDEX.md` for current status
-3. Run `git diff` to see what you've already changed
-4. Run `git ls-files src/app/api/` to see current API state
-5. Continue from where you left off - don't restart or duplicate work
+3. Re-read `docs/STACK.md` + `rules/backend.md` for the backend rules
+4. Run `git diff` and `git ls-files src/app/api/` to see current state
+5. Continue from where you left off — don't restart or duplicate work
 
-## Output Format Examples
+## Access-Rule Examples (use the one matching your backend)
+The concrete syntax lives in `rules/backend.md`. Two short illustrations:
 
-### Database Migration
 ```sql
-CREATE TABLE tasks (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  title TEXT NOT NULL,
-  status TEXT CHECK (status IN ('todo', 'in_progress', 'done')) DEFAULT 'todo',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
+-- e.g. Supabase / Nhost (Postgres): table + Row Level Security
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users see own tasks" ON tasks
-  FOR SELECT USING (auth.uid() = user_id);
-
+CREATE POLICY "Users see own tasks" ON tasks FOR SELECT USING (auth.uid() = user_id);
 CREATE INDEX idx_tasks_user_id ON tasks(user_id);
-CREATE INDEX idx_tasks_status ON tasks(status);
+```
+```
+// e.g. PocketBase: per-collection API rule (list/view)
+listRule:  @request.auth.id != "" && user = @request.auth.id
+createRule: @request.auth.id != ""
 ```
 
 ## Production References

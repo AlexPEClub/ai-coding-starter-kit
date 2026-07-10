@@ -1,7 +1,7 @@
 ---
 name: deploy
-description: Deploy to Vercel with production-ready checks, error tracking, and security headers setup.
-argument-hint: "feature-spec-path or 'to Vercel'"
+description: Deploy to the project's chosen target with production-ready checks, error tracking, and security headers. Reads the deploy target from CLAUDE.md. Covers web deploy and, if mobile is enabled, Expo EAS builds to the app stores.
+argument-hint: "feature-spec-path or 'deploy web' / 'deploy mobile'"
 user-invocable: true
 ---
 
@@ -11,104 +11,89 @@ user-invocable: true
 You are an experienced DevOps Engineer handling deployment, environment setup, and production readiness.
 
 ## Before Starting
-1. Read `features/INDEX.md` to know what is being deployed
-2. Check QA status in the feature spec
-3. Verify no Critical/High bugs exist in QA results
-4. If QA has not been done, tell the user: "Run `/qa` first before deploying."
+1. Read `CLAUDE.md` **Tech Stack** to learn the deploy target and whether mobile is enabled. If it still shows `{{DEPLOY_TARGET}}`, tell the user: "Run `/setup` first — no deploy target is configured." Stop.
+2. Read `docs/STACK.md` for hosting/data-residency specifics.
+3. Read `features/INDEX.md` to know what is being deployed.
+4. Check QA status in the feature spec — no Critical/High bugs. If QA hasn't run: "Run `/qa` first before deploying." Stop.
 
-## Workflow
-
-### 1. Pre-Deployment Checks
+## Pre-Deployment Checks (all targets)
 - [ ] `npm run build` succeeds locally
 - [ ] `npm run lint` passes
-- [ ] QA Engineer has approved the feature (check feature spec)
-- [ ] No Critical/High bugs in test report
+- [ ] QA approved the feature; no Critical/High bugs
 - [ ] All environment variables documented in `.env.local.example`
 - [ ] No secrets committed to git
-- [ ] All database migrations applied in Supabase (if applicable)
+- [ ] Backend migrations / access rules applied (if applicable)
 - [ ] All code committed and pushed to remote
 
-### 2. Vercel Setup (first deployment only)
+## Web Deploy — follow the section matching the chosen target
 
-> **Prerequisite (manual, do this first):** The user must create a Vercel account in the browser before this step — go to [vercel.com](https://vercel.com) and sign up (e.g. "Sign up with GitHub"). Account creation and login are browser/OAuth steps that cannot be automated by the skill. Also ensure the repo is pushed to a GitHub remote so Vercel can connect to it.
+### Cloudflare Pages
+> Prerequisite (manual): create a Cloudflare account and connect the Git repo.
+- [ ] `npx wrangler pages deploy` or connect the repo in the Cloudflare dashboard for push-to-deploy
+- [ ] Add env vars in the Pages project settings
+- [ ] Note Workers runtime limits (no full Node API; CPU cap) — verify SSR/edge routes behave
 
-Guide the user through:
-- [ ] Create Vercel project: `npx vercel` or via vercel.com
-- [ ] Connect GitHub repository for auto-deploy on push
-- [ ] Add all environment variables from `.env.local.example` in Vercel Dashboard
-- [ ] Build settings: Framework Preset = Next.js (auto-detected)
-- [ ] Configure domain (or use default `*.vercel.app`)
+### Vercel
+> Prerequisite (manual): create a Vercel account and push the repo to GitHub.
+- [ ] `npx vercel` (or connect via vercel.com) for auto-deploy on push
+- [ ] Add all env vars from `.env.local.example` in the Vercel dashboard
+- [ ] Framework Preset = Next.js (auto-detected); configure domain
+- [ ] Reminder (from STACK.md): US-entity → confirm no sensitive data is stored here without a documented decision
 
-### 3. Deploy
-- Push to main branch → Vercel auto-deploys
-- Or manual: `npx vercel --prod`
-- Monitor build in Vercel Dashboard
+### Coolify on a (Hetzner/EU) VPS  — also the "same VPS as backend" option
+> Prerequisite (manual): a VPS with Coolify installed and a domain pointed at it.
+- [ ] Create a new Coolify application from the Git repo (Nixpacks/Dockerfile auto-detected)
+- [ ] Set env vars in Coolify; enable auto-deploy webhook on push
+- [ ] Attach the domain; Coolify provisions TLS (Let's Encrypt)
+- [ ] If co-located with a self-hosted backend, keep both behind the same reverse proxy
 
-### 4. Post-Deployment Verification
-- [ ] Production URL loads correctly
-- [ ] Deployed feature works as expected
-- [ ] Database connections work (if applicable)
-- [ ] Authentication flows work (if applicable)
-- [ ] No errors in browser console
-- [ ] No errors in Vercel function logs
+### Netlify
+> Prerequisite (manual): Netlify account + repo connected.
+- [ ] Connect repo for Git-based deploys; set build command and env vars
+- [ ] Configure Netlify Functions / Edge Functions if used
 
-### 5. Production-Ready Essentials
+## Mobile Deploy (only if Mobile = React Native (Expo))
+> Prerequisites (manual): an Expo account, plus Apple Developer + Google Play Console accounts for store submission.
+- [ ] `mobile/` builds locally (`npx expo start` runs; no red-screen errors)
+- [ ] EAS configured: `eas build:configure`
+- [ ] Build: `eas build --platform ios` and `eas build --platform android`
+- [ ] Internal test: submit iOS build to **TestFlight**; share Android build/track
+- [ ] Store submission: `eas submit -p ios` / `eas submit -p android`
+- [ ] App Store Connect + Play Console metadata, privacy labels (declare data handling per STACK.md), screenshots
+- [ ] Bump `version`/`buildNumber`/`versionCode` in `app.json` per release
 
-For first deployment, guide the user through these setup guides:
+## Post-Deployment Verification
+- [ ] Production URL / app build loads and the feature works
+- [ ] Backend connections work; auth flows work
+- [ ] No console errors; no server/function log errors
 
-**Error Tracking (5 min):** See [error-tracking.md](../../../docs/production/error-tracking.md)
-**Security Headers (copy-paste):** See [security-headers.md](../../../docs/production/security-headers.md)
-**Performance Check:** See [performance.md](../../../docs/production/performance.md)
-**Database Optimization:** See [database-optimization.md](../../../docs/production/database-optimization.md)
-**Rate Limiting (optional):** See [rate-limiting.md](../../../docs/production/rate-limiting.md)
+## Production-Ready Essentials (first web deploy)
+- **Error Tracking:** [error-tracking.md](../../../docs/production/error-tracking.md)
+- **Security Headers:** [security-headers.md](../../../docs/production/security-headers.md)
+- **Performance:** [performance.md](../../../docs/production/performance.md)
+- **Database Optimization:** [database-optimization.md](../../../docs/production/database-optimization.md)
+- **Rate Limiting (optional):** [rate-limiting.md](../../../docs/production/rate-limiting.md)
 
-### 6. Post-Deployment Bookkeeping
-- Update feature spec: Add deployment section with production URL and date
-- Update `features/INDEX.md`: Set status to **Deployed**
-- Create git tag: `git tag -a v1.X.0-PROJ-X -m "Deploy PROJ-X: [Feature Name]"`
-- Push tag: `git push origin v1.X.0-PROJ-X`
+## Post-Deployment Bookkeeping
+- Update the feature spec: add a deployment section (URL/build, date)
+- Update `features/INDEX.md`: status → **Deployed**
+- Tag: `git tag -a v1.X.0-PROJ-X -m "Deploy PROJ-X: [Feature Name]"` and `git push origin v1.X.0-PROJ-X`
 
 ## Common Issues
+- **Build fails on host but works locally:** check Node version; ensure deps are in `dependencies`, not only `devDependencies`; read the host build log.
+- **Env vars missing:** set them in the host dashboard; client-side vars need `NEXT_PUBLIC_`; redeploy after adding.
+- **Backend connection errors:** verify URL/keys in host env vars; check access rules; confirm a self-hosted instance / managed project isn't paused or down.
+- **EAS build fails:** check `app.json` config, credentials, and native module compatibility in the EAS build log.
 
-### Build fails on Vercel but works locally
-- Check Node.js version (Vercel may use different version)
-- Ensure all dependencies are in package.json (not just devDependencies)
-- Review Vercel build logs for specific error
-
-### Environment variables not available
-- Verify vars are set in Vercel Dashboard (Settings → Environment Variables)
-- Client-side vars need `NEXT_PUBLIC_` prefix
-- Redeploy after adding new env vars (they don't apply retroactively)
-
-### Database connection errors
-- Verify Supabase URL and anon key in Vercel env vars
-- Check RLS policies allow the operations being attempted
-- Verify Supabase project is not paused (free tier pauses after inactivity)
-
-## Rollback Instructions
-If production is broken:
-1. **Immediate:** Vercel Dashboard → Deployments → Click "..." on previous working deployment → "Promote to Production"
-2. **Fix locally:** Debug the issue, `npm run build`, commit, push
-3. Vercel auto-deploys the fix
-
-## Full Deployment Checklist
-- [ ] Pre-deployment checks all pass
-- [ ] Vercel build successful
-- [ ] Production URL loads and works
-- [ ] Feature tested in production environment
-- [ ] No console errors, no Vercel log errors
-- [ ] Error tracking setup (Sentry or alternative)
-- [ ] Security headers configured in next.config
-- [ ] Lighthouse score checked (target > 90)
-- [ ] Feature spec updated with deployment info
-- [ ] `features/INDEX.md` updated to Deployed
-- [ ] Git tag created and pushed
-- [ ] User has verified production deployment
+## Rollback
+1. **Web (managed hosts):** promote the previous working deployment in the dashboard.
+2. **Web (Coolify/VPS):** redeploy the previous commit / image.
+3. **Mobile:** you cannot instantly roll back a shipped store build — halt the release, ship a fixed build; use staged rollout on Play to limit blast radius.
 
 ## Git Commit
 ```
 deploy(PROJ-X): Deploy [feature name] to production
 
-- Production URL: https://your-app.vercel.app
+- Target: <web target> / mobile: TestFlight + Play
 - Deployed: YYYY-MM-DD
 ```

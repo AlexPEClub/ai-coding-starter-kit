@@ -43,25 +43,20 @@ Cover these topics through natural conversation (not as a checklist):
 - Success metrics: how do you know this product worked?
 - Non-goals: what are you explicitly NOT building in this version?
 
-### Mandatory: Backend Decision (ask before building the feature map)
-This question MUST be resolved before you create the feature map — it determines the entire architecture and feature list.
+### Mandatory: Confirm the backend (already chosen in /setup)
+The backend was decided in `/setup` and recorded in `CLAUDE.md` (Tech Stack) and `docs/STACK.md`. Do NOT re-run the stack decision here — just read it and reflect it in the feature map.
 
-Ask:
-> "Does the app need to store data persistently or sync between users/devices?"
-> My recommendation: Yes — most apps need at least local persistence. If multiple users or cross-device sync is needed, a backend is required.
+1. Read `CLAUDE.md` Tech Stack. If it still shows `{{BACKEND}}`, stop and tell the user: "Run `/setup` first to choose the stack, then `/init`."
+2. Confirm with the user in one line: "Using **<backend from STACK.md>** as decided in setup — correct?"
 
-**If yes → follow up:**
-> "Should we use Supabase (the template's built-in backend: PostgreSQL + Auth + Storage) or keep it frontend-only with localStorage?"
-> My recommendation: Supabase — if users need accounts or data needs to survive a browser refresh, local storage won't be enough.
-
-**If Supabase is chosen:**
-- Add **"Supabase Infrastructure Setup"** as **PROJ-1, P0** in the feature map
+**If the chosen backend needs infrastructure (any managed/self-hosted backend):**
+- Add **"<Backend> Infrastructure Setup"** as **PROJ-1, P0** in the feature map
 - All features that require auth, data storage, or file uploads must list PROJ-1 as a dependency
-- This feature covers: project setup, environment variables, database schema outline, auth configuration
+- This feature covers: instance/project setup, environment variables, schema/collections outline, auth/access-rule configuration
 
-**If frontend-only (localStorage):**
+**If the backend is "None (local-only)":**
 - No infrastructure feature needed
-- Note "No backend — localStorage only" in the PRD Constraints section
+- Note "No backend — local device storage only" in the PRD Constraints section
 
 ### Mandatory: Design System (ask before building the feature map)
 Ask:
@@ -119,10 +114,10 @@ Apply feedback, then update `features/INDEX.md` and the "Next Available ID" line
 
 ## Checklist Before Completion
 - [ ] PRD fully filled out (Vision, Target Users, Roadmap, Metrics, Constraints, Non-Goals)
-- [ ] Backend decision resolved (Supabase vs. localStorage)
-- [ ] If Supabase: "Supabase Infrastructure Setup" added as PROJ-1, P0, no dependencies
-- [ ] If Supabase: all data/auth-dependent features list PROJ-1 as dependency
-- [ ] If frontend-only: noted in PRD Constraints
+- [ ] Backend confirmed from `docs/STACK.md` (not re-decided here)
+- [ ] If backend needs infra: "<Backend> Infrastructure Setup" added as PROJ-1, P0, no dependencies
+- [ ] If backend needs infra: all data/auth-dependent features list PROJ-1 as dependency
+- [ ] If local-only: noted in PRD Constraints
 - [ ] Design system decision resolved
 - [ ] If design system provided: saved to `docs/design-system.md` and referenced in PRD
 - [ ] Every feature respects Single Responsibility
