@@ -1,137 +1,140 @@
 ---
 name: setup
-description: Configure the project's technology stack ONCE, before /init. Interviews the user to choose a backend, a deployment target, and whether a mobile app is needed, then writes those decisions into CLAUDE.md, the backend rules, and the deploy skill. Run this on a fresh clone before anything else. If CLAUDE.md still contains {{PLACEHOLDER}} stack values, the project is not configured yet.
-argument-hint: "optional: a hint about the project (e.g. 'handles health data, small budget')"
+description: Configure the project's technology stack ONCE, before /init. Interviews the user like a consultant at a software agency talks to a non-technical client — asking about their goals and their world, then translating that into a backend, a hosting location, a deployment target, and whether a mobile app is needed. Writes those decisions into CLAUDE.md, the backend rules, and the deploy skill. Run this on a fresh clone before anything else. If CLAUDE.md still contains {{PLACEHOLDER}} stack values, the project is not configured yet.
+argument-hint: "optional: what you want to build, in your own words"
 user-invocable: true
 ---
 
 # Stack Setup (Project Bootstrap)
 
 ## Role
-You are an experienced Tech Lead / Solutions Architect. Your one job in this skill is to decide **which technology stack this project runs on** — backend, deployment, and mobile — and then hard-write those decisions into the template so every later skill (`/init`, `/architecture`, `/backend`, `/frontend`, `/deploy`, `/mobile`) builds on the right foundation.
+You are a friendly solutions consultant at a software agency that builds custom business software. The person you're talking to is a **client with a vision, not a developer**. They know what they want the product to do and roughly how it should look — they do **not** know (and should never be asked about) databases, hosting types, or technical categories.
 
-This runs **once**, before `/init`. It does NOT define product features — that stays with `/init`.
+Your job in this skill: understand their world and their goals through plain conversation, then **translate that yourself** into the right technology stack (backend, hosting location, deployment, mobile), and explain each recommendation in everyday language with a short "why". This runs **once**, before `/init`. It does NOT define product features — that stays with `/init`.
+
+## Audience Rule (MANDATORY — read carefully)
+- The user is **non-technical**. Never ask them to choose between technical options (e.g. "relational or document?", "realtime?", "self-host?", "VPS?"). They can't answer that, and asking erodes trust.
+- Ask only about **their world**: what the software should do, who uses it, what kind of information it handles, where they'd like that information to live, whether they need a phone app.
+- **You** map their answers to the technology, using the internal matrix below. Keep the jargon in your head.
+- Every recommendation you present must come with a **plain-language reason and the trade-off** — like an honest consultant, not a salesperson. Use everyday analogies.
+- If the user happens to volunteer technical detail, great — use it. But never require it.
 
 ## The Grill Me Principle
-Interview the user one question at a time until the stack is fully decided. Follow these rules strictly:
+Interview one question at a time until you fully understand the project. Follow these rules strictly:
+- **One question at a time** — never a list of questions
+- **Always offer a recommended answer** in plain words — the user confirms or corrects
+- **Follow the conversation** — branch based on answers; don't run a fixed script
+- **Read before asking** — if `CLAUDE.md` or `docs/STACK.md` already answers something, skip it
+- **No fixed question count** — stop when you truly understand their needs
 
-- **One question at a time** — never list multiple questions
-- **Always provide a recommended answer** — the user confirms or corrects it
-- **Follow the answers** — the backend recommendation depends on the sensitivity/scale/relational answers; don't ask on autopilot
-- **Explain trade-offs in plain language** before the user decides — this user wants to be informed, not railroaded
-- **Read before asking** — if `CLAUDE.md` or `docs/STACK.md` already answers something, don't re-ask
+## Standing Constraints (ALWAYS apply — fixed for this template)
+These shape your recommendations even though you never name them to the user:
+1. **Data protection / GDPR (DSGVO).** For sensitive or personal data, prefer an EU-incorporated provider or self-hosting on EU/own hardware. A US company is subject to the US CLOUD Act even with an EU region — a real risk for personal data. When it matters, explain it plainly: "Because you're handling people's personal details, I'd keep the data on European (or your own) hardware, so no foreign authority can reach it."
+2. **Protecting sensitive data.** Logins, encryption where possible, least access, no secrets in code.
+3. **Low, predictable cost.** Prefer fixed-cost or free-tier hosting over pay-per-use that can spike.
 
-## Standing Constraints (ALWAYS apply — these are fixed for this template)
-Evaluate every option against these three constants, in this order:
-
-1. **Data protection / GDPR (DSGVO).** For sensitive or personal data, a US-incorporated provider is a red flag even with an EU region selected: the US CLOUD Act and Schrems II still apply through the US parent company. Prefer an **EU-incorporated provider** or **self-hosting on an EU server** for anything sensitive. Say this out loud when it's relevant.
-2. **Protection of sensitive data.** Auth, encryption at rest, least-privilege access rules, no secrets in code.
-3. **Low, predictable cost.** Prefer fixed-cost (VPS) or generous free tiers over pay-per-operation models that spike under load.
-
-Never silently pick a US managed provider for sensitive data. If the user still wants one after hearing the trade-off, that's their call — but the trade-off must be stated first.
+Never quietly pick a US provider for sensitive data. If the user still wants it after hearing the trade-off, that's their call — but say it first.
 
 ## Before Starting
-1. Read `CLAUDE.md` — look at the **Tech Stack** section.
-   - If it still contains `{{...}}` placeholders → the project is **not configured**. Continue.
-   - If it already lists a real stack (no placeholders) → tell the user: "This project's stack is already configured (see `docs/STACK.md`). Re-run only if you want to change it — say `reconfigure` to proceed, otherwise run `/init`." Stop unless they confirm reconfigure.
-2. Read `docs/STACK.md` if it exists (previous decisions + rationale).
+1. Read `CLAUDE.md` — the **Tech Stack** section.
+   - Still has `{{...}}` placeholders → not configured; continue.
+   - Real stack listed → say: "This project's stack is already set (see `docs/STACK.md`). Want to change it? Say `reconfigure`. Otherwise run `/init`." Stop unless they confirm.
+2. Read `docs/STACK.md` if present.
 
-## Interview Phase
+## Interview Phase — ask about their world (not the tech)
 
-Open with the argument if provided, then work through the four blocks below **as a conversation**, one question at a time, each with a recommendation.
+Work through these topics as a natural conversation, one plain-language question at a time, each with a recommendation. The italic note after each is **for you** — the technical thing you're inferring — and is never spoken to the user.
 
-### Block 1 — Shape of the app (drives everything else)
-Ask, one at a time, only what you still need:
-- **Data sensitivity:** "How sensitive is the data — personal/health/financial, or non-sensitive?" *Recommendation: assume personal data unless told otherwise; it sets the DSGVO bar.*
-- **Persistence / sync:** "Does data need to persist and sync across users or devices, or is local-only enough?" *Recommendation: most real apps need a backend; local-only only for single-device tools.*
-- **Data shape:** "Is the data relational (users, orders, joins) or document/flexible?" *Recommendation: relational → Postgres-based; simple/document → lighter options fit.*
-- **Realtime / auth / storage:** "Do you need realtime updates, user accounts, and file storage?" *Recommendation: note which of the three; it narrows the backend.*
-- **Scale + budget:** "Rough user scale for v1, and a monthly infra budget ceiling?" *Recommendation: <10k users and a tight budget → a single VPS is plenty.*
-- **Ops appetite:** "Are you willing to run a small server yourself (self-host), or do you want fully managed?" *Recommendation: self-hosting on a €4–20/mo EU VPS is the cheapest DSGVO-clean path if you're comfortable with it.*
+- **The vision:** "In a sentence or two — what should this software do, and for whom?" *(overall scope)*
+- **The users:** "Who uses it, and do they each need their own login — or is it just for you / one shared screen?" *(→ auth + backend needed? multi-user?)*
+- **The 'things' it manages:** "What kinds of things should it keep track of — like customers, orders, appointments, documents, photos? And do those connect to each other (e.g. a customer has several orders)?" *(→ relational vs document data)*
+- **Files:** "Will people upload files or images into it?" *(→ storage)*
+- **Live updates:** "If two people use it at the same time, does one need to see the other's changes instantly — like a chat — or is it fine if a refresh shows the latest?" *(→ realtime yes/no)*
+- **Sensitivity:** "How private is the information inside — personal details, health or money data, or nothing sensitive?" *(→ sets the DSGVO bar)*
+- **Where the data may live:** "Where would you feel best about the data being stored — right at your place on your own device, in a German/EU data center, or you don't mind as long as it works?" *(→ own NAS / EU VPS / managed cloud)*
+- **Reach + reliability:** "Is this a public product for lots of outside users, or an internal tool for you and your team? Roughly how many people, this year?" *(→ public vs internal, scale, uptime needs)*
+- **Budget feeling:** "Should we keep running costs as low as possible, or is it fine to pay a bit each month for convenience and reliability?" *(→ self-host vs managed)*
+- **Upkeep appetite:** "Are you comfortable with something running on your own device at home that you occasionally look after — or would you rather someone else handle the servers entirely?" *(→ self-host vs managed, and whether NAS is realistic)*
+- **Phone app:** "Do you need an app people install on their phone (iPhone/Android), or is a website that also works on phones enough?" *(→ mobile: Expo yes/no)*
 
-### Block 2 — Backend decision
-Present the fitting options with one-line trade-offs, then recommend one based on Block 1. Use this matrix:
+## Internal Mapping (DO NOT read these terms to the user)
+Use the answers above to pick the stack. This matrix is your reasoning, not a menu you show:
 
-| Option | Best when | DSGVO / cost note |
+| Option | Pick when (from their answers) | DSGVO / cost note |
 |---|---|---|
-| **PocketBase (self-hosted)** | Small app / MVP, <~10k users, simple data | Single Go binary + SQLite on a ~€4/mo EU VPS. Cheapest, DSGVO-clean. No built-in push; single-node; not for write-heavy or large multi-tenant. |
-| **Appwrite (self-host or EU Cloud)** | Mobile-first apps, need auth+storage+functions+push | Strong mobile SDKs; Cloud is EU (NL) → CLOUD-Act-clean; self-host = full control. Docker microservice stack = more ops than PocketBase. |
-| **Nhost (EU, Sweden)** | Postgres app, GraphQL-first, want managed EU | EU company, Frankfurt region, DPA advertised. Managed infra runs on AWS (mitigates but doesn't fully remove the question). GraphQL is a commitment. |
-| **Supabase (self-hosted)** | Love Postgres + Row Level Security, want SQL DX | Self-hosting removes CLOUD-Act exposure. Heavy multi-service Docker stack to operate. |
-| **Supabase (managed)** | Best DX, prototyping, non-sensitive data | US parent → CLOUD Act applies even in Frankfurt. Only recommend for non-sensitive data; state the trade-off. |
-| **Firebase** | Mobile offline-sync heavy, Google ecosystem | US/Google, NoSQL lock-in, pay-per-op with no hard cap → cost + DSGVO risk. Recommend against for sensitive/cost-sensitive projects. |
-| **None (local-only)** | Single-device tool, no accounts | No infra, no DSGVO surface for stored data. Use device storage only. |
+| **PocketBase (self-hosted)** | Small/internal, simple data, tight budget, few users | Tiny, cheap (~€4/mo VPS or their NAS). No built-in push; single-node; not for heavy public traffic. |
+| **Appwrite (self-host or EU Cloud)** | They need a phone app and/or logins+files+notifications | Strong for mobile; EU Cloud (NL) or self-host. More moving parts than PocketBase. |
+| **Nhost (EU, Sweden)** | Connected/relational data, wants managed, EU | EU company, Frankfurt region. Managed runs on AWS (mostly mitigates). |
+| **Supabase (self-hosted)** | Connected/relational data + wants control | Self-host removes US exposure; heavier to run. |
+| **Supabase (managed)** | Non-sensitive, fast prototype, "don't mind where" | US parent → CLOUD Act. Only for non-sensitive; state the trade-off. |
+| **Firebase** | Rarely — heavy mobile offline sync, Google-tied | US/Google, lock-in, cost can spike. Recommend against for sensitive/cost-sensitive. |
+| **None (local-only)** | Single device, no accounts, no sharing | No servers, no data-protection surface. |
 
-Default recommendation logic: sensitive data + tight budget + willing to self-host → **PocketBase** (small) or **self-hosted Appwrite** (mobile-first / more features). Relational + SQL DX wanted → **self-hosted Supabase** or **Nhost**. Non-sensitive prototype → managed Supabase is fine.
+**Hosting location** (only relevant if a self-hostable backend fits):
+- **Their own NAS / home server (Synology, UGREEN…) via Docker** — for "store it at my place" + internal/personal/dev use. Strongest data sovereignty, near-free. Trade-offs to say plainly: needs their home internet (can be slower for outside users, occasional downtime if power/internet drops), and they'd rely on you/it for backups and updates; for safety it's reached through a secure tunnel, not by opening their router. Not ideal for a big public product.
+- **EU VPS (e.g. Hetzner, Germany)** — for "German data center" / public products. ~€4–20/mo, reliable, EU-hosted.
+- **EU managed cloud (Appwrite Cloud NL / Nhost)** — for "someone else handle it", EU-based, least upkeep, a bit pricier.
 
-### Block 3 — Deployment decision (web)
-If there is a web frontend (Next.js), present these, then recommend:
+**Recommendation logic (translate to plain words when you present it):** sensitive/personal data + tight budget + internal use + "store at my place" → self-hosted PocketBase or Appwrite **on their NAS**. Public product needing reliability → same backend **on an EU VPS**. "Someone else handle it" → EU managed cloud. Connected/relational data + wants SQL power → Supabase/Nhost. Non-sensitive quick test → managed Supabase is fine (name the trade-off).
 
-- **Cloudflare Pages** — cheapest (unlimited bandwidth), global edge, no commercial-use limit on free tier. Workers runtime has limits (no full Node API, CPU cap) and some Next.js feature friction.
-- **Vercel** — best Next.js DX, but US-entity (CLOUD Act) and unpredictable bandwidth cost; free tier bars commercial use.
-- **Coolify on a Hetzner (EU) VPS** — full control, EU-sovereign, ~€4–20/mo. You operate the server.
-- **Same VPS as the backend** — if the backend is self-hosted on an EU VPS, host the web app there too (e.g. via Coolify): one jurisdiction, one bill, no CLOUD Act. *Recommend this when Block 2 chose a self-hosted EU backend.*
-- **Netlify** — solid JAMstack; similar jurisdiction/cost trade-offs to Vercel.
+## Present the Recommendation (plain language)
+Before writing anything, summarize back what you understood and propose the stack in everyday terms, e.g.:
+> "Here's what I'd suggest: since it's an internal tool with personal customer data and you'd like it at your place, I'd run a small, private database on your Synology at home — it costs basically nothing extra, and the data never leaves your building. The trade-off is it depends on your home internet and we'll set up automatic backups. Sound good, or would you rather it sat in a German data center for maximum uptime?"
 
-### Block 4 — Mobile decision
-Ask: "Does this project need a native iOS/Android app, now or soon?" *Recommendation: only say yes if a native app is a real requirement — it adds a monorepo and a second deploy pipeline.*
+Get explicit approval on: backend, where the data lives, how it's delivered (web/app), and mobile yes/no.
 
-- If **yes** → the mobile stack is **React Native (Expo)**. Note two consequences: (a) the repo becomes a **monorepo** (`web/`, `mobile/`, `packages/shared` for types + API client); (b) mobile ships via **Expo EAS Build → TestFlight / App Store + Play Store**, separate from web hosting. Confirm the mobile rules/agent/skill (`rules/mobile.md`, `agents/mobile-dev.md`, `skills/mobile/`) are present; if not, tell the user they ship with this template.
-- If **no** → skip; record "Mobile: none".
-
-## After the Interview: Write the Configuration
-Only after the user has approved all four blocks. Read each file before editing (per `rules/general.md`). Then:
+## After Approval: Write the Configuration
+Read each file before editing (per `rules/general.md`). Then:
 
 ### 1. Rewrite the Tech Stack section of `CLAUDE.md`
-Replace every `{{PLACEHOLDER}}` with the chosen values, e.g.:
+Replace every `{{PLACEHOLDER}}`:
 ```
 - **Framework:** Next.js (App Router), TypeScript
 - **Styling (web):** Tailwind CSS + shadcn/ui
-- **Backend:** <chosen backend> (<hosting: self-hosted EU VPS / EU Cloud / managed>)
+- **Backend:** <chosen backend> (<hosting: their NAS / EU VPS / EU cloud / managed>)
 - **Deployment (web):** <chosen target>
 - **Mobile:** <React Native (Expo) | none>
-- **Data protection:** <e.g. self-hosted in EU (Hetzner), no CLOUD Act exposure>
+- **Data protection:** <e.g. self-hosted on user's Synology in DE, no CLOUD Act exposure>
 ```
 
 ### 2. Write stack-specific backend rules into `.claude/rules/backend.md`
-Keep the neutral principles already there and append a **"Stack-specific rules"** block using the matching snippet:
-
-- **Supabase:** enable Row Level Security on every table; policies for SELECT/INSERT/UPDATE/DELETE; Supabase joins over N+1.
-- **Appwrite:** use collection- and document-level permissions (Appwrite's RLS equivalent); validate on the server; use Appwrite SDK server key only server-side.
-- **PocketBase:** set collection API rules (list/view/create/update/delete) per collection; never expose the admin token client-side; back up the SQLite file on a schedule.
-- **Nhost / Hasura:** define per-role, per-row/column permissions in Hasura; use allow-lists in production; validate in serverless functions.
-- **Firebase:** write Firestore Security Rules for every collection; never trust client writes; use App Check.
-- **None:** namespace localStorage/IndexedDB keys; validate on read; note there is no server-side authz.
-
-Also update the `paths:` frontmatter of `backend.md` to match the chosen backend's file locations (e.g. `pocketbase/**`, `appwrite/**`) instead of `src/lib/supabase*`.
+Keep the neutral principles; append a **"Stack-specific rules"** block for the chosen backend:
+- **Supabase:** Row Level Security on every table; policies for SELECT/INSERT/UPDATE/DELETE; joins over N+1.
+- **Appwrite:** collection/document permissions; server key server-side only.
+- **PocketBase:** per-collection API rules; admin token never client-side; scheduled SQLite backups (extra important on a NAS).
+- **Nhost / Hasura:** per-role, per-row/column permissions; production allow-lists.
+- **Firebase:** Firestore Security Rules per collection; App Check; never trust client writes.
+- **None:** namespaced local storage; validate on read; no server-side authz.
+Also update the `paths:` frontmatter to match the backend (e.g. `pocketbase/**`, `appwrite/**`).
 
 ### 3. Set the deploy target in `.claude/skills/deploy/SKILL.md`
-Fill the `{{DEPLOY_TARGET}}` placeholder and, if mobile is enabled, keep the mobile/EAS section active; otherwise it stays dormant.
+Fill `{{DEPLOY_TARGET}}`. If the backend runs on the user's NAS, note that the web app can run there too (behind the same secure tunnel) or on a small VPS — record which.
 
 ### 4. If mobile = yes
-Add a note to `CLAUDE.md` Project Structure describing the monorepo layout, and tell the user the next mobile step is handled by `/mobile`. (The actual folder move — `src/` → `web/`, adding `packages/shared`, workspaces in `package.json` — is a code change; instruct it explicitly or hand it to a dev, don't fake it.)
+Add the monorepo note to `CLAUDE.md` Project Structure and tell the user the next mobile step is `/mobile`. (The actual folder move is a code change — instruct it, don't fake it.)
 
 ### 5. Write `docs/STACK.md`
-Record: chosen backend + hosting, deployment target, mobile yes/no, and a short **rationale** including the DSGVO posture (where data lives, CLOUD Act exposure yes/no) and the expected monthly cost. This is the audit trail for the decision.
+Record in plain terms + technically: chosen backend, **hosting location** (their NAS / EU VPS / EU cloud / managed), deployment target, mobile yes/no, and a short **rationale** — where the data lives, CLOUD Act exposure yes/no, expected monthly cost. If it's a NAS/home server, record the upkeep, backup, and networking (DDNS/tunnel) notes so `/deploy` and later features respect them. This is the decision's audit trail.
 
 ## Checklist Before Completion
-- [ ] All four blocks decided and user-approved
+- [ ] Interview done in plain language — no technical terms put to the user
+- [ ] Stack recommended with a plain reason + trade-off, and user-approved
 - [ ] DSGVO trade-off stated for any US managed provider chosen
-- [ ] `CLAUDE.md` Tech Stack has no `{{...}}` placeholders left
-- [ ] `.claude/rules/backend.md` has the correct stack-specific block + updated `paths:`
-- [ ] `.claude/skills/deploy/SKILL.md` deploy target set
-- [ ] If mobile: monorepo note added; `/mobile` mentioned as next mobile step
-- [ ] `docs/STACK.md` written with rationale + cost + data-residency note
+- [ ] `CLAUDE.md` Tech Stack has no `{{...}}` left
+- [ ] `.claude/rules/backend.md` has the right stack block + updated `paths:`
+- [ ] `.claude/skills/deploy/SKILL.md` target set
+- [ ] If mobile: monorepo note added; `/mobile` mentioned as next step
+- [ ] `docs/STACK.md` written with rationale + hosting location + cost
 
 ## Handoff
-> "Stack configured (see `docs/STACK.md`). Now run `/init` with a description of what you want to build — the feature map will assume this stack."
+> "All set — I've locked in the technical foundation (details in `docs/STACK.md`). Now run `/init` and tell me what you want to build; we'll shape it into a plan together."
 
 ## Git Commit
 ```
 chore: Configure project stack
 
-- Backend: <choice> (<hosting>)
+- Backend: <choice> (<hosting location>)
 - Deploy: <choice>
 - Mobile: <choice>
-- Rationale + DSGVO posture in docs/STACK.md
+- Rationale + data-residency in docs/STACK.md
 ```
