@@ -31,6 +31,7 @@
 | PROJ-30 | Themenvorschläge (wöchentlich, KI) | 🔵 Roadmap — Content-Epic: 1×/Woche ~20 Themenvorschläge aus der Wissensbasis unter Berücksichtigung bereits behandelter Themen; Themen müssen freigegeben werden, bevor Content entsteht | 2026-07-20 |
 | PROJ-31 | Content-Studio (Generierung + Redaktion + Lern-Loop) | 🔵 Planned — Spec geschrieben; Tonalität im Prototyp validiert. Regler=Stil, Freitext=nur fachliche Korrektur, jede Iteration gespeichert + Lern-Speicher; Sie-Form + neutral (keine Marke); nur für freigegebene Themen (PROJ-30), speist PROJ-32 | 2026-07-20 |
 | PROJ-32 | Publishing (Blog / Social Media / Newsletter) | 🔵 Roadmap — Content-Epic: freigegebene Inhalte auf allen Kanälen (Webseiten-Blog, Social Media, Newsletter) ausspielen | 2026-07-20 |
+| PROJ-33 | Löschschutz für Partners | 🟠 In Review — Hotfix fertig & gepusht (Branch `claude/session-yomvzd`), Deploy steht noch aus (Session ohne Server-Zugriff). BEFORE DELETE Trigger auf `tms.partners` blockiert jeden Löschversuch, Partner können nur auf inaktiv (`is_active = false`) gesetzt werden. Migration: `20260721120000_PROJ-33_partners_no_delete.sql` — Deploy-Anleitung siehe Feature-Spec | 2026-07-21 |
 
 ## Architektur-Dokumente
 
@@ -58,4 +59,4 @@
 - Vor jeder Code-Änderung: CLAUDE.md, docs/PRD.md und relevante Feature-Datei lesen.
 - Status in INDEX.md und Feature-Header immer synchron halten.
 
-## Next Available ID: PROJ-33
+## Next Available ID: PROJ-34
