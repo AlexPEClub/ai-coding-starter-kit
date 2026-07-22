@@ -6,9 +6,11 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Install dependencies
+# Install ALL dependencies (incl. devDependencies) — required to build
+# (typescript für next.config.ts, tailwind/postcss etc.). Das Runtime-Image
+# nutzt nur das .next/standalone-Output, devDependencies landen NICHT in Produktion.
 COPY package.json package-lock.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
