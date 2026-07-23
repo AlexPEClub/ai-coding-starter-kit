@@ -27,6 +27,50 @@ export type UpsertResult =
   | { ok: true }
   | { ok: false; error: string };
 
+/** Best-effort-Gerätestandort (kann fehlen, wenn nicht erlaubt/verfügbar). */
+export type Coords = { lat: number; lon: number };
+
+/**
+ * Prüft, dass die Tour dem eingeloggten Fahrer gehört.
+ * Gibt den serviceClient + user zurück, oder einen Fehler.
+ */
+async function assertTourOwnedByCurrentUser(
+  tourId: string
+): Promise<
+  | { ok: true; serviceClient: ReturnType<typeof createAdminClient> }
+  | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { ok: false, error: "Nicht eingeloggt." };
+  }
+
+  const serviceClient = createAdminClient({ schema: "tms" });
+
+  const { data: tour, error } = await serviceClient
+    .from("tours")
+    .select("id, fahrer_id")
+    .eq("id", tourId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[assertTourOwnedByCurrentUser]", error);
+    return { ok: false, error: "Konnte Tour nicht prüfen." };
+  }
+  if (!tour) {
+    return { ok: false, error: "Tour nicht gefunden." };
+  }
+  if (tour.fahrer_id !== user.id) {
+    return { ok: false, error: "Diese Tour ist dir nicht zugewiesen." };
+  }
+
+  return { ok: true, serviceClient };
+}
+
 /**
  * Hilfsfunktion: Lädt Partner- und Adressdaten für Tour-Liste
  */
@@ -115,7 +159,7 @@ export async function getDriverToursForToday(): Promise<DriverToursResult> {
       `)
       .eq("fahrer_id", user.id)
       .eq("geplantes_abholdatum", today)
-      .eq("status", "geplant")
+      .in("status", ["geplant", "unterwegs"])
       .order("geplantes_abholdatum", { ascending: true });
 
     if (error) {
@@ -178,7 +222,7 @@ export async function getDriverToursForDateRange(
       .eq("fahrer_id", user.id)
       .gte("geplantes_abholdatum", startDate)
       .lte("geplantes_abholdatum", endDate)
-      .eq("status", "geplant")
+      .in("status", ["geplant", "unterwegs"])
       .order("geplantes_abholdatum", { ascending: true });
 
     if (error) {
@@ -196,21 +240,76 @@ export async function getDriverToursForDateRange(
 }
 
 /**
- * Setzt den Status einer Tour auf 'abgeholt'.
+ * "Navi" gedrückt: Fahrer ist zu diesem Kunden unterwegs.
+ * Setzt Status 'unterwegs' + Startzeit; Standort best-effort (kann fehlen).
  */
-export async function markTourAsCollected(tourId: string): Promise<UpsertResult> {
+export async function markTourEnRoute(
+  tourId: string,
+  coords?: Coords
+): Promise<UpsertResult> {
   try {
-    const serviceClient = createAdminClient({ schema: "tms" });
+    const owned = await assertTourOwnedByCurrentUser(tourId);
+    if (!owned.ok) return owned;
 
-    const today = new Date().toISOString().split("T")[0];
+    const now = new Date().toISOString();
 
-    const { error } = await serviceClient
+    const update: Record<string, unknown> = {
+      status: "unterwegs",
+      tour_startzeit: now,
+      geaendert_am: now,
+    };
+    if (coords) {
+      update.tour_start_lat = coords.lat;
+      update.tour_start_lon = coords.lon;
+    }
+
+    const { error } = await owned.serviceClient
       .from("tours")
-      .update({
-        status: "erledigt",
-        tatsaechliches_abholdatum: today,
-        geaendert_am: new Date().toISOString(),
-      })
+      .update(update)
+      .eq("id", tourId);
+
+    if (error) {
+      console.error("[markTourEnRoute]", error);
+      return { ok: false, error: "Konnte Status nicht aktualisieren." };
+    }
+
+    revalidatePath("/fahrer");
+    return { ok: true };
+  } catch (err) {
+    console.error("[markTourEnRoute] Exception:", err);
+    return { ok: false, error: "Unerwarteter Fehler beim Aktualisieren des Status." };
+  }
+}
+
+/**
+ * "Erledigt" bestätigt: Tour abgeschlossen.
+ * Setzt Status 'erledigt', Abschluss-Zeit + Abholdatum; Standort best-effort.
+ */
+export async function markTourAsCollected(
+  tourId: string,
+  coords?: Coords
+): Promise<UpsertResult> {
+  try {
+    const owned = await assertTourOwnedByCurrentUser(tourId);
+    if (!owned.ok) return owned;
+
+    const now = new Date().toISOString();
+    const today = now.split("T")[0];
+
+    const update: Record<string, unknown> = {
+      status: "erledigt",
+      tatsaechliches_abholdatum: today,
+      abgeschlossen_am: now,
+      geaendert_am: now,
+    };
+    if (coords) {
+      update.abschluss_lat = coords.lat;
+      update.abschluss_lon = coords.lon;
+    }
+
+    const { error } = await owned.serviceClient
+      .from("tours")
+      .update(update)
       .eq("id", tourId);
 
     if (error) {

@@ -24,7 +24,7 @@
 | PROJ-18 | Globaler Header mit Navigation | ✅ Deployed | 2026-07-03 |
 | PROJ-19 | Auftragsverwaltung | ✅ Deployed | 2026-07-05 |
 | PROJ-20 | Logistik & Abholung | ✅ Deployed | 2026-07-06 |
-| PROJ-21 | Fahrer-Seite | ✅ Deployed | 2026-07-06 |
+| PROJ-21 | Fahrer-Seite | ✅ Deployed — DB-Erweiterung Driver-Tour-Lifecycle (Status `unterwegs`/`angekommen`/`problem` + Spalte `tms.tours.abgeschlossen_am`) am 2026-07-22 live angewendet & verifiziert | 2026-07-22 |
 | PROJ-22 | Kalender für blockierte Tage | ✅ Deployed | 2026-07-07 |
 | PROJ-28 | Hersteller-Verwaltung & Artikel-Zuordnung | ✅ Deployed | 2026-07-10 |
 | PROJ-29 | Wissensbasis (KI-Content-Fundament) | 🔵 Planned — Spec geschrieben; Fundament des Content-Epics: technische Quelldaten (Leitz-Lexikon + Hersteller) per PDF→KI-Extraktion→Prüfung, Rolle „Redaktion" | 2026-07-20 |
