@@ -1,8 +1,8 @@
 # PROJ-29: Wissensbasis (KI-Content-Fundament)
 
-## Status: Planned
+## Status: Architected
 **Created:** 2026-07-20
-**Last Updated:** 2026-07-22
+**Last Updated:** 2026-07-23
 
 > Erstes Feature des **Content-Epics** (PROJ-29 → PROJ-30 → PROJ-31 → PROJ-32).
 > Ziel des Epics: eine große, durchsuchbare Text-Basis zu Themen der
@@ -173,13 +173,88 @@
 <!-- Added by /architecture -->
 | Decision | Rationale | Date |
 |----------|-----------|------|
-| _wird in /architecture ergänzt_ | | |
+| Rolle „Redaktion" als achte Rolle im bestehenden `USER_ROLES`-Array (nicht separates Berechtigungssystem) | Nutzt komplette vorhandene Auth-/RLS-Infrastruktur weiter, keine Duplikation | 2026-07-23 |
+| Hersteller/Quelle als Freitext-Feld, keine Verknüpfung zur PROJ-28-Herstellertabelle | Hält Wissensbasis wie im Product-Decision-Log festgelegt entkoppelt von Produktstammdaten | 2026-07-23 |
+| Neue Kategorien-Tabelle (Werkzeugart/Material) mit n:m-Zuordnung zu Dokumenten, admin-pflegbar | Gleiches bewährtes Muster wie Hersteller-Verwaltung (PROJ-28); erweiterbar ohne Code-Änderung | 2026-07-23 |
+| Supabase Storage (privater Bucket) für Original-PDFs — erstes Storage-Feature im Projekt | Kein bestehendes Muster vorhanden, wird hier neu etabliert | 2026-07-23 |
+| Text-Extraktion läuft asynchron im Hintergrund nach dem Upload, kein OCR | Vermeidet Timeouts bei großen PDFs; OCR bewusst außen vor gelassen (mit dir bestätigt) — gescannte PDFs gelten als Fehlerfall | 2026-07-23 |
+| Postgres-Volltextsuche (statt einfaches Text-Pattern-Matching wie in anderen Modulen) | Bestehendes Pattern-Matching ist für lange PDF-Fließtexte zu langsam/unpräzise bei wachsender Dokumentenmenge | 2026-07-23 |
+| Dokument-Verarbeitungsstatus (Wird verarbeitet / Aktiv / Fehler) als rein technisches Feld, getrennt von jeglichem inhaltlichen Freigabe-Konzept | Bildet die asynchrone Verarbeitung ab, ohne den bewusst abgeschafften Entwurf/Geprüft-Workflow wieder einzuführen | 2026-07-23 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### A) Komponentenstruktur
+
+```
+Wissensbasis-Seite (nur Rollen Redaktion/Admin)
+├─ Upload-Bereich
+│   ├─ Datei-Auswahl (PDF)
+│   ├─ Werkzeugart-Auswahl (Mehrfachauswahl, aus Taxonomie)
+│   ├─ Material-Auswahl (Mehrfachauswahl, aus Taxonomie)
+│   └─ Hersteller/Quelle-Eingabe (Freitext)
+├─ Dokumenten-Liste (Tabelle)
+│   ├─ Suchfeld (durchsucht Volltext, Dateiname, Quelle)
+│   ├─ Filter (Werkzeugart, Material)
+│   ├─ Zeile: Dateiname, Quelle, Tags, Upload-Datum, Verarbeitungsstatus
+│   ├─ Tags nachträglich bearbeiten
+│   └─ Dokument löschen
+├─ Leerzustand ("Erstes Dokument hochladen")
+└─ Kategorien-Verwaltung (nur Admin) — Werkzeugart/Material pflegen
+    (gleiches Muster wie die bestehende Hersteller-Verwaltung aus PROJ-28)
+```
+
+### B) Datenmodell (fachlich beschrieben)
+
+**Wissensbasis-Dokument** — pro Upload ein Eintrag:
+- Dateiname, Hersteller/Quelle (Freitext — bewusst kein Verweis auf die PROJ-28-Herstellertabelle,
+  um die Wissensbasis wie im Decision Log festgelegt von Produktstammdaten entkoppelt zu halten)
+- Original-PDF (Verweis auf die abgelegte Datei)
+- Extrahierter Volltext
+- Werkzeugart-Tag(s) und Material-Tag(s) (mehrere pro Dokument möglich)
+- Hochgeladen von, Upload-Datum
+- **Verarbeitungsstatus** (technisch, kein inhaltlicher Freigabe-Status!): "Wird verarbeitet" →
+  "Aktiv" oder "Fehler bei der Verarbeitung". Nötig, weil die Text-Umwandlung bei großen PDFs etwas
+  dauern darf (siehe Edge Cases) und im Hintergrund läuft, statt den Upload-Vorgang zu blockieren.
+
+**Kategorie** — admin-gepflegte Taxonomie-Werte:
+- Art (Werkzeugart oder Material) + Name (z.B. "Säge", "Holz")
+- Frei erweiterbar durch Admin, analog zur bestehenden Hersteller-Verwaltung (PROJ-28)
+
+Ein Dokument kann mehrere Kategorien beider Art zugeordnet bekommen (Mehrfachauswahl beim Upload).
+
+### C) Tech-Entscheidungen (mit Begründung)
+
+- **Neue Rolle „Redaktion":** wird als achte Rolle in das bestehende Rollen-Array aufgenommen
+  (gleiches Muster wie die 7 Werkstatt-Rollen) statt eines separaten Berechtigungssystems — nutzt
+  die komplette vorhandene Auth-/RLS-Infrastruktur wieder, statt sie zu duplizieren. Das ist eine
+  kleine Erweiterung des bereits deployten PROJ-1-Rollenmodells, kein eigener Spec-Vorlauf nötig.
+- **Datei-Ablage:** Supabase Storage, privater Bucket, Zugriff nur für Redaktion/Admin. Dies ist der
+  erste Storage-Anwendungsfall im Projekt — es gibt noch kein bestehendes Muster dafür, wir
+  etablieren hier den ersten.
+- **Text-Extraktion:** einfache serverseitige PDF-zu-Text-Umwandlung (kein KI-Modell, siehe
+  Open Questions in der Spec — bereits als hinfällig markiert). Läuft **im Hintergrund** nach dem
+  Upload, damit große Dateien den Upload-Vorgang nicht blockieren oder zum Timeout führen.
+- **Kein OCR:** Nur PDFs mit echtem Textlayer werden unterstützt (Entscheidung mit dir bestätigt).
+  Gescannte Bild-PDFs ohne Textlayer werden wie ein Extraktions-Fehler behandelt. OCR kann bei
+  Bedarf später nachgerüstet werden.
+- **Volltextsuche:** Postgres-Volltextsuche (kein einfaches Text-Pattern-Matching) über den
+  extrahierten Text. Bestehende Suchen im Projekt nutzen nur einfaches Text-Pattern-Matching, das
+  reicht für kurze Felder wie Namen — für längere, durchsuchte Fließtexte aus PDFs ist das bei
+  wachsender Dokumentenmenge zu langsam und unpräzise.
+- **Taxonomie-Verwaltung:** eigene, admin-pflegbare Kategorien-Tabelle mit Mehrfachzuordnung pro
+  Dokument (statt fester Auswahlliste im Code) — gleiches bewährtes Muster wie die
+  Hersteller-Verwaltung aus PROJ-28, damit neue Werkzeugarten/Materialien ohne Code-Änderung
+  ergänzt werden können.
+
+### D) Abhängigkeiten (neue Pakete)
+
+- Eine PDF-Text-Extraktions-Bibliothek für serverseitige Verarbeitung (konkrete Bibliothek wird in
+  `/backend` ausgewählt und installiert).
+- Keine KI-/Sprachmodell-Anbindung nötig für dieses Feature (durch die Scope-Vereinfachung entfällt
+  dieser Bedarf komplett — spart Kosten und Komplexität gegenüber der ursprünglichen Planung).
 
 ## QA Test Results
 _To be added by /qa_

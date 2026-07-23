@@ -27,7 +27,7 @@
 | PROJ-21 | Fahrer-Seite | ✅ Deployed | 2026-07-06 |
 | PROJ-22 | Kalender für blockierte Tage | ✅ Deployed | 2026-07-07 |
 | PROJ-28 | Hersteller-Verwaltung & Artikel-Zuordnung | ✅ Deployed | 2026-07-10 |
-| PROJ-29 | Wissensbasis (KI-Content-Fundament) | 🔵 Planned — Spec verfeinert (2026-07-22): kein Wissens-Eintrag/Entwurf-Geprüft-Workflow mehr, stattdessen PDF→Text-Konvertierung→sofort aktives, getaggtes Dokument (Werkzeugart/Material), Rolle „Redaktion"; wartet auf „approved" | 2026-07-22 |
+| PROJ-29 | Wissensbasis (KI-Content-Fundament) | 🔵 Architected — Architektur steht: neue Rolle „Redaktion" (8. Rolle), Supabase Storage (Erstnutzung im Projekt) für PDFs, asynchrone Text-Extraktion ohne OCR, Postgres-Volltextsuche, admin-pflegbare Kategorien-Tabelle (Werkzeugart/Material); wartet auf „approved" für `/frontend`+`/backend` | 2026-07-23 |
 | PROJ-30 | Themenvorschläge (wöchentlich, KI) | 🔵 Roadmap — Content-Epic: 1×/Woche ~20 Themenvorschläge aus der Wissensbasis unter Berücksichtigung bereits behandelter Themen; Themen müssen freigegeben werden, bevor Content entsteht | 2026-07-20 |
 | PROJ-31 | Content-Studio (Generierung + Redaktion + Lern-Loop) | 🔵 Planned — Spec verfeinert (2026-07-23): durchsucht Wissensbasis-Dokumente selbst (Retrieval statt geprüfter Fakten), zeigt Quellen im Entwurf an. Regler=Stil, Freitext=nur fachliche Korrektur, jede Iteration gespeichert + Lern-Speicher; Sie-Form + neutral (keine Marke); nur für freigegebene Themen (PROJ-30), speist PROJ-32; wartet auf „approved" | 2026-07-23 |
 | PROJ-32 | Publishing (Blog / Social Media / Newsletter) | 🔵 Roadmap — Content-Epic: freigegebene Inhalte auf allen Kanälen (Webseiten-Blog, Social Media, Newsletter) ausspielen | 2026-07-20 |
