@@ -1,6 +1,6 @@
 # PROJ-29: Wissensbasis (KI-Content-Fundament)
 
-## Status: Architected
+## Status: In Progress
 **Created:** 2026-07-20
 **Last Updated:** 2026-07-23
 
@@ -255,6 +255,30 @@ Ein Dokument kann mehrere Kategorien beider Art zugeordnet bekommen (Mehrfachaus
   `/backend` ausgewählt und installiert).
 - Keine KI-/Sprachmodell-Anbindung nötig für dieses Feature (durch die Scope-Vereinfachung entfällt
   dieser Bedarf komplett — spart Kosten und Komplexität gegenüber der ursprünglichen Planung).
+
+## Frontend-Implementierung (2026-07-23)
+
+Umgesetzt gemäß Tech Design:
+- **Rolle „Redaktion"** in `src/lib/roles.ts` ergänzt (8. Rolle), `isRedaktion()`-Helper hinzugefügt,
+  Test in `src/lib/roles.test.ts` aktualisiert.
+- **Seite** `/verwaltung/wissensbasis` (`src/app/(app)/verwaltung/wissensbasis/page.tsx`),
+  zugänglich für Redaktion + Admin.
+- **Komponenten** unter `src/components/wissensbasis/`: `wissensbasis-admin-page.tsx`
+  (Orchestrierung), `document-table.tsx` (Tabelle + Suche/Filter + Upload-/Tag-/Lösch-Dialoge),
+  `category-manager-dialog.tsx` (Admin-only Taxonomie-Pflege).
+- **Navigation:** neue Sektion „Redaktion" im Burger-Menü (`app-header.tsx`), sichtbar für
+  Redaktion/Admin.
+- **Abweichung vom Tech Design (bewusst, nur für diese Frontend-Phase):** Die Server Actions in
+  `src/lib/actions/knowledge-documents.ts` nutzen einen **temporären In-Memory-Speicher** statt
+  echtem Supabase Storage/Postgres-Volltextsuche, damit die UI schon jetzt testbar ist. Das
+  Verarbeitungsstatus-Feld sowie die Fehlerbehandlung bei leerem/unlesbarem Text sind bereits nach
+  Tech Design modelliert; `/backend` ersetzt nur die Datenhaltung, nicht die Schnittstellen/Typen.
+- **Verifiziert:** `npm run lint`, `npm run build` (inkl. TypeScript-Check) und `npm test`
+  (34 Unit-Tests) laufen grün. **Nicht verifiziert:** interaktives Durchklicken im Browser — dieses
+  Worktree hat keine `.env.local` mit Supabase-Zugangsdaten, `npm run dev` schlägt daher schon auf
+  `/login` fehl ("Your project's URL and Key are required..."). Das ist eine Umgebungs-Einschränkung
+  dieses Worktrees, keine Eigenschaft von PROJ-29 — sollte vor `/qa` mit echten Zugangsdaten
+  nachgeholt werden.
 
 ## QA Test Results
 _To be added by /qa_

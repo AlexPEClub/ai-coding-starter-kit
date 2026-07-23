@@ -20,6 +20,7 @@ import {
   Users,
   Factory,
   PackageSearch,
+  BookOpen,
 } from "lucide-react";
 
 import { type UserRole } from "@/lib/roles";
@@ -81,7 +82,17 @@ const adminNavItems: NavItem[] = [
   { href: "/verwaltung/artikel", label: "Artikel", icon: PackageSearch },
 ];
 
-function NavigationSheet({ isAdmin }: { isAdmin: boolean }) {
+const redaktionNavItems: NavItem[] = [
+  { href: "/verwaltung/wissensbasis", label: "Wissensbasis", icon: BookOpen },
+];
+
+function NavigationSheet({
+  isAdmin,
+  isRedaktion,
+}: {
+  isAdmin: boolean;
+  isRedaktion: boolean;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -162,6 +173,29 @@ function NavigationSheet({ isAdmin }: { isAdmin: boolean }) {
               </div>
             </>
           )}
+
+          {/* Redaktion-Bereich */}
+          {(isRedaktion || isAdmin) && (
+            <div className="border-t border-border mt-2 pt-2">
+              <div className="px-4 py-1 text-xs font-semibold uppercase text-muted-foreground">
+                Redaktion
+              </div>
+              {redaktionNavItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <SheetClose key={item.href} asChild>
+                    <Link
+                      href={item.href}
+                      className="flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:bg-muted"
+                    >
+                      <Icon className="h-5 w-5 shrink-0 text-muted-foreground" />
+                      {item.label}
+                    </Link>
+                  </SheetClose>
+                );
+              })}
+            </div>
+          )}
         </nav>
       </SheetContent>
     </Sheet>
@@ -171,6 +205,7 @@ function NavigationSheet({ isAdmin }: { isAdmin: boolean }) {
 export function AppHeader({ user }: { user: CurrentUser }) {
   const router = useRouter();
   const isAdmin = user.roles?.includes("admin") ?? false;
+  const isRedaktion = user.roles?.includes("redaktion") ?? false;
 
   async function handleLogout() {
     await signOutAction();
@@ -181,7 +216,7 @@ export function AppHeader({ user }: { user: CurrentUser }) {
       <div className="mx-auto flex h-16 max-w-6xl items-center px-4">
         {/* Links: Burger-Menü */}
         <div className="flex w-14 items-center justify-start">
-          <NavigationSheet isAdmin={isAdmin} />
+          <NavigationSheet isAdmin={isAdmin} isRedaktion={isRedaktion} />
         </div>
 
         {/* Mitte: Logo (echt zentriert) */}
