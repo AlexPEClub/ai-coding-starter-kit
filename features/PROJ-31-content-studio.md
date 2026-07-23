@@ -2,7 +2,7 @@
 
 ## Status: Planned
 **Created:** 2026-07-20
-**Last Updated:** 2026-07-20
+**Last Updated:** 2026-07-23
 
 > Dritter Baustein des **Content-Epics** (PROJ-29 → PROJ-30 → **PROJ-31** → PROJ-32) und dessen
 > Herzstück. Hier wird zu einem **freigegebenen Thema** (aus PROJ-30) mit KI ein Artikel (Text +
@@ -16,8 +16,10 @@
 
 ## Dependencies
 - **PROJ-1 (Auth & Rollen)** — Rolle **„Redaktion"** (+ Admin).
-- **PROJ-29 (Wissensbasis)** — liefert die geprüften **Fakten/Quelldaten** als Grundlage der
-  Generierung.
+- **PROJ-29 (Wissensbasis)** — liefert die hochgeladenen **Wissensbasis-Dokumente** (Volltext,
+  getaggt nach Werkzeugart/Material) als Rohdaten-Basis. Seit der PROJ-29-Verfeinerung
+  (2026-07-22) gibt es dort keine vorab geprüften Einzel-Fakten mehr — PROJ-31 durchsucht die
+  Dokumente selbst nach themenrelevanten Textstellen (siehe Kern-Mechanik).
 - **PROJ-30 (Themenvorschläge)** — liefert die **freigegebenen Themen**; Content wird **nur** für
   freigegebene Themen erstellt.
 - **Speist PROJ-32 (Publishing)** — freigegebene Artikel gehen dorthin zur Ausspielung.
@@ -42,22 +44,26 @@
 ## Kern-Mechanik (validiert)
 1. **Tonalitäts-Anker:** Ein hinterlegter **Beispiel-Text** (vom Team selbst geschrieben) gibt den
    Grundstil vor und fließt in jede Generierung ein.
-2. **Zwei strikt getrennte Feedback-Wege:**
+2. **Faktengrundlage aus der Wissensbasis (Retrieval):** Bei „Entwurf erzeugen" durchsucht das
+   System die getaggten Wissensbasis-Dokumente (PROJ-29) nach themenrelevanten Textstellen und
+   übergibt diese der KI als Faktenbasis. Die verwendeten Quellen (Dokument + Fundstelle) werden
+   dem Entwurf sichtbar beigefügt, damit der Redakteur die Fakten nachprüfen kann.
+3. **Zwei strikt getrennte Feedback-Wege:**
    - **🎚️ Regler = Stil/Tonalität** (wie der Text *klingt*).
    - **✍️ Freitext = ausschließlich fachliche Richtigstellung** (kein „gefällt mir nicht"; nur:
      „das ist technisch falsch, richtig ist …").
-3. **Iterativ:** Feedback → Text wird **neu erzeugt** → wiederholen, bis „ok".
-4. **Iterations-Historie:** jede Version wird gespeichert (nichts geht verloren).
-5. **Lern-Speicher:** fachliche Korrekturen (und Tonalitäts-Einstellungen) werden gespeichert und in
+4. **Iterativ:** Feedback → Text wird **neu erzeugt** → wiederholen, bis „ok".
+5. **Iterations-Historie:** jede Version wird gespeichert (nichts geht verloren).
+6. **Lern-Speicher:** fachliche Korrekturen (und Tonalitäts-Einstellungen) werden gespeichert und in
    künftige Generierungen eingespeist → Fehler werden nicht wiederholt, der Start-Text wird über die
    Zeit besser („auf Anhieb passend").
-6. **Harte Regeln:** **„Sie"-Form** als Standard; **kein Hersteller/keine Marke** wird je genannt
+7. **Harte Regeln:** **„Sie"-Form** als Standard; **kein Hersteller/keine Marke** wird je genannt
    (immer neutral).
 
 ## Out of Scope
 - **Themenfindung & -freigabe** → PROJ-30 (Content entsteht nur für bereits freigegebene Themen).
 - **Veröffentlichung & kanalspezifische Ausspielung** (Blog/Social/Newsletter) → PROJ-32.
-- **Pflege der Wissensbasis** (PDF-Upload, Extraktion, Prüfung) → PROJ-29.
+- **Pflege der Wissensbasis** (PDF-Upload, Text-Konvertierung, Taggen) → PROJ-29.
 - **Kanalspezifische Format-Varianten** (kurzer Social-Post vs. langer Blog-Artikel) → primär
   PROJ-32; hier entsteht zunächst der **Kern-Artikel** (siehe Open Questions).
 - **Externe Bildbeschaffung/Stockfotos** — nur KI-Generierung oder eigener Upload.
@@ -74,8 +80,13 @@
 
 ### Generierung
 - [ ] Angenommen ein freigegebenes Thema liegt vor, wenn der Redakteur „Entwurf erzeugen" klickt,
-  dann erstellt die KI aus den geprüften Wissensbasis-Fakten einen ersten Artikel-Text im
-  hinterlegten Tonalitäts-Stil.
+  dann durchsucht das System die getaggten Wissensbasis-Dokumente (PROJ-29) nach themenrelevanten
+  Textstellen und die KI erstellt daraus einen ersten Artikel-Text im hinterlegten Tonalitäts-Stil.
+- [ ] Angenommen ein Entwurf wurde erzeugt, wenn er erscheint, dann werden die dafür verwendeten
+  Wissensbasis-Quellen (Dokument + Fundstelle) sichtbar aufgelistet, damit der Redakteur die Fakten
+  nachprüfen kann.
+- [ ] Angenommen zu einem Thema gibt es keine oder kaum passenden Wissensbasis-Dokumente, wenn der
+  Redakteur „Entwurf erzeugen" klickt, dann wird ein Hinweis angezeigt statt eines erfundenen Textes.
 - [ ] Angenommen ein Text wird erzeugt, wenn er erscheint, dann ist er in **Sie-Form** verfasst und
   enthält **keinen Hersteller-/Markennamen**.
 - [ ] Angenommen die Generierung schlägt fehl (z.B. KI nicht erreichbar), wenn der Redakteur sie
@@ -112,9 +123,10 @@
   zurück in Bearbeitung genommen werden (nachvollziehbar in der Historie).
 
 ## Edge Cases
-- **KI erfindet Fakten (Halluzination):** Generierung soll sich an geprüfte Wissensbasis-Einträge
-  halten; erfundene/unbelegte Aussagen werden über die Fakten-Korrektur richtiggestellt und gelernt.
-  (Ob Aussagen zwingend an Quellen gebunden werden müssen → Open Question.)
+- **KI erfindet Fakten (Halluzination):** Generierung soll sich an die gefundenen
+  Wissensbasis-Textstellen halten; die angezeigten Quellen ermöglichen dem Redakteur den
+  Faktencheck. Erfundene/unbelegte Aussagen werden über die Fakten-Korrektur richtiggestellt und
+  fließen in den Lern-Speicher ein.
 - **KI nennt versehentlich eine Marke:** muss verhindert/abgefangen werden (Neutralitäts-Regel ist
   hart; Durchsetzung → Open Question).
 - **Widersprüchliche Korrekturen über die Zeit:** wenn eine neue Korrektur einer früheren
@@ -140,8 +152,9 @@
 - [ ] **Lern-Mechanik technisch:** wie werden Korrekturen thematisch zugeordnet und eingespeist
   (Few-shot-Beispiele/gesammeltes Faktenwissen vs. späteres Fine-Tuning)? → `/architecture`.
 - [ ] **Ein globaler Beispiel-Text als Tonalitäts-Anker oder mehrere** (z.B. je Content-Typ)?
-- [ ] **Quellen-/Halluzinations-Absicherung:** müssen generierte Aussagen an konkrete
-  Wissensbasis-Einträge gebunden/belegbar sein?
+- [x] **Quellen-/Halluzinations-Absicherung:** Ja — generierte Entwürfe durchsuchen die
+  Wissensbasis-Dokumente gezielt nach themenrelevanten Textstellen und zeigen die verwendeten
+  Quellen (Dokument + Fundstelle) dem Redakteur an, statt frei zu erfinden. (2026-07-23)
 - [ ] **Neutralitäts-Durchsetzung:** wie hart wird „keine Marke nennen" erzwungen (Blacklist,
   automatische Nachkontrolle)?
 - [ ] **Kanal-Varianten:** entsteht hier nur der Kern-Artikel, und kanalspezifische Kurz-/
@@ -160,6 +173,8 @@
 | **Sie-Form** als Standard, **keine Hersteller-/Markennennung** (immer neutral) | Ausdrückliche Vorgabe des Users | 2026-07-20 |
 | **Bilder**: KI-generiert ODER selbst hochgeladen | Flexibilität; eigene Fotos oft besser/authentischer | 2026-07-20 |
 | Umbenannt von „Artikel-Werkstatt" → **„Content-Studio"** | Klarerer, passenderer Name | 2026-07-20 |
+| Content-Studio durchsucht die Wissensbasis-Dokumente selbst nach themenrelevanten Textstellen (Retrieval), statt auf vorab geprüfte Einzel-Fakten zuzugreifen | Notwendige Anpassung an die vereinfachte PROJ-29-Wissensbasis (keine geprüften Einträge mehr, siehe PROJ-29-Verfeinerung 2026-07-22) | 2026-07-23 |
+| Generierte Entwürfe zeigen die verwendeten Wissensbasis-Quellen (Dokument + Fundstelle) sichtbar an | Kompensiert den Wegfall der PROJ-29-Vorprüfung; ermöglicht dem Redakteur gezielten Faktencheck | 2026-07-23 |
 
 ### Technical Decisions
 <!-- Added by /architecture -->
