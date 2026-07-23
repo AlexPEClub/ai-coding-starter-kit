@@ -1,10 +1,10 @@
 # PROJ-11: Kundendetailseite (erweitert)
 
-**Status:** ✅ Deployed (2026-07-18) — Erweiterung (Bestellhistorie Produkttyp/Gruppierung/Donut-Chart) live auf tms.gudel-werkzeuge.de, gegen echte Kundendaten verifiziert (siehe Abschnitt „Deploy-Verlauf 2026-07-18")  
+**Status:** 🟢 Approved — Umsatz-Tab-Neubau: QA abgeschlossen (2026-07-22), 0 Critical/High Bugs, 47/47 Tests grün, bereit für `/deploy`. Live-Verifikation (Umsatz-Tab + Kunden-Liste gegen echten Kunden) als Auflage direkt nach Deploy, siehe Abschnitt „QA Test Results — Umsatz-Tab-Neubau (2026-07-22)". Bestellhistorie-Erweiterung bleibt ✅ Deployed (2026-07-18, siehe Abschnitt „Deploy-Verlauf 2026-07-18")  
 **Projekt:** TMS 2.0  
 **Priorität:** Hoch  
 **Autor:** Klausi (KI-Entwickler)  
-**Datum:** 2026-07-02 (Erweiterung: 2026-07-17)
+**Datum:** 2026-07-02 (Erweiterung: 2026-07-17, Umsatz-Neubau: 2026-07-21, Implementierung: 2026-07-22)
 
 ---
 
@@ -38,23 +38,65 @@ Bereits vorhanden und bleibt erhalten:
 - Speichern → Update in `partner_addresses` (SSOT = Supabase)
 - Abbrechen → Keine Änderung
 
-### 2.3 Umsatz-Anzeige
+### 2.3 Umsatz-Anzeige (Neubau 2026-07-21)
 
-**Balkendiagramm:**
-- Monatsumsätze (Jan–Dez)
-- Gesplittet in: Handelsware, Service, Sonderwerkzeug
-- Farben: Handelsware = Blau, Service = Grün, Sonderwerkzeug = Orange
-- Datenquelle: `mv_partner_monthly_revenue`
+**Werkstatt-Vergleich:** Bisher hing die Umsatz-Kachel an einer Ablage
+(`mv_partner_monthly_revenue`), die es in der echten Werkstatt nie gab —
+deshalb war das Fach immer leer. Jetzt zählen wir stattdessen direkt aus dem
+Rechnungsordner (`invoice_items`), genau wie bei der Bestellhistorie.
 
-**Jahres-Switch:**
-- Dropdown oben rechts im Diagramm
-- Verfügbare Jahre dynamisch aus der Datenbank
-- Standard: aktuelles Jahr
+**Datengrundlage:** Direkte Auswertung von `tms.invoice_items` (über
+`tms.invoices` mit dem Kunden verknüpft) — keine Abhängigkeit mehr von einer
+nie befüllten Materialized View. Handel/Service-Zuordnung läuft über
+dieselbe Verknüpfung wie in der Bestellhistorie:
+`invoice_items.article_number → products.number → products.type`
+(`PRODUCT` = Handelsware, `SERVICE` = Servicegeschäft).
+
+**KPI-Reihe (oben, klickbar):**
+- **Gesamtumsatz** — zählt ALLE Rechnungspositionen im gewählten Zeitraum,
+  auch die ohne Artikel-Match (wichtigste, oft weiterverwendete Kennzahl —
+  soll nicht künstlich niedriger wirken als der echte Umsatz)
+- **Handelsumsatz** — nur Positionen mit `products.type = 'PRODUCT'`
+- **Serviceumsatz** — nur Positionen mit `products.type = 'SERVICE'`
+- **Nicht zugeordnet** (optional, nur wenn > 0 im Zeitraum) — Positionen ohne
+  Artikel-Match, damit die Differenz zwischen Gesamt- und Handel+Service-Summe
+  nachvollziehbar bleibt
+- Jede KPI zeigt zusätzlich einen **Vergleichs-Badge** (grün/rot, % Veränderung)
+  gegenüber der vorherigen, gleich langen Periode (siehe unten)
+
+**Dynamisches Chart (unten, reagiert auf KPI-Klick):**
+- Standard (keine KPI angeklickt): Balkendiagramm, ein Balken pro Monat,
+  gestapelt in Handelsumsatz/Serviceumsatz (+ „Nicht zugeordnet" falls vorhanden)
+- Klick auf **Handelsumsatz**-KPI: Chart zeigt nur Handelsumsatz pro Monat,
+  gestapelt nach **Rabattgruppe** (`position_groups`, gleiche Verknüpfung wie
+  Bestellhistorie: `products.group_id → position_groups`)
+- Klick auf **Serviceumsatz**-KPI: analog, gestapelt nach Rabattgruppe der
+  Service-Positionen
+- Erneuter Klick auf die aktive KPI hebt den Filter wieder auf (Toggle,
+  zurück zum Standard-Chart) — gleiches Muster wie das Donut-Chart in der
+  Bestellhistorie (2.4.1)
+- Klick auf **Gesamtumsatz** setzt immer auf den Standard-Chart zurück
+
+**Zeitraum-Dropdown:**
+- **Standard: „Letzte 12 Monate"** — rollierendes Fenster (heute − 365 Tage
+  bis heute), NICHT Kalenderjahr. Bewusst umbenannt von „YTD", um das
+  rollierende Verhalten klar zu machen (Kalender-YTD wäre etwas anderes)
+- Zusätzlich wählbar: **Kalenderjahre**, dynamisch aus den vorhandenen
+  Rechnungsdaten ermittelt (ältestes Jahr mit Daten bis aktuelles Jahr,
+  z.B. 2023, 2024, 2025, 2026 …) — zeigt dann nur Rechnungspositionen mit
+  Rechnungsdatum in genau diesem Kalenderjahr
+- Zusätzlich wählbar: **„Gesamt"** — alle jemals gespeicherten
+  Rechnungspositionen des Kunden, ohne Zeitfilter
+
+**Vergleichs-Badge (Vorperiode):**
+- Bei „Letzte 12 Monate": Vergleich mit den 365 Tagen davor
+- Bei Kalenderjahr (z.B. 2025): Vergleich mit dem Vorjahr (2024)
+- Bei „Gesamt": kein Vergleich (kein sinnvoller „Davor"-Zeitraum)
+- Anzeige: Prozent-Veränderung, grün bei Zuwachs, rot bei Rückgang
 
 **Werte-Anzeige:**
-- Umsatz pro Kategorie + Gesamt pro Monat
-- Summe des ausgewählten Jahres
-- Anzahl Rechnungen
+- KPI-Werte für den gewählten Zeitraum (siehe oben)
+- Chart-Tooltip zeigt Monat + Betrag je Kategorie/Rabattgruppe
 
 ### 2.4 Bestellhistorie (NUR Trade Goods)
 
@@ -166,12 +208,19 @@ Tortenstück zeigt nur die Teile aus diesem Fach.
 - [ ] Adress-Änderungen werden in Supabase gespeichert
 - [ ] Nach Speichern wird die Ansicht aktualisiert
 
-### Umsatz
-- [ ] Balkendiagramm zeigt 12 Monate
-- [ ] Drei Farben für Handel/Service/Sonderwerkzeug
-- [ ] Dropdown zeigt alle verfügbaren Jahre
-- [ ] Jahreswechsel aktualisiert Diagramm sofort
-- [ ] Summen werden korrekt angezeigt
+### Umsatz (Neubau 2026-07-21)
+- [ ] Gesamtumsatz zählt ALLE `invoice_items` im gewählten Zeitraum, unabhängig von Artikel-Match
+- [ ] Handelsumsatz/Serviceumsatz basieren auf `products.type` (`PRODUCT`/`SERVICE`) über `invoice_items.article_number → products.number`
+- [ ] KPI „Nicht zugeordnet" erscheint nur, wenn im Zeitraum tatsächlich unzugeordnete Positionen existieren
+- [ ] Standard-Zeitraum ist „Letzte 12 Monate" (rollierend, heute − 365 Tage), nicht Kalenderjahr
+- [ ] Zeitraum-Dropdown enthält zusätzlich alle Kalenderjahre mit vorhandenen Daten sowie „Gesamt"
+- [ ] Kalenderjahr-Auswahl zeigt ausschließlich Positionen mit Rechnungsdatum in diesem Jahr
+- [ ] Klick auf KPI „Handelsumsatz" filtert das Chart auf Handelsumsatz, gestapelt nach Rabattgruppe
+- [ ] Klick auf KPI „Serviceumsatz" filtert das Chart auf Serviceumsatz, gestapelt nach Rabattgruppe
+- [ ] Erneuter Klick auf aktive KPI hebt den Filter auf (Toggle zurück zum Standard-Chart)
+- [ ] Klick auf „Gesamtumsatz" setzt Chart-Filter zurück auf Standardansicht
+- [ ] Vergleichs-Badge zeigt korrekte %-Veränderung ggü. Vorperiode (365 Tage bzw. Vorjahr), grün bei Zuwachs/rot bei Rückgang
+- [ ] Bei „Gesamt"-Auswahl wird kein Vergleichs-Badge angezeigt
 - [ ] Responsive: Diagramm passt sich an
 
 ### Bestellhistorie
@@ -334,7 +383,8 @@ wiederverwenden statt duplizieren.
 - ✅ PROJ-1 (Auth) — erledigt
 - ✅ PROJ-2a.1 (Kunden-Stammdaten) — erledigt
 - ✅ Tabellen `partners`, `partner_addresses`, `partner_contacts`, `invoices`, `invoice_items` — existieren
-- ✅ Materialized View `mv_partner_monthly_revenue` — existiert
+- ❌ Materialized View `mv_partner_monthly_revenue` — existiert NICHT in Produktion (siehe Deploy-Verlauf 2026-07-18); wird durch Neubau 2.3 ersetzt, nicht mehr benötigt
+- ⚠️ Schema-Drift bei `invoice_items`/`products`/`position_groups` (fehlende Migrationen) — separates Ticket, NICHT Teil dieses Umbaus
 
 ---
 
@@ -350,6 +400,46 @@ wiederverwenden statt duplizieren.
 
 ## 9. Decision Log
 
+### Produkt (2026-07-21 — Refine: Umsatz-Tab Neubau)
+- **Umsatz-Tab wird komplett neu aufgebaut**, da die Datengrundlage
+  (`mv_partner_monthly_revenue`) nie in Produktion existierte (siehe
+  Deploy-Verlauf 2026-07-18) — kein reines Redesign, sondern Ersatz der
+  kompletten Datenquelle durch direkte `invoice_items`-Auswertung, analog
+  zur bereits produktiven Bestellhistorie.
+- **Gesamtumsatz zählt ALLE Rechnungspositionen**, auch ohne Artikel-Match zu
+  `products` — Begründung: diese Kennzahl wird an anderer Stelle
+  weiterverwendet und soll nicht künstlich niedriger ausfallen als der
+  tatsächliche Kundenumsatz.
+- **Kategorie „Sonderwerkzeug" entfällt ersatzlos** — basierte auf
+  `invoice_items.revenue_category`, die zu 100% NULL ist (bereits in der
+  Bestellhistorie durch `products.type` ersetzt). Nur noch
+  Handelsumsatz/Serviceumsatz über `products.type` (`PRODUCT`/`SERVICE`).
+- **Rabattgruppen (`position_groups`)** werden als Chart-Aufschlüsselung
+  angezeigt: Klick auf KPI Handelsumsatz/Serviceumsatz splittet das
+  Chart nach Rabattgruppe (Toggle-Verhalten wie Donut-Chart in 2.4.1).
+- **Standard-Zeitraum: rollierend, 365 Tage** ("Letzte 12 Monate"), NICHT
+  Kalender-YTD — Dropdown bietet zusätzlich feste Kalenderjahre (dynamisch)
+  und „Gesamt".
+- **Vergleichs-Badge** (grün/rot, %) gegen Vorperiode: 365 Tage davor bzw.
+  Vorjahr, je nach Auswahl; kein Vergleich bei „Gesamt".
+- **KPI-Reihe bleibt schlank:** nur Gesamtumsatz/Handelsumsatz/Serviceumsatz
+  (+ optional „Nicht zugeordnet"). Vorschlag „Anzahl Rechnungen"/„Ø
+  Bestellwert" wurde abgelehnt.
+- **Schema-Drift-Bereinigung ist explizit NICHT Teil dieses Umbaus** —
+  eigenes, separates Ticket.
+
+### Technisch (2026-07-21, korrigiert bei /architecture)
+- **Kein neues DB-Objekt.** Statt der ursprünglich vorgeschlagenen neuen
+  Materialized View `mv_partner_revenue` wird direkt aus `invoice_items`
+  berechnet — exakt das Muster, das die bereits produktiv laufende
+  Bestellhistorie verwendet (kein Refresh-Risiko, keine neue Migration nötig,
+  vermeidet die Fehlerklasse, die am 18.07. zum Rollback führte).
+- Gleiche Join-Logik wie Bestellhistorie:
+  `invoice_items.article_number → products.number → products.type`,
+  `products.group_id → position_groups` für die Rabattgruppen-Aufschlüsselung.
+- Falls Performance bei sehr großen Kunden später zum Problem wird, kann eine
+  View als Optimierung nachgerüstet werden — nicht Teil dieses Umbaus.
+
 ### Produkt (2026-07-17 — Refine: Bestellhistorie Produkttyp/Gruppierung/Donut-Chart)
 - **Kennzahl im Donut-Chart:** Anzahl Bestellpositionen je Artikelgruppe (nicht Mengen-Summe). Begründung: User-Beispiel "10 mal ein HW Sägeblatt gekauft" bezieht sich auf Anzahl der Vorkommnisse, nicht auf Stückzahl je Position.
 - **Segment-Klick-Verhalten:** Toggle — erneuter Klick auf aktives Segment hebt den Filter auf. Dropdown bietet zusätzlich "Alle" als expliziten Reset.
@@ -364,6 +454,12 @@ wiederverwenden statt duplizieren.
 - [x] Kennzahl im Donut-Chart = Anzahl Bestellpositionen (nicht Mengen-Summe) → bestätigt (2026-07-17)
 - [x] Toggle-Verhalten beim erneuten Klick auf ein aktives Segment → bestätigt (2026-07-17)
 - [x] Ausblenden von Positionen ohne Produkt-Match (statt z.B. "unbekannt" anzuzeigen) → bestätigt (2026-07-17)
+- [x] Standard-Zeitraum Umsatz-Tab: rollierend (365 Tage) statt Kalenderjahr → bestätigt (2026-07-21)
+- [x] Gesamtumsatz zählt ALLE `invoice_items` (auch ohne Produkt-Match) → bestätigt (2026-07-21)
+- [x] Jahresumsatz-Bereitstellung: Live-Berechnung aus `invoice_items` statt der nie existierenden Materialized View → bestätigt (2026-07-21), bei /architecture nochmals korrigiert (kein neues DB-Objekt, siehe Abschnitt „Technisch (2026-07-21, korrigiert bei /architecture)")
+- [x] Dritte Kategorie „Sonderwerkzeug" (basierte auf leerer `revenue_category`-Spalte) entfällt ersatzlos → bestätigt (2026-07-21)
+- [x] Zusatz-KPIs „Anzahl Rechnungen" / „Ø Bestellwert" → abgelehnt, KPI-Reihe bleibt schlank (2026-07-21)
+- [x] Schema-Drift-Bereinigung (fehlende Migrationen) im Rahmen dieses Umbaus mitlösen? → Nein, separates Ticket (2026-07-21)
 
 ---
 
@@ -506,6 +602,129 @@ Projekt bisher keine Testinfrastruktur (nur `roles.test.ts` und
 Ein neues Mocking-Setup nur für diese Erweiterung einzuführen wäre
 Over-Engineering — die Verifikation erfolgt stattdessen im `/qa`-Schritt
 gegen echte Daten (siehe Akzeptanzkriterien Abschnitt 4).
+
+---
+
+## 15. Tech Design (Solution Architect) — Umsatz-Tab Neubau (2026-07-21)
+
+**Werkstatt-Vergleich:** Die alte Umsatz-Kachel hing an einem Fach, das es in
+der echten Werkstatt nie gab (die Materialized View existierte nie in
+Produktion) — deshalb war sie immer leer. Der Neubau hängt die Kachel
+stattdessen direkt an den Rechnungsordner, denselben, den die
+Bestellhistorie schon erfolgreich nutzt. Kein neues Lager (keine neue
+Datenbank-Tabelle/-View), nur eine neue Auswertung des Bestehenden.
+
+### A) Komponenten-Struktur
+
+```
+Tab: Umsatz
+├── KPI-Reihe (NEU, ersetzt bisherige Summen-Karte)
+│   ├── Gesamtumsatz-Kachel (klickbar, mit Vergleichs-Badge %)
+│   ├── Handelsumsatz-Kachel (klickbar, mit Vergleichs-Badge %)
+│   ├── Serviceumsatz-Kachel (klickbar, mit Vergleichs-Badge %)
+│   └── "Nicht zugeordnet"-Kachel (nur sichtbar, wenn > 0 im Zeitraum)
+├── Zeitraum-Dropdown (oben rechts): Letzte 12 Monate (Standard) │
+│   Kalenderjahre (dynamisch) │ Gesamt
+└── Umsatz-Chart (NEU, ersetzt bisheriges Balkendiagramm)
+    ├── Standardansicht: Balken pro Monat, gestapelt Handel/Service
+    │   (+ Nicht zugeordnet)
+    └── Gefilterte Ansicht (nach KPI-Klick): Balken pro Monat, gestapelt
+        nach Rabattgruppe — nur für die angeklickte Kategorie
+```
+
+Die KPI-Reihe und das Chart sind **ein zusammenhängender Baustein**: Klick
+auf eine KPI ändert nur, WIE das Chart darunter aufgeschlüsselt wird — die
+KPI-Werte selbst ändern sich nicht durch den Chart-Klick, nur durch den
+Zeitraum-Dropdown. Die bisherige separate "Summen-Karte" entfällt, ihre
+Funktion übernimmt die neue KPI-Reihe.
+
+**Aufräumen bestehender Code-Verwirrung:** Aktuell existieren zwei
+unterschiedliche, sich überschneidende Umsatz-Komponenten
+(`revenue-chart.tsx` mit eingebauter KPI-Anzeige, sowie eine zweite,
+inzwischen ungenutzte `revenue-summary.tsx`). Der Neubau ersetzt beide durch
+eine klare Aufteilung: eine KPI-Reihen-Komponente + eine Chart-Komponente,
+die verwaiste Datei wird entfernt.
+
+### B) Datenmodell (fachlich)
+
+Keine neuen Tabellen oder Datenbank-Objekte. Alles wird direkt aus den
+bereits vorhandenen Rechnungspositionen berechnet — genau wie bei der
+Bestellhistorie:
+
+- **Zeitraum bestimmt die Auswahl der Rechnungspositionen** (Rechnungsdatum
+  innerhalb der letzten 365 Tage / im gewählten Kalenderjahr / ganze
+  Historie)
+- **Kategorie** (Handel/Service/Nicht zugeordnet) ergibt sich pro Position
+  aus der Artikel-Art des verknüpften Artikel-Stammdatensatzes (dieselbe
+  Verknüpfung wie in der Bestellhistorie)
+- **Rabattgruppe** ergibt sich pro Position aus der Warengruppe des
+  verknüpften Artikels (dieselbe Verknüpfung wie im Donut-Chart der
+  Bestellhistorie)
+- **Vergleichswert** ist dieselbe Berechnung, nur für die vorherige,
+  gleich lange Periode (365 Tage davor bzw. Vorjahr)
+
+Der "Jahresumsatz" ist also kein gespeicherter Wert, sondern das Ergebnis
+einer Live-Berechnung über die Rechnungspositionen im gewählten Zeitraum —
+das entspricht der Erkenntnis, dass hier keine zusätzliche Datenablage
+nötig ist, solange die Berechnung schnell genug bleibt (siehe Tech-
+Entscheidungen).
+
+Der gewählte Zeitraum und die aktive Chart-Kategorie sind reiner
+Anzeige-Zustand auf der Seite — nichts davon wird gespeichert, beim
+nächsten Öffnen der Seite startet wieder der Standard (Letzte 12 Monate,
+kein Kategorie-Filter).
+
+### C) Tech-Entscheidungen (Begründung)
+
+- **Keine neue Materialized View.** Ursprünglich war eine neue, eigens
+  migrierte View (`mv_partner_revenue`) angedacht, um den "Jahresumsatz"
+  vorab zu berechnen. Entscheidung: stattdessen live aus den
+  Rechnungspositionen berechnen — genau das Muster, das die Bestellhistorie
+  bereits produktiv nutzt. Vorteil: kein neues Datenbank-Objekt, kein
+  Refresh-Zeitplan, keine Wiederholung der Fehlerklasse, die am 18.07. zum
+  Produktions-Rollback führte (eine angenommene, aber nie migrierte View).
+  Falls die Live-Berechnung bei sehr großen Kunden spürbar langsam wird,
+  kann eine View später als reine Performance-Optimierung nachgerüstet
+  werden — das ist kein Blocker für diesen Umbau.
+- **Wiederverwendung der Bestellhistorie-Verknüpfung:** Artikel-Art und
+  Warengruppe werden über dieselbe, bereits produktiv geprüfte Verknüpfung
+  ermittelt wie in der Bestellhistorie (Artikelnummer → Artikel-Stammdaten →
+  Warengruppe). Keine neue Verknüpfungslogik, kein Risiko neuer
+  Dateninkonsistenzen.
+- **Batchweises Nachladen der Artikel-Zuordnung:** Wie in der
+  Bestellhistorie werden Artikelnummern in Blöcken gegen den Artikelstamm
+  abgeglichen (statt aller Artikelnummern auf einmal), um die
+  "Adressen-zu-lang"-Problematik zu vermeiden, die beim letzten Deploy schon
+  einmal aufgetreten war.
+- **Zeitraum- und Kategorie-Filterung serverseitig:** Wie beim
+  bestehenden Zeitraum-/Suchfilter der Bestellhistorie wird direkt in der
+  Datenbank-Abfrage gefiltert, nicht erst im Browser — bleibt schnell auch
+  bei Kunden mit sehr vielen Rechnungen.
+- **Gleiches visuelles Muster wie Bestellhistorie:** Gleiche
+  Diagramm-Bibliothek, gleiche Design-System-Farben, gleiches
+  Toggle-Verhalten bei Kategorie-Klick (aktive Kategorie erneut anklicken
+  hebt den Filter wieder auf) — einheitliches Erscheinungsbild, kein neues
+  Erlern-Muster für Nutzer.
+- **Aufräumen der doppelten Altkomponenten** (`revenue-summary.tsx`
+  verwaist, `revenue-chart.tsx` überladen): wird im Zuge dieses Umbaus durch
+  die neue, klar getrennte KPI-/Chart-Struktur ersetzt, nicht parallel
+  weitergeführt.
+
+### D) Abhängigkeiten (Packages)
+
+Keine neuen Packages nötig — Diagramm-Bibliothek (Recharts) und
+Dropdown-Baustein sind bereits im Projekt vorhanden und werden nur
+wiederverwendet.
+
+## 16. Technical Decisions (Architektur, 2026-07-21)
+
+| Decision | Rationale | Date |
+|----------|-----------|------|
+| Keine neue Materialized View — Live-Berechnung direkt aus `invoice_items`, analog Bestellhistorie | Vermeidet neues DB-Objekt/Refresh-Risiko; genau die Fehlerklasse, die am 18.07. zum Rollback führte, wird nicht wiederholt | 2026-07-21 |
+| Wiederverwendung der Artikel-Art-/Warengruppen-Verknüpfung aus der Bestellhistorie (kein neuer Verknüpfungscode) | Vermeidet Dateninkonsistenzen, nutzt bereits produktiv geprüfte Logik | 2026-07-21 |
+| Batchweiser Abgleich der Artikelnummern gegen den Artikelstamm (statt Gesamtkatalog auf einmal) | Vermeidet die "Adressen-zu-lang"-Problematik aus BUG-5 (18.07.) erneut | 2026-07-21 |
+| Zeitraum-/Kategorie-Filterung serverseitig statt im Browser | Bleibt performant auch bei Kunden mit sehr vielen Rechnungen | 2026-07-21 |
+| Zusammenlegen der doppelten Altkomponenten (`revenue-summary.tsx`, `revenue-chart.tsx`) in eine klare KPI-/Chart-Struktur | Beseitigt bestehende Code-Verwirrung/Redundanz, statt sie fortzuführen | 2026-07-21 |
 
 ---
 
@@ -747,10 +966,209 @@ Alle Blocker behoben und live verifiziert:
   Abschnitt 4 „Bestellhistorie" erfüllt.
 
 ### Weiterhin offen (SEPARATE Tickets, nicht Teil von PROJ-11)
-- Umsatz-Tab: fehlende Materialized View `mv_partner_monthly_revenue`.
-- `invoice_items.revenue_category` komplett NULL — falls fachlich eine echte
-  Umsatzkategorisierung gebraucht wird, eigene Pipeline nötig.
+- ~~Umsatz-Tab: fehlende Materialized View `mv_partner_monthly_revenue`~~ →
+  wird durch den Umsatz-Tab-Neubau (Abschnitt 2.3/15/16, Refine + Architektur
+  2026-07-21) direkt adressiert (Live-Berechnung aus `invoice_items`, kein
+  neues DB-Objekt), nicht mehr separat offen.
+- `invoice_items.revenue_category` komplett NULL — für den Umsatz-Neubau
+  irrelevant (nutzt `products.type` statt dieser Spalte), bleibt aber für
+  andere denkbare Auswertungen ein offener Punkt.
 - Kein echtes Staging (docker-compose deployt immer nach Production).
+- Schema-Drift (fehlende Migrationen für `invoice_items`, `products`,
+  `position_groups` u.a.) — bewusst separates Ticket, siehe Refine
+  2026-07-21.
+
+---
+
+## 17. Implementierungsnotizen — Umsatz-Tab-Neubau (2026-07-22)
+
+**Anlass:** Nutzer meldete leere Felder im Umsatz-Tab der Kundendetailseite.
+Ursache bestätigt (siehe Abschnitt „Deploy-Verlauf 2026-07-18"): die
+Materialized View `mv_partner_monthly_revenue` existierte nie in Produktion.
+Der bereits genehmigte Architektur-Vorschlag (Abschnitt 15/16) wurde
+übernommen und umgesetzt.
+
+**Backend (`src/lib/actions/revenue.ts`, komplett neu):**
+- Alle Funktionen lesen jetzt live aus `tms.invoice_items` (gejoint mit
+  `tms.invoices!inner`), kein Zugriff mehr auf die tote View.
+- Neue Funktionen: `getPartnerRevenueSummary`, `getPartnerRevenueChartData`,
+  `getPartnerRevenueGroupChartData`, `getAvailableRevenueYears`. Wiederverwendung
+  von `chunk()`/`centsToEuro()` aus `orders-helpers.ts`.
+- „Gesamt"-Zeitraum bündelt das Chart nach Kalenderjahr statt nach Monat (nicht
+  explizit in Abschnitt 2.3 spezifiziert, aber analog zur bisherigen
+  Jahresansicht — sonst zu viele Balken bei mehrjähriger Historie).
+
+**Frontend (`revenue-chart.tsx`, komplett neu):** KPI-Reihe
+(Gesamt/Handel/Service/Nicht-zugeordnet, klickbar mit Toggle), Zeitraum-Dropdown
+(12 Monate/Kalenderjahre/Gesamt), gestapeltes Balkendiagramm (ersetzt Area-Chart)
+mit Umschaltung auf Rabattgruppen-Aufschlüsselung bei KPI-Klick. „Schärfumsatz/
+Auftrag"-Kachel entfernt (laut Decision Log 2026-07-21 abgelehnt).
+
+**Aufräumen:** `revenue-summary.tsx` (verwaist) und `revenue-chart.tsx.bak`
+gelöscht. `src/lib/actions/order-stats.ts` komplett entfernt — `getPartnerOrderStats`
+war bereits tot (nirgends importiert), `getPartnerOrderDates` wurde nur von der
+jetzt entfernten Schärfumsatz-Kachel genutzt und hatte dadurch keine Aufrufer mehr.
+
+**Zusätzlicher Fund (nicht in der ursprünglichen Spec):** `getPartnersWithRevenue`
+in `src/lib/actions/partners.ts` (Umsatzspalte auf der Kunden-Listenseite `/kunden`)
+las ebenfalls aus `mv_partner_monthly_revenue` — gleiche Ursache, gleicher Fix:
+Live-Summe aus `invoice_items` für das laufende Kalenderjahr, batched über
+`partnerIds` wie zuvor. Läuft über `createAdminClient`, nicht den bisherigen
+RLS-Client der Funktion — `invoice_items`/`invoices`-GRANTs sind bisher nur für
+`service_role` verifiziert (siehe Abschnitt 14).
+
+**Verifikation in dieser Sandbox:** `npx tsc --noEmit` ✅, `npm run build` ✅,
+`npx vitest run src/` ✅ (34/34 Tests grün). **Kein Live-Browser-Test möglich**
+(keine Supabase-Zugangsdaten in der Sandbox) — muss im `/qa`-Schritt gegen echte
+Kundendaten verifiziert werden, u.a.:
+- `SELECT` gegen `tms.invoice_items JOIN tms.invoices` mit `service_role` liefert
+  Daten (Rechte-Check, wie in Abschnitt 14 für die Bestellhistorie bereits bestätigt).
+- Umsatz-Tab zeigt bei einem echten Kunden (z.B. Bod'or KTM GmbH) plausible,
+  von Null abweichende Zahlen für „Letzte 12 Monate", ein Kalenderjahr und „Gesamt".
+- Kunden-Liste (`/kunden`) zeigt wieder echte Umsatzwerte statt durchgängig €0.
+- KPI-Klick auf Handel/Service togglet die Rabattgruppen-Aufschlüsselung korrekt
+  und wieder zurück.
+
+---
+
+## QA Test Results — Umsatz-Tab-Neubau (2026-07-22)
+
+**Getestet:** 2026-07-22
+**App-URL:** nicht erreichbar (keine `.env.local`/Supabase-Zugangsdaten in dieser
+Sandbox — Dev-Server crasht beim ersten Request in der Middleware mit
+„Your project's URL and Key are required to create a Supabase client!"; explizit
+verifiziert per `npx playwright test ... --project=chromium`, Server-Log
+bestätigt fehlende Env-Vars). **Kein Login, kein Live-Browser-Test möglich** —
+gleiche Einschränkung wie bei den vorherigen PROJ-11-QA-Runden.
+**Tester:** QA Engineer (KI)
+
+### Automatisierte Tests
+- `npx tsc --noEmit`: ✅ keine Fehler
+- `npm run build`: ✅ erfolgreich (Turbopack, alle Routen kompilieren, inkl. `/kunden` + `/kunden/[id]`)
+- `npm run lint`: ⚠️ 1 Warnung (siehe BUG-1), 0 Fehler
+- `npx vitest run src/`: ✅ 47/47 Tests grün (13 neue Tests in `src/lib/actions/revenue.test.ts`)
+- Neue E2E-Testsuite `tests/PROJ-11-umsatz-tab.spec.ts` geschrieben (9 Szenarien ×
+  2 Browser-Profile = 18 Testläufe). `npx playwright test --list` bestätigt: Datei
+  syntaktisch korrekt, alle Tests werden erkannt. **Nicht ausgeführt** — Sandbox
+  hat keine Supabase-Zugangsdaten, Login schlägt fehl (siehe oben). Erfordert
+  echten Testkunden (`PROJ11_TEST_KUNDE_ID`) mit Handels- und Service-Positionen
+  in mehreren Kalenderjahren.
+
+### Unit-Tests (`revenue.test.ts`, Black-Box gegen gemockten Supabase-Admin-Client)
+Da `revenue.ts` (anders als `orders.ts`/`orders-helpers.ts`) keine separate
+Helpers-Datei mit exportierten Pure-Functions hat, wurden die exportierten
+Server-Actions selbst mit einem gemockten Supabase-Client getestet (Query-Builder
+inkl. `.eq/.in/.gte/.lte/.range` + PromiseLike `.then`). Deckt ab:
+- Kategorisierung Handel/Service/Nicht-zugeordnet inkl. Positionen ohne Artikel-Match
+- Gesamtumsatz zählt ALLE Positionen (auch ohne Match) — Abschnitt 4, Kriterium 1
+- Kalenderjahr-Filterung (nur Positionen mit `document_date` im gewählten Jahr)
+- Rollierendes 365-Tage-Fenster inkl. exakter Tagesgrenze zur Vorperiode
+- Monats-Bucketing mit Null-Auffüllung für Monate ohne Umsatz
+- Jahres-Bucketing bei „Gesamt"
+- Rabattgruppen-Aufschlüsselung inkl. „Ohne Gruppe"-Fallback
+- Partner-Isolation (Umsatz eines anderen Kunden fließt nicht ein)
+- Edge Cases: neuer Kunde ohne Rechnungen (Nullwerte, kein Fehler), DB-Fehler
+  (ok:false, generische Fehlermeldung, kein Crash)
+
+Alle 13 Tests grün. Diese Logik ist damit deutlich besser abgesichert als der
+ursprüngliche Umsatz-Tab (der überhaupt keine Tests hatte).
+
+### Akzeptanzkriterien-Status (Abschnitt 4, „Umsatz (Neubau 2026-07-21)")
+
+- [x] Gesamtumsatz zählt ALLE `invoice_items` im gewählten Zeitraum, unabhängig von Artikel-Match — unit-getestet
+- [x] Handelsumsatz/Serviceumsatz basieren auf `products.type` — unit-getestet
+- [x] KPI „Nicht zugeordnet" erscheint nur bei Wert > 0 — Code-Review (`showUnassigned = current.unassigned > 0`)
+- [x] Standard-Zeitraum „Letzte 12 Monate" (rollierend) — unit-getestet (Tagesgrenze exakt geprüft)
+- [x] Zeitraum-Dropdown: Kalenderjahre + „Gesamt" — Code-Review + E2E geschrieben (ungeprüft, s.o.)
+- [x] Kalenderjahr-Auswahl zeigt nur Positionen dieses Jahres — unit-getestet
+- [x] Klick auf „Handelsumsatz" filtert nach Rabattgruppe — unit-getestet (`getPartnerRevenueGroupChartData`) + Code-Review Toggle-Logik
+- [x] Klick auf „Serviceumsatz" analog — unit-getestet
+- [x] Erneuter Klick auf aktive KPI hebt Filter auf (Toggle) — Code-Review (`activeCategory === category ? null : category`)
+- [x] Klick auf „Gesamtumsatz" setzt Chart-Filter zurück — Code-Review (`onClick={() => setActiveCategory(null)}`)
+- [x] Vergleichs-Badge zeigt korrekte %-Veränderung — Code-Review `ChangeIndicator`, Vorperiodenwerte unit-getestet
+- [x] Bei „Gesamt" kein Vergleichs-Badge — unit-getestet (`hasComparison=false`, `previous=null` bei `type:"all"`) + Code-Review (`previous !== undefined`-Check in `KpiCard`)
+- [ ] **UNGEPRÜFT (Sandbox)** — Responsive Verhalten des Diagramms in echtem Browser
+- [ ] **UNGEPRÜFT (Sandbox)** — visuelle Darstellung, Ladezustände, Animationen live
+
+### Edge Cases (identifiziert + getestet)
+- [x] Neuer Kunde ohne Rechnungspositionen → Nullwerte, kein Fehler (unit-getestet)
+- [x] Datenbank-Fehler bei der Abfrage → `ok:false`, generische Fehlermeldung, kein Crash (unit-getestet)
+- [x] Artikel ohne Rabattgruppe in der Aufschlüsselung → Fallback „Ohne Gruppe" (unit-getestet)
+- [x] Rollierendes Fenster an der exakten Tagesgrenze zur Vorperiode (unit-getestet)
+- [x] Umsatz eines anderen Kunden fließt nicht ein (Partner-Isolation, unit-getestet)
+
+### Security-Audit (Red-Team)
+- [x] **Authentifizierung:** `/kunden` und `/kunden/[id]` sind nicht in `PUBLIC_PATHS`
+  (`middleware.ts`) — nicht angemeldete Requests werden zu `/login` umgeleitet,
+  bevor eine Server Action ausgeführt wird. Der Matcher in `src/proxy.ts` greift
+  pfadbasiert (nicht methodenspezifisch), deckt also auch die POST-Requests der
+  neuen Server Actions ab. Kein neuer Endpoint, keine neue Angriffsfläche.
+- [x] **Injection:** Der Umsatz-Tab hat kein Freitext-Suchfeld. Einzige
+  Nutzereingabe ist die Zeitraum-Auswahl (`partnerId`, `period.year`) — beide
+  laufen über parametrisierte PostgREST-Filter (`.eq/.gte/.lte`), keine
+  String-Konkatenation in rohes SQL. Kein XSS-Vektor: Rabattgruppen-Namen kommen
+  aus `tms.position_groups` (interne Stammdaten, kein User-Input) und werden von
+  React/Recharts als Text gerendert, nicht als HTML.
+- [x] **Fehlerbehandlung:** Alle neuen Funktionen fangen Fehler ab und geben nur
+  generische Meldungen („Unerwarteter Fehler") an den Client zurück; Details
+  landen ausschließlich in `console.error` (serverseitig). Kein Leak von
+  DB-Fehlermeldungen oder internen Strukturen an den Browser.
+- [~] **Autorisierung (informativ, kein neuer Befund):** Alle vier neuen
+  Funktionen sowie der geänderte Teil von `getPartnersWithRevenue` laufen über
+  `createAdminClient` (`service_role`, umgeht RLS) ohne eigene Rollenprüfung —
+  identisch zum bereits akzeptierten Muster der Bestellhistorie (Abschnitt 14).
+  Jede der 7 internen Rollen kann damit den Umsatz jedes Kunden sehen; das PRD
+  sieht keine kundenspezifische Zugriffsbeschränkung vor, insofern kein neuer
+  Befund, nur zur Vollständigkeit dokumentiert.
+- **BUG-2 (Low, informativ):** `period.year`/`partnerId` werden nicht mit Zod
+  validiert, bevor sie in die Server Actions einfließen (Abweichung von
+  `backend.md`-Konvention) — deckungsgleich mit dem bereits bestehenden Muster
+  in `orders.ts` (`groupId`, `page`, `pageSize` sind dort ebenfalls unvalidiert).
+  Fehlverhalten wird durch das bestehende try/catch abgefangen (fail-closed,
+  generische Fehlermeldung) — kein Crash, kein Leak. Nicht neu durch diesen
+  Umbau eingeführt.
+
+### Regressionstest
+- Build/Typecheck/Vitest-Suite komplett grün (s.o.) — keine anderen Dateien
+  importieren die entfernten Exporte (`getPartnerRevenue`,
+  `getPartnerRevenueWithComparison`, `getPartnerYearlyRevenue`,
+  `getPartnerRollingRevenue`, `getPartnerOrderStats`, `getPartnerOrderDates`);
+  verifiziert per Grep + erfolgreichem Production-Build.
+- Bestellhistorie-Tab (deployed, PROJ-11 Abschnitt 2.4/2.4.1) ist von diesem Diff
+  nicht betroffen — keine der geänderten/gelöschten Dateien wird dort importiert.
+- Kunden-Liste (`/kunden`): einzige Änderung ist die Datenquelle der
+  Umsatzspalte in `getPartnersWithRevenue`; Sortier-/Paginierungs-/Suchlogik
+  unverändert.
+
+### Bugs Found
+
+#### BUG-1: ESLint-Warnung — instabiler Ausdruck in `useEffect`-Dependency-Array
+- **Severity:** Low
+- **Fundort:** `src/app/(app)/kunden/[id]/components/revenue-chart.tsx:133`
+  (`react-hooks/exhaustive-deps`)
+- **Szenario:** `periodKey(period)` wird direkt im Dependency-Array verwendet;
+  ESLint kann nicht statisch prüfen, ob der Ausdruck stabil ist. Funktional
+  korrekt (liefert einen primitiven String, Vergleich funktioniert wie
+  vorgesehen) — reiner Lint-Hygiene-Punkt, kein beobachtbares Fehlverhalten.
+- **Fix-Vorschlag:** `const key = useMemo(() => periodKey(period), [period])`
+  einmal berechnen und in allen drei `useEffect`s referenzieren.
+- **Priorität:** Nice to have, nicht blockierend.
+
+#### BUG-2: siehe Security-Audit oben (fehlende Zod-Validierung, Low, kein neuer Befund)
+
+### Summary
+- **Acceptance Criteria:** 12/14 verifiziert (unit-getestet/Code-Review), 2/14
+  ungeprüft (Sandbox-Limitierung, kein Live-Browser möglich)
+- **Bugs Found:** 2 total (0 Critical, 0 High, 0 Medium, 2 Low)
+- **Security:** Pass — keine neuen Befunde, ein informativer Low-Punkt
+- **Production Ready:** YES, mit einer Auflage (siehe unten)
+- **Recommendation:** Deploy freigeben. Direkt nach dem Deploy denselben
+  Live-Check wiederholen, der für die Bestellhistorie am 2026-07-18 gemacht
+  wurde (echter Kunde, z.B. Bod'or KTM GmbH: Umsatz-Tab zeigt plausible,
+  von Null abweichende Zahlen für „Letzte 12 Monate"/ein Kalenderjahr/„Gesamt",
+  KPI-Klicks togglen die Rabattgruppen-Ansicht korrekt) — das ist die einzige
+  Möglichkeit, die live-abhängigen Punkte zu schließen, da diese Sandbox keine
+  Supabase-Zugangsdaten hat.
 
 ---
 

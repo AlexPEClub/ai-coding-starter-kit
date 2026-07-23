@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -12,336 +12,281 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Button } from "@/components/ui/button";
 import {
-  TrendingUp,
-  Wrench,
-  Package,
-  ArrowUpRight,
-  ArrowDownRight,
-  Calculator,
-} from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { TrendingUp, Wrench, Package, HelpCircle, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import {
-  getPartnerRollingRevenue,
-  getPartnerYearlyRevenue,
-  RollingMonth,
-  YearlyRevenue,
+  getPartnerRevenueSummary,
+  getPartnerRevenueChartData,
+  getPartnerRevenueGroupChartData,
+  getAvailableRevenueYears,
+  RevenuePeriod,
+  RevenueCategoryTotals,
+  RevenueChartPoint,
+  RevenueGroupChartResult,
 } from "@/lib/actions/revenue";
-import { getPartnerOrderDates } from "@/lib/actions/order-stats";
 
 interface RevenueChartProps {
   partnerId: string;
 }
 
-type ViewMode = "month" | "year";
+type Category = "handel" | "service";
+
+// Design-System-Chartfarben, wie im Donut-Chart der Bestellhistorie
+// (order-group-chart.tsx) — für die Rabattgruppen-Aufschlüsselung.
+const GROUP_COLORS = ["#FF6B6D", "#4ECDC4", "#7C6CFF", "#F59F00", "#4DABF7", "#2FB344"];
+const HANDEL_COLOR = "#10b981";
+const SERVICE_COLOR = "#f59e0b";
+const UNASSIGNED_COLOR = "#9ca3af";
 
 function formatMoney(value: number): string {
   return `€${value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function calculateTotals(data: RollingMonth[]) {
-  return data.reduce(
-    (acc, item) => ({
-      handel: acc.handel + item.revenue_retail,
-      service: acc.service + item.revenue_service,
-      custom: acc.custom + item.revenue_custom,
-      total: acc.total + item.revenue_total,
-      invoices: acc.invoices + item.invoice_count,
-    }),
-    { handel: 0, service: 0, custom: 0, total: 0, invoices: 0 }
-  );
+function periodKey(period: RevenuePeriod): string {
+  return period.type === "year" ? `year-${period.year}` : period.type;
 }
 
 function ChangeIndicator({ current, previous }: { current: number; previous: number }) {
-  if (!previous || previous === 0) return null;
+  if (!previous) return null;
   const change = ((current - previous) / previous) * 100;
   const isPositive = change > 0;
-  const sign = change > 0 ? "+" : "";
   const colorClass = isPositive ? "text-green-600" : "text-red-600";
   const Icon = isPositive ? ArrowUpRight : ArrowDownRight;
 
   return (
     <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${colorClass}`}>
       <Icon className="h-3 w-3" />
-      {sign}{change.toFixed(0)}%
+      {isPositive ? "+" : ""}
+      {change.toFixed(0)}%
     </span>
   );
 }
 
-function RevenueSummary({
-  data,
-  previousYearData,
-  periodLabel,
-  orderDates,
-}: {
-  data: RollingMonth[];
-  previousYearData?: RollingMonth[];
-  periodLabel: string;
-  orderDates: string[];
-}) {
-  const totals = calculateTotals(data);
-  const previousTotals = previousYearData ? calculateTotals(previousYearData) : null;
+interface KpiCardProps {
+  title: string;
+  value: number;
+  previous?: number;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  bg: string;
+  borderColor: string;
+  active?: boolean;
+  onClick?: () => void;
+  index: number;
+}
 
-  // --- Auftragsstatistik berechnen ---
-  // Aufträge nach Jahr/Monat gruppieren
-  const orderCounts = new Map<string, number>();
-  for (const dateStr of orderDates) {
-    if (!dateStr) continue;
-    const d = new Date(dateStr);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    orderCounts.set(key, (orderCounts.get(key) || 0) + 1);
-  }
-
-  // Aktuelle Periode
-  let currentTotalOrders = 0;
-  let currentTotalRevenue = 0;
-
-  for (const item of data) {
-    const key = `${item.year}-${String(item.month).padStart(2, "0")}`;
-    const orders = orderCounts.get(key) || 0;
-    const revenue = item.revenue_total;
-
-    if (orders > 0 && revenue > 0) {
-      currentTotalOrders += orders;
-      currentTotalRevenue += revenue;
-    }
-  }
-
-  const avgRevenuePerOrder = currentTotalOrders > 0 ? currentTotalRevenue / currentTotalOrders : 0;
-
-  // Vorherige Periode
-  let prevTotalOrders = 0;
-  let prevTotalRevenue = 0;
-
-  if (previousYearData) {
-    for (const item of previousYearData) {
-      const key = `${item.year}-${String(item.month).padStart(2, "0")}`;
-      const orders = orderCounts.get(key) || 0;
-      const revenue = item.revenue_total;
-
-      if (orders > 0 && revenue > 0) {
-        prevTotalOrders += orders;
-        prevTotalRevenue += revenue;
-      }
-    }
-  }
-
-  const prevAvgRevenuePerOrder = prevTotalOrders > 0 ? prevTotalRevenue / prevTotalOrders : 0;
-
-  const cards = [
-    {
-      title: "Gesamtumsatz",
-      value: totals.total,
-      display: formatMoney(totals.total),
-      previous: previousTotals?.total || 0,
-      icon: TrendingUp,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
-      borderColor: "border-blue-100",
-    },
-    {
-      title: "Handelsware",
-      value: totals.handel,
-      display: formatMoney(totals.handel),
-      previous: previousTotals?.handel || 0,
-      icon: Package,
-      color: "text-emerald-600",
-      bg: "bg-emerald-50",
-      borderColor: "border-emerald-100",
-    },
-    {
-      title: "Service",
-      value: totals.service,
-      display: formatMoney(totals.service),
-      previous: previousTotals?.service || 0,
-      icon: Wrench,
-      color: "text-amber-600",
-      bg: "bg-amber-50",
-      borderColor: "border-amber-100",
-    },
-    {
-      title: "Schärfumsatz / Auftrag",
-      value: avgRevenuePerOrder,
-      display: formatMoney(avgRevenuePerOrder),
-      previous: 0,
-      subText: currentTotalOrders > 0 ? `${currentTotalOrders} Aufträge` : "Keine Aufträge",
-      icon: Calculator,
-      color: "text-indigo-600",
-      bg: "bg-indigo-50",
-      borderColor: "border-indigo-100",
-    },
-  ];
-
+function KpiCard({ title, value, previous, icon: Icon, color, bg, borderColor, active, onClick, index }: KpiCardProps) {
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        Umsatz {periodLabel}
-        {previousYearData && previousYearData.length > 0 && (
-          <span className="ml-2 text-xs">(Vergleich: Vorherige 12 Monate)</span>
-        )}
-      </p>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {cards.map((card, index) => (
-          <motion.div
-            key={card.title}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: index * 0.1 }}
-            whileHover={{ scale: 1.02 }}
-            className={`rounded-lg border ${card.borderColor} bg-card p-4 shadow-sm`}
-          >
-            <div className="flex items-start gap-3">
-              <div className={`rounded-md p-2 ${card.bg}`}>
-                <card.icon className={`h-5 w-5 ${card.color}`} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-muted-foreground truncate">{card.title}</p>
-                <p className="text-lg font-semibold truncate">{card.display}</p>
-                {'subText' in card && card.subText && (
-                  <p className="text-xs text-muted-foreground mt-0.5">{card.subText}</p>
-                )}
-                {card.previous > 0 && (
-                  <div className="mt-1">
-                    <ChangeIndicator current={card.value} previous={card.previous} />
-                  </div>
-                )}
-              </div>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: index * 0.1 }}
+      whileHover={onClick ? { scale: 1.02 } : undefined}
+      onClick={onClick}
+      className={`rounded-lg border ${active ? "border-primary ring-1 ring-primary" : borderColor} bg-card p-4 shadow-sm ${
+        onClick ? "cursor-pointer" : ""
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className={`rounded-md p-2 ${bg}`}>
+          <Icon className={`h-5 w-5 ${color}`} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-muted-foreground truncate">{title}</p>
+          <p className="text-lg font-semibold truncate">{formatMoney(value)}</p>
+          {previous !== undefined && (
+            <div className="mt-1">
+              <ChangeIndicator current={value} previous={previous} />
             </div>
-          </motion.div>
-        ))}
+          )}
+        </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 export function RevenueChart({ partnerId }: RevenueChartProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>("month");
+  const [period, setPeriod] = useState<RevenuePeriod>({ type: "rolling365" });
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [activeCategory, setActiveCategory] = useState<Category | null>(null);
 
-  // Rolling 12 Months
-  const [currentPeriod, setCurrentPeriod] = useState<RollingMonth[]>([]);
-  const [previousPeriod, setPreviousPeriod] = useState<RollingMonth[]>([]);
-  const [hasPreviousPeriod, setHasPreviousPeriod] = useState(false);
-
-  // Auftragsdaten
-  const [orderDates, setOrderDates] = useState<string[]>([]);
-
-  // Jahresdaten
-  const [yearlyData, setYearlyData] = useState<YearlyRevenue[]>([]);
-
+  const [totals, setTotals] = useState<RevenueCategoryTotals | null>(null);
+  const [previousTotals, setPreviousTotals] = useState<RevenueCategoryTotals | null>(null);
+  const [chartPoints, setChartPoints] = useState<RevenueChartPoint[]>([]);
+  const [groupChart, setGroupChart] = useState<RevenueGroupChartResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Rolling 12 Months + Aufträge laden
   useEffect(() => {
-    async function loadRolling() {
-      if (viewMode !== "month") return;
-      setIsLoading(true);
-
-      const [revenueResult, orderResult] = await Promise.all([
-        getPartnerRollingRevenue(partnerId),
-        getPartnerOrderDates(partnerId),
-      ]);
-
-      if (revenueResult.ok) {
-        setCurrentPeriod(revenueResult.currentPeriod);
-        setPreviousPeriod(revenueResult.previousPeriod);
-        setHasPreviousPeriod(revenueResult.hasPreviousPeriod);
-      }
-
-      if (orderResult.ok) {
-        setOrderDates(orderResult.dates);
-      }
-
-      setIsLoading(false);
-    }
-    loadRolling();
-  }, [partnerId, viewMode]);
-
-  // Jahresdaten laden
-  useEffect(() => {
-    async function loadYearly() {
-      if (viewMode !== "year") return;
-      setIsLoading(true);
-      const result = await getPartnerYearlyRevenue(partnerId);
-      if (result.ok) {
-        setYearlyData(result.years);
-      }
-      setIsLoading(false);
-    }
-    loadYearly();
-  }, [partnerId, viewMode]);
-
-  const periodLabel = useMemo(() => {
-    if (currentPeriod.length === 0) return "letzte 12 Monate";
-    const first = currentPeriod[0];
-    const last = currentPeriod[currentPeriod.length - 1];
-    return `${first.label} – ${last.label}`;
-  }, [currentPeriod]);
-
-  const monthChartData = useMemo(() => {
-    return currentPeriod.map((item, index) => {
-      const prevItem = previousPeriod[index];
-      return {
-        name: item.label,
-        Handelsware: Number(item.revenue_retail.toFixed(2)),
-        Service: Number(item.revenue_service.toFixed(2)),
-        Sonderwerkzeug: Number(item.revenue_custom.toFixed(2)),
-        Gesamt: Number(item.revenue_total.toFixed(2)),
-        "Vorherige 12M": prevItem ? Number(prevItem.revenue_total.toFixed(2)) : 0,
-      };
+    getAvailableRevenueYears(partnerId).then((result) => {
+      if (result.ok) setAvailableYears(result.years);
     });
-  }, [currentPeriod, previousPeriod]);
+  }, [partnerId]);
 
-  const yearChartData = useMemo(() => {
-    return yearlyData.map((item) => ({
-      name: item.year.toString(),
-      Gesamtumsatz: Number(item.revenue_total.toFixed(2)),
-      Handelsware: Number(item.revenue_retail.toFixed(2)),
-      Service: Number(item.revenue_service.toFixed(2)),
-      Sonderwerkzeug: Number(item.revenue_custom.toFixed(2)),
-    }));
-  }, [yearlyData]);
+  useEffect(() => {
+    setActiveCategory(null);
+  }, [partnerId, periodKey(period)]);
 
-  const hasMonthData = currentPeriod.some(
-    (d) => d.revenue_retail > 0 || d.revenue_service > 0 || d.revenue_custom > 0
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setIsLoading(true);
+      const [summaryResult, chartResult] = await Promise.all([
+        getPartnerRevenueSummary(partnerId, period),
+        getPartnerRevenueChartData(partnerId, period),
+      ]);
+      if (cancelled) return;
+      if (summaryResult.ok) {
+        setTotals(summaryResult.current);
+        setPreviousTotals(summaryResult.previous);
+      }
+      if (chartResult.ok) setChartPoints(chartResult.points);
+      setIsLoading(false);
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partnerId, periodKey(period)]);
+
+  useEffect(() => {
+    if (!activeCategory) {
+      setGroupChart(null);
+      return;
+    }
+    let cancelled = false;
+    getPartnerRevenueGroupChartData(partnerId, period, activeCategory).then((result) => {
+      if (!cancelled && result.ok) setGroupChart(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partnerId, periodKey(period), activeCategory]);
+
+  const periodOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = [
+      { value: "rolling365", label: "Letzte 12 Monate" },
+    ];
+    for (const year of availableYears) {
+      options.push({ value: `year-${year}`, label: year.toString() });
+    }
+    options.push({ value: "all", label: "Gesamt" });
+    return options;
+  }, [availableYears]);
+
+  function handlePeriodChange(value: string) {
+    if (value === "all") setPeriod({ type: "all" });
+    else if (value === "rolling365") setPeriod({ type: "rolling365" });
+    else setPeriod({ type: "year", year: Number(value.replace("year-", "")) });
+  }
+
+  function toggleCategory(category: Category) {
+    setActiveCategory((current) => (current === category ? null : category));
+  }
+
+  const standardChartData = useMemo(
+    () =>
+      chartPoints.map((p) => ({
+        name: p.label,
+        Handelsware: Number(p.handel.toFixed(2)),
+        Service: Number(p.service.toFixed(2)),
+        "Nicht zugeordnet": Number(p.unassigned.toFixed(2)),
+      })),
+    [chartPoints]
   );
 
-  const hasYearData = yearlyData.length > 0;
+  const groupChartData = useMemo(() => {
+    if (!groupChart) return [];
+    return groupChart.points.map((p) => {
+      const row: Record<string, number | string> = { name: p.label };
+      for (const name of groupChart.groupNames) {
+        row[name] = Number((p.values[name] || 0).toFixed(2));
+      }
+      return row;
+    });
+  }, [groupChart]);
 
-  if (isLoading) {
+  const hasChartData = standardChartData.some(
+    (d) => d.Handelsware > 0 || d.Service > 0 || d["Nicht zugeordnet"] > 0
+  );
+
+  if (isLoading && !totals) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="space-y-6"
-      >
-        <div className="h-[120px] animate-pulse bg-muted rounded">
-          <div className="grid grid-cols-4 gap-3 h-full p-4">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+        <div className="h-[100px] animate-pulse bg-muted rounded">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 h-full p-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="bg-muted-foreground/10 rounded" />
             ))}
           </div>
         </div>
-        <div className="h-[400px] animate-pulse bg-muted rounded">
-          <div className="flex items-center justify-between mb-4 px-4 pt-4">
-            <div className="h-6 w-32 bg-muted-foreground/20 rounded" />
-            <div className="h-10 w-32 bg-muted-foreground/20 rounded" />
-          </div>
-        </div>
+        <div className="h-[400px] animate-pulse bg-muted rounded" />
       </motion.div>
     );
   }
 
+  const current = totals ?? { total: 0, handel: 0, service: 0, unassigned: 0 };
+  const previous = previousTotals;
+  const showUnassigned = current.unassigned > 0;
+
   return (
     <div className="space-y-6">
-      {/* KPI-Karten — immer sichtbar in Monatsansicht */}
-      {viewMode === "month" && (
-        <RevenueSummary
-          data={currentPeriod}
-          previousYearData={hasPreviousPeriod ? previousPeriod : undefined}
-          periodLabel={periodLabel}
-          orderDates={orderDates}
+      {/* KPI-Reihe */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard
+          title="Gesamtumsatz"
+          value={current.total}
+          previous={previous?.total}
+          icon={TrendingUp}
+          color="text-blue-600"
+          bg="bg-blue-50"
+          borderColor="border-blue-100"
+          onClick={() => setActiveCategory(null)}
+          index={0}
         />
-      )}
+        <KpiCard
+          title="Handelsumsatz"
+          value={current.handel}
+          previous={previous?.handel}
+          icon={Package}
+          color="text-emerald-600"
+          bg="bg-emerald-50"
+          borderColor="border-emerald-100"
+          active={activeCategory === "handel"}
+          onClick={() => toggleCategory("handel")}
+          index={1}
+        />
+        <KpiCard
+          title="Serviceumsatz"
+          value={current.service}
+          previous={previous?.service}
+          icon={Wrench}
+          color="text-amber-600"
+          bg="bg-amber-50"
+          borderColor="border-amber-100"
+          active={activeCategory === "service"}
+          onClick={() => toggleCategory("service")}
+          index={2}
+        />
+        {showUnassigned && (
+          <KpiCard
+            title="Nicht zugeordnet"
+            value={current.unassigned}
+            icon={HelpCircle}
+            color="text-slate-600"
+            bg="bg-slate-50"
+            borderColor="border-slate-100"
+            index={3}
+          />
+        )}
+      </div>
 
       {/* Chart */}
       <motion.div
@@ -350,189 +295,92 @@ export function RevenueChart({ partnerId }: RevenueChartProps) {
         transition={{ duration: 0.3 }}
         className="rounded-lg border bg-card p-6 shadow-sm space-y-6"
       >
-        {/* Header mit Periode-Info und Toggle */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h3 className="font-semibold text-lg">
-              {viewMode === "month" ? "Letzte 12 Monate" : "Jahresumsätze"}
+              {activeCategory === "handel" && "Handelsumsatz nach Rabattgruppe"}
+              {activeCategory === "service" && "Serviceumsatz nach Rabattgruppe"}
+              {!activeCategory && "Umsatzentwicklung"}
             </h3>
-            {viewMode === "month" && currentPeriod.length > 0 && (
-              <p className="text-sm text-muted-foreground">{periodLabel}</p>
-            )}
           </div>
-
-          <div className="flex items-center gap-3">
-            {/* Toggle Monat/Jahr */}
-            <div className="flex rounded-lg border bg-muted p-1">
-              <Button
-                variant={viewMode === "month" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("month")}
-                className="text-xs"
-              >
-                12 Monate
-              </Button>
-              <Button
-                variant={viewMode === "year" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("year")}
-                className="text-xs"
-              >
-                Jahr
-              </Button>
-            </div>
-          </div>
+          <Select value={periodKey(period)} onValueChange={handlePeriodChange}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {periodOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Monatsansicht: Rolling 12 Months */}
-        {viewMode === "month" && (
-          <>
-            {hasMonthData ? (
-              <ResponsiveContainer width="100%" height={400}>
-                <AreaChart
-                  data={monthChartData}
-                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="colorPrev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#9ca3af" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#9ca3af" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} />
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    tickLine={false}
-                    tickFormatter={(value: any) =>
-                      value ? `€${(Number(value) / 1000).toFixed(0)}k` : "€0"
-                    }
-                  />
-                  <Tooltip
-                    formatter={(value: any, name: any) => [
-                      `€${Number(value).toLocaleString("de-DE", { minimumFractionDigits: 2 })}`,
-                      String(name),
-                    ]}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Legend wrapperStyle={{ paddingTop: "1rem" }} />
-                  <Area
-                    type="monotone"
-                    dataKey="Handelsware"
-                    stackId="1"
-                    stroke="#10b981"
-                    fill="#10b981"
-                    fillOpacity={0.85}
-                    strokeWidth={1.5}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="Service"
-                    stackId="1"
-                    stroke="#f59e0b"
-                    fill="#f59e0b"
-                    fillOpacity={0.85}
-                    strokeWidth={1.5}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="Sonderwerkzeug"
-                    stackId="1"
-                    stroke="#8b5cf6"
-                    fill="#8b5cf6"
-                    fillOpacity={0.85}
-                    strokeWidth={1.5}
-                  />
-                  {hasPreviousPeriod && (
-                    <Area
-                      type="monotone"
-                      dataKey="Vorherige 12M"
-                      stroke="#9ca3af"
-                      strokeDasharray="5 5"
-                      fill="url(#colorPrev)"
-                      fillOpacity={0.3}
-                      strokeWidth={2}
-                    />
-                  )}
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[400px] flex items-center justify-center text-muted-foreground">
-                Keine Umsatzdaten in den letzten 12 Monaten verfügbar
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Jahresansicht */}
-        {viewMode === "year" && (
-          <>
-            {hasYearData ? (
-              <ResponsiveContainer width="100%" height={400}>
-                <AreaChart
-                  data={yearChartData}
-                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} />
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    tickLine={false}
-                    tickFormatter={(value: any) =>
-                      value ? `€${(Number(value) / 1000).toFixed(0)}k` : "€0"
-                    }
-                  />
-                  <Tooltip
-                    formatter={(value: any, name: any) => [
-                      `€${Number(value).toLocaleString("de-DE", { minimumFractionDigits: 2 })}`,
-                      String(name),
-                    ]}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Legend wrapperStyle={{ paddingTop: "1rem" }} />
-                  <Area
-                    type="monotone"
-                    dataKey="Handelsware"
-                    stackId="1"
-                    stroke="#10b981"
-                    fill="#10b981"
-                    fillOpacity={0.85}
-                    strokeWidth={1.5}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="Service"
-                    stackId="1"
-                    stroke="#f59e0b"
-                    fill="#f59e0b"
-                    fillOpacity={0.85}
-                    strokeWidth={1.5}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="Sonderwerkzeug"
-                    stackId="1"
-                    stroke="#8b5cf6"
-                    fill="#8b5cf6"
-                    fillOpacity={0.85}
-                    strokeWidth={1.5}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[400px] flex items-center justify-center text-muted-foreground">
-                Keine Jahresumsatzdaten verfügbar
-              </div>
-            )}
-          </>
+        {!activeCategory ? (
+          hasChartData ? (
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={standardChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} />
+                <YAxis
+                  tick={{ fontSize: 12 }}
+                  tickLine={false}
+                  tickFormatter={(value: any) => (value ? `€${(Number(value) / 1000).toFixed(0)}k` : "€0")}
+                />
+                <Tooltip
+                  formatter={(value: any, name: any) => [
+                    `€${Number(value).toLocaleString("de-DE", { minimumFractionDigits: 2 })}`,
+                    String(name),
+                  ]}
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                  }}
+                />
+                <Legend wrapperStyle={{ paddingTop: "1rem" }} />
+                <Bar dataKey="Handelsware" stackId="1" fill={HANDEL_COLOR} />
+                <Bar dataKey="Service" stackId="1" fill={SERVICE_COLOR} />
+                <Bar dataKey="Nicht zugeordnet" stackId="1" fill={UNASSIGNED_COLOR} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+              Keine Umsatzdaten im gewählten Zeitraum verfügbar
+            </div>
+          )
+        ) : groupChartData.length > 0 && groupChart && groupChart.groupNames.length > 0 ? (
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={groupChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} />
+              <YAxis
+                tick={{ fontSize: 12 }}
+                tickLine={false}
+                tickFormatter={(value: any) => (value ? `€${(Number(value) / 1000).toFixed(0)}k` : "€0")}
+              />
+              <Tooltip
+                formatter={(value: any, name: any) => [
+                  `€${Number(value).toLocaleString("de-DE", { minimumFractionDigits: 2 })}`,
+                  String(name),
+                ]}
+                contentStyle={{
+                  backgroundColor: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px",
+                }}
+              />
+              <Legend wrapperStyle={{ paddingTop: "1rem" }} />
+              {groupChart.groupNames.map((name, i) => (
+                <Bar key={name} dataKey={name} stackId="1" fill={GROUP_COLORS[i % GROUP_COLORS.length]} />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+            Keine Rabattgruppen-Daten im gewählten Zeitraum verfügbar
+          </div>
         )}
       </motion.div>
     </div>

@@ -1,6 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { centsToEuro } from "./orders-helpers";
 
 // Types für tms.partners (easybill Kunden)
 export type Partner = {
@@ -112,30 +114,46 @@ export async function getPartnersWithRevenue(
     return { ok: true, data: [] };
   }
 
-  // 2. Umsatz-Daten für ALLE Partner laden (in Batches)
+  // 2. Umsatz-Daten für ALLE Partner laden (in Batches) — live aus
+  // `tms.invoice_items` statt der nie in Produktion existierenden
+  // `mv_partner_monthly_revenue` (siehe features/PROJ-11-kundendetailseite.md,
+  // Deploy-Verlauf 2026-07-18 + Umsatz-Tab-Neubau). Läuft über den Admin-Client,
+  // da `invoice_items`/`invoices`-GRANTs bisher nur für `service_role` verifiziert
+  // sind (siehe revenue.ts).
   const partnerIds = partners.map((p) => p.id);
   const revenueByPartner = new Map<string, number>();
   const BATCH_SIZE = 100;
+  const PAGE_REVENUE = 1000;
+  const yearFrom = `${currentYear}-01-01`;
+  const yearTo = `${currentYear}-12-31`;
+  const adminClient = createAdminClient({ schema: "tms" });
 
   for (let i = 0; i < partnerIds.length; i += BATCH_SIZE) {
     const batchIds = partnerIds.slice(i, i + BATCH_SIZE);
-    const { data: revenueData, error: revenueError } = await supabase
-      .schema("tms")
-      .from("mv_partner_monthly_revenue")
-      .select("partner_id, revenue_total")
-      .eq("year", currentYear)
-      .in("partner_id", batchIds);
 
-    if (revenueError) {
-      console.error("[getPartnersWithRevenue] Revenue:", revenueError);
-      continue;
-    }
+    for (let from = 0; ; from += PAGE_REVENUE) {
+      const { data: revenueData, error: revenueError } = await adminClient
+        .from("invoice_items")
+        .select("total_price_net, invoices!inner(document_date, partner_id)")
+        .in("invoices.partner_id", batchIds)
+        .gte("invoices.document_date", yearFrom)
+        .lte("invoices.document_date", yearTo)
+        .order("id", { ascending: true })
+        .range(from, from + PAGE_REVENUE - 1);
 
-    if (revenueData) {
-      for (const row of revenueData) {
-        const current = revenueByPartner.get(row.partner_id) || 0;
-        revenueByPartner.set(row.partner_id, current + Number(row.revenue_total));
+      if (revenueError) {
+        console.error("[getPartnersWithRevenue] Revenue:", revenueError);
+        break;
       }
+
+      const batch = (revenueData || []) as any[];
+      for (const row of batch) {
+        const partnerId = row.invoices?.partner_id;
+        if (!partnerId) continue;
+        const current = revenueByPartner.get(partnerId) || 0;
+        revenueByPartner.set(partnerId, current + centsToEuro(row.total_price_net));
+      }
+      if (batch.length < PAGE_REVENUE) break;
     }
   }
 
