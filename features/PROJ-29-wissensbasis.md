@@ -1,14 +1,22 @@
 # PROJ-29: Wissensbasis (KI-Content-Fundament)
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-07-20
-**Last Updated:** 2026-07-20
+**Last Updated:** 2026-07-23
 
 > Erstes Feature des **Content-Epics** (PROJ-29 → PROJ-30 → PROJ-31 → PROJ-32).
-> Ziel des Epics: eine große, geprüfte Datenbank an Texten & Bildern zu Themen der
+> Ziel des Epics: eine große, durchsuchbare Text-Basis zu Themen der
 > Holzwerkstoff-Zerspanung aufbauen und daraus Content-Marketing (Blog, Social
 > Media, Newsletter) für Schreiner/Tischler betreiben. **Diese Spec baut nur das
-> Fundament: die strukturierte, geprüfte Wissensbasis aus technischen Quelldaten.**
+> Fundament: hochgeladene Hersteller-Dokumente als durchsuchbare Text-Basis, die
+> PROJ-30 wöchentlich nach neuen Themen durchsucht.**
+>
+> **Spec-Verfeinerung (2026-07-22):** Kern-Mechanik grundlegend vereinfacht. Statt
+> strukturierter Wissens-Einträge mit Technik-Feldern und einem Entwurf/Geprüft-
+> Freigabeworkflow pro Eintrag entsteht pro Upload nur noch ein getaggtes, sofort
+> aktives Text-Dokument (PDF → Text-Konvertierung, kein KI-Struktur-Extraktion mehr
+> nötig). Die inhaltliche Auswertung (Themen finden) übernimmt vollständig der
+> wöchentliche Scan in PROJ-30.
 
 ## Dependencies
 - **PROJ-1 (Auth & Rollen)** — muss um eine neue Rolle **„Redaktion"** erweitert
@@ -18,26 +26,31 @@
   PROJ-31 (Artikel-Werkstatt), PROJ-32 (Publishing).
 
 ## User Stories
-- Als **Redakteur** möchte ich Hersteller-PDFs/Dokumente hochladen, damit die KI
-  daraus strukturierte Wissens-Einträge vorschlägt und ich nicht alles abtippen muss.
-- Als **Redakteur** möchte ich jeden KI-vorgeschlagenen Eintrag prüfen, korrigieren
-  und auf „Geprüft" setzen, damit nur verlässliches Wissen in die Basis gelangt.
-- Als **Redakteur** möchte ich die Wissensbasis nach Werkzeugart, Material, Status
-  und im Volltext durchsuchen/filtern, damit ich schnell den passenden Eintrag finde.
-- Als **Redakteur** möchte ich zu jedem Eintrag die Quelle (Hersteller + Seite) und
-  den Originaltext-Auszug sehen, damit ich Fakten belegen und nachprüfen kann.
+- Als **Redakteur** möchte ich Hersteller-PDFs/Dokumente hochladen, damit sie
+  automatisch in durchsuchbaren Text umgewandelt und für die weitere
+  Content-Erstellung verfügbar werden, ohne dass ich etwas abtippen muss.
+- Als **Redakteur** möchte ich ein Dokument beim Hochladen nach Werkzeugart und
+  Material taggen, damit ich die Wissensbasis später gezielt filtern kann.
+- Als **Redakteur** möchte ich die Wissensbasis nach Werkzeugart, Material und im
+  Volltext durchsuchen/filtern, damit ich schnell das passende Dokument finde.
+- Als **Redakteur** möchte ich zu jedem Dokument die Quelle (Hersteller, Dateiname,
+  Upload-Datum) sehen, damit ich Fakten später belegen und nachprüfen kann.
 - Als **Admin** möchte ich die Kategorien (Werkzeugart, Material) pflegen, damit die
   Taxonomie zum Sortiment und zu neuen Themen passt.
 
 ## Out of Scope
 <!-- Bewusst NICHT Teil dieser Spec — gehört zu späteren Epic-Teilen. -->
+- **Strukturierte Wissens-Einträge mit Technik-Feldern** (Kennwerte etc.) und ein
+  Entwurf/Geprüft-Freigabeworkflow pro Eintrag — bewusst verworfen zugunsten eines
+  einfachen, getaggten Text-Korpus. Strukturierte Fakten-Extraktion für einen
+  konkreten Artikel passiert bedarfsweise erst in **PROJ-31**.
 - **Wöchentliche Themenvorschläge** aus der Wissensbasis → **PROJ-30**
 - **Artikel-Text- & Bildgenerierung** und der **Lern-Loop** (Korrekturen verbessern
   den Start-Prompt) → **PROJ-31**
 - **Veröffentlichung** auf Blog / Social Media / Newsletter → **PROJ-32**
 - **Automatisches Web-Scraping** von Hersteller-Websites (nur manueller Upload im MVP)
-- **Verknüpfung Wissens-Eintrag ↔ konkretes Produkt/SKU** aus PROJ-28 (bewusst
-  entkoppelt; ggf. später als optionale Verlinkung)
+- **Verknüpfung Dokument ↔ konkretes Produkt/SKU** aus PROJ-28 (bewusst entkoppelt;
+  ggf. später als optionale Verlinkung)
 - **Kundenseitige / öffentliche Ansicht** der Wissensbasis (rein internes Werkzeug)
 - **Themen außerhalb des Scopes:** ausschließlich Zerspanungswerkzeuge (Sägen,
   Fräser, Bohrer) für die Materialien Holz, Kunststoff, Aluminium — alles andere
@@ -51,81 +64,90 @@
 - [ ] Angenommen ein Nutzer hat NICHT die Rolle Redaktion oder Admin, wenn er die
   Wissensbasis-Seite aufruft, dann wird ihm der Zugriff verwehrt (keine Anzeige/Aktion).
 - [ ] Angenommen ein Nutzer hat die Rolle Redaktion, wenn er die Wissensbasis öffnet,
-  dann kann er Einträge sehen, hochladen, prüfen und bearbeiten.
+  dann kann er Dokumente sehen, hochladen, taggen und bearbeiten.
 
-### Upload & KI-Extraktion
+### Upload & Text-Konvertierung
 - [ ] Angenommen die Wissensbasis wird erstmalig eingerichtet, wenn sie startet, dann
   ist zunächst nur das **Leitz-Lexikon** als Quelle hinterlegt, und weitere
   Hersteller-Dokumente können **jederzeit** ergänzt werden.
-- [ ] Angenommen ein Redakteur ist eingeloggt, wenn er ein PDF/Dokument hochlädt,
-  dann wird die Datei gespeichert und die KI extrahiert daraus Eintrags-Vorschläge.
-- [ ] Angenommen die KI hat ein PDF verarbeitet, wenn die Extraktion fertig ist, dann
-  erscheinen die Vorschläge als Einträge im Status „Entwurf" mit vorbefüllten Feldern.
-- [ ] Angenommen ein hochgeladenes PDF ist unlesbar/beschädigt, wenn die Extraktion
-  fehlschlägt, dann wird eine verständliche Fehlermeldung angezeigt und keine
-  fehlerhaften Einträge angelegt.
+- [ ] Angenommen ein Redakteur ist eingeloggt, wenn er ein PDF/Dokument hochlädt und
+  Werkzeugart/Material taggt, dann wird die Datei gespeichert, automatisch in eine
+  durchsuchbare Textdatei umgewandelt und ist **sofort ohne weiteren Freigabeschritt**
+  Teil der Wissensbasis.
+- [ ] Angenommen ein hochgeladenes PDF ist unlesbar/beschädigt oder enthält keinen
+  extrahierbaren Text, wenn die Text-Konvertierung fehlschlägt, dann wird eine
+  verständliche Fehlermeldung angezeigt und kein fehlerhaftes/leeres Dokument abgelegt.
 
-### Eintrag & Felder
-- [ ] Angenommen ein Eintrag wird angelegt, wenn er gespeichert wird, dann enthält er
-  mindestens: Titel/Begriff, Werkzeugart, Material, technische Kennwerte,
-  Beschreibungstext (destilliert), Originaltext-Auszug, Quelle (Hersteller + Seite),
-  Status.
-- [ ] Angenommen ein Redakteur bearbeitet einen Eintrag, wenn er speichert, dann
-  werden die Änderungen übernommen und der Änderungszeitpunkt festgehalten.
-- [ ] Angenommen ein Eintrag hat keine Werkzeugart oder kein Material gesetzt, wenn der
-  Redakteur ihn auf „Geprüft" setzen will, dann wird eine Validierungsmeldung angezeigt
-  (Pflichtfelder für „Geprüft").
-
-### Freigabe-Status (Entwurf → Geprüft)
-- [ ] Angenommen ein Eintrag ist im Status „Entwurf", wenn ein Redakteur ihn prüft und
-  auf „Geprüft" setzt, dann gilt er als verlässlicher Bestandteil der Wissensbasis.
-- [ ] Angenommen nur geprüfte Einträge sollen später Themen/Artikel speisen, wenn die
-  Basis abgefragt wird, dann sind „Entwurf"-Einträge klar als solche gekennzeichnet
-  und getrennt filterbar.
-- [ ] Angenommen ein KI-Vorschlag ist falsch/unbrauchbar, wenn der Redakteur ihn
-  verwirft/löscht, dann wird er aus der Basis entfernt und zählt nicht.
+### Dokument & Metadaten
+- [ ] Angenommen ein Dokument wird hochgeladen, wenn es gespeichert wird, dann enthält
+  es mindestens: Dateiname, Hersteller/Quelle, Upload-Datum, Werkzeugart-Tag(s),
+  Material-Tag(s), extrahierter Volltext.
+- [ ] Angenommen ein Redakteur möchte die Tags eines Dokuments korrigieren, wenn er sie
+  ändert und speichert, dann werden die Änderungen übernommen und der
+  Änderungszeitpunkt festgehalten.
+- [ ] Angenommen ein Dokument wurde versehentlich oder fälschlich hochgeladen, wenn ein
+  Redakteur es löscht, dann wird es aus der Wissensbasis entfernt und fließt nicht mehr
+  in den wöchentlichen Themen-Scan (PROJ-30) ein.
 
 ### Suche & Filter
-- [ ] Angenommen es existieren Einträge, wenn ein Redakteur nach Werkzeugart, Material
-  oder Status filtert, dann werden nur passende Einträge angezeigt.
-- [ ] Angenommen es existieren Einträge, wenn ein Redakteur einen Suchbegriff eingibt,
-  dann werden Einträge mit Treffern in Titel/Beschreibung/Quelle angezeigt.
+- [ ] Angenommen es existieren Dokumente, wenn ein Redakteur nach Werkzeugart oder
+  Material filtert, dann werden nur passende Dokumente angezeigt.
+- [ ] Angenommen es existieren Dokumente, wenn ein Redakteur einen Suchbegriff eingibt,
+  dann werden Dokumente mit Treffern in Dateiname/Volltext/Quelle angezeigt.
 - [ ] Angenommen die Wissensbasis ist leer, wenn ein Redakteur sie öffnet, dann sieht
   er einen Leerzustand mit Hinweis „Erstes Dokument hochladen".
 
 ## Edge Cases
-- **Unlesbares/leeres PDF:** Extraktion schlägt fehl → Fehlermeldung, keine Einträge.
-- **Off-Topic-Dokument** (nicht Zerspanung/Holz-Kunststoff-Alu): KI sollte wenige/keine
-  Einträge vorschlagen; Redakteur kann irrelevante Vorschläge verwerfen.
-- **Dublette:** Dieselbe Kennzahl/derselbe Begriff taucht in mehreren Hersteller-PDFs
-  auf → Einträge bleiben zunächst getrennt (mit Hersteller-Quelle), Redakteur kann sie
-  später zusammenführen/verknüpfen. (Merge-Automatik = Open Question.)
-- **Sehr großes PDF** mit vielen Themen → Extraktion darf dauern; Fortschritt/Status
-  sichtbar, kein Timeout-Abbruch ohne Rückmeldung.
-- **Gleichzeitige Bearbeitung** eines Eintrags durch zwei Redakteure → letzter
-  Speichervorgang gewinnt, aber es darf kein stiller Datenverlust ohne Hinweis passieren.
-- **Fehlende technische Kennwerte** in der Quelle → Eintrag darf als „Entwurf"
-  gespeichert werden, aber „Geprüft" erfordert die Pflichtfelder.
+- **Unlesbares/leeres PDF:** Text-Konvertierung schlägt fehl → Fehlermeldung, kein
+  Dokument angelegt.
+- **Gescanntes/Bild-PDF ohne echten Textlayer:** Standard-Textextraktion liefert
+  keinen/kaum Text → wird wie „unlesbar" behandelt (siehe Open Questions zu OCR).
+- **Off-Topic-Dokument** (nicht Zerspanung/Holz-Kunststoff-Alu): wird ganz normal
+  hochgeladen und getaggt; Redakteur kann es bei Bedarf einfach wieder löschen.
+- **Dublette:** Derselbe Begriff taucht in mehreren Hersteller-PDFs auf → Dokumente
+  bleiben getrennt (mit eigener Hersteller-Quelle), kein automatisches Zusammenführen.
+- **Sehr großes PDF** mit vielen Themen → Text-Konvertierung darf dauern;
+  Fortschritt/Status sichtbar, kein Timeout-Abbruch ohne Rückmeldung.
+- **Gleichzeitige Bearbeitung** der Tags eines Dokuments durch zwei Redakteure →
+  letzter Speichervorgang gewinnt, aber es darf kein stiller Datenverlust ohne Hinweis
+  passieren.
 
 ## Technical Requirements (optional)
 - **Security:** Nur Rollen Redaktion + Admin (RLS). Rein internes Tool.
-- **Datei-Ablage:** hochgeladene Quell-PDFs in Supabase Storage.
-- **Datenmenge:** erwartet Hunderte bis niedrige Tausende Einträge — Suche/Filter
+- **Datei-Ablage:** Original-PDF und extrahierter Volltext in Supabase Storage/DB.
+- **Datenmenge:** erwartet Hunderte bis niedrige Tausende Dokumente — Suche/Filter
   müssen dabei flott bleiben.
-- **KI-Extraktion:** konkretes Modell/Verfahren wird in `/architecture` festgelegt.
+- **Text-Extraktion:** einfache PDF-zu-Text-Konvertierung (Standard-Bibliothek),
+  kein komplexes KI-Modell nötig — konkrete Bibliothek wird in `/architecture`
+  festgelegt.
 
 ## Open Questions
 <!-- Ungelöste Punkte aus dem Interview. In /refine schließen, wenn geklärt. -->
-- [ ] **Urheberrecht:** Speicherung wörtlicher Originaltext-Auszüge (aus Leitz-Lexikon
-  & Hersteller-Katalogen) intern rechtlich absichern — ggf. mit Anwalt klären. (Fakten
-  selbst sind frei; wörtliche Auszüge sind geschützt.)
-- [ ] **Duplikat-Strategie:** getrennt lassen vs. automatisch zusammenführen, wenn
-  derselbe Begriff aus mehreren Herstellern kommt.
-- [ ] **Feldkatalog „technische Kennwerte":** feste Felder oder frei/variabel je
-  Werkzeugart (z.B. Vorschub, Drehzahl, Schnittgeschwindigkeit, Zähnezahl, Winkel)?
-- [ ] **Welche KI/Extraktions-Pipeline** (Modell, Kosten, on-prem vs. API) — Architektur.
-- [ ] Taxonomie fix oder admin-erweiterbar — im Interview „admin-erweiterbar"
-  empfohlen; final in Architektur/Umsetzung bestätigen.
+- [x] **Urheberrecht:** Speicherung wörtlicher Originaltext-Auszüge → intern, rein für
+  Faktencheck (Redaktion/PROJ-31), nie öffentlich sichtbar oder in generierte Artikel
+  kopiert; Auszug bewusst kurz halten (Zitatcharakter). Vor einem größeren
+  Massenimport an Hersteller-Dokumenten wird eine kurze anwaltliche Prüfung
+  empfohlen, blockiert aber nicht die Entwicklung. (2026-07-22)
+- [x] **Duplikat-Strategie:** Dokumente bleiben strikt getrennt je Quelle, kein
+  automatisches Zusammenführen. Optional kann die Redaktion Dokumente manuell
+  verknüpfen. (2026-07-22)
+- [x] **Feldkatalog „technische Kennwerte":** hinfällig — durch die Scope-Vereinfachung
+  (siehe unten) gibt es keine strukturierten Kennwerte-Felder mehr in PROJ-29.
+  (2026-07-22)
+- [x] **Welche KI/Extraktions-Pipeline:** hinfällig/vereinfacht — es braucht keine
+  KI-Struktur-Extraktion mehr, nur eine einfache PDF-zu-Text-Konvertierung
+  (Standard-Bibliothek); konkrete Bibliothek → `/architecture`. (2026-07-22)
+- [x] Taxonomie fix oder admin-erweiterbar → bestätigt: **admin-erweiterbar**, gilt
+  jetzt für Dokument-Tags (Werkzeugart/Material) statt für Eintrags-Felder.
+  (2026-07-22)
+- [ ] **Gescannte/Bild-PDFs ohne Textlayer:** reicht Standard-Textextraktion, oder
+  wird OCR benötigt, damit auch gescannte Hersteller-Kataloge durchsuchbar werden?
+  → in `/architecture` klären.
+- [ ] **Downstream-Auswirkung auf PROJ-31:** Die Content-Studio-Spec (PROJ-31)
+  verweist in ihren Dependencies noch auf „geprüfte Fakten/Quelldaten" aus PROJ-29.
+  Durch den Wegfall des Entwurf/Geprüft-Workflows liefert PROJ-29 künftig
+  ungeprüfte, getaggte Rohtext-Dokumente statt geprüfter Einträge — PROJ-31 sollte
+  in einem eigenen `/refine PROJ-31` entsprechend angepasst werden.
 
 ## Decision Log
 
@@ -133,26 +155,130 @@
 | Decision | Rationale | Date |
 |----------|-----------|------|
 | Eigene Rolle „Redaktion" (statt nur Admin) | Dediziertes Content-/Wissens-Team, getrennt von der Werkstatt; erweitert PROJ-1 | 2026-07-20 |
-| Ingestion: PDF-Upload → KI-Extraktion → Admin-Review | Wenig Tipparbeit bei vielen Themen, Kontrolle bleibt beim Menschen | 2026-07-20 |
-| Eintrag = Lexikon-Begriff mit strukturierten Technik-Feldern | Ideale, gut abfragbare Grundlage für spätere Themen-/Artikelgenerierung | 2026-07-20 |
-| Status Entwurf → Geprüft, nur „Geprüft" zählt als verlässlich | Qualitätskontrolle für KI-Extrakte, verhindert ungeprüfte Fakten | 2026-07-20 |
-| Speicherung: destillierte Fakten UND wörtliche Originaltext-Auszüge | Bequeme Referenz für KI & Faktencheck; Urheberrecht bleibt offener Punkt | 2026-07-20 |
+| ~~Ingestion: PDF-Upload → KI-Extraktion → Admin-Review~~ *(überholt, siehe 2026-07-22)* | Wenig Tipparbeit bei vielen Themen, Kontrolle bleibt beim Menschen | 2026-07-20 |
+| ~~Eintrag = Lexikon-Begriff mit strukturierten Technik-Feldern~~ *(überholt, siehe 2026-07-22)* | Ideale, gut abfragbare Grundlage für spätere Themen-/Artikelgenerierung | 2026-07-20 |
+| ~~Status Entwurf → Geprüft, nur „Geprüft" zählt als verlässlich~~ *(überholt, siehe 2026-07-22)* | Qualitätskontrolle für KI-Extrakte, verhindert ungeprüfte Fakten | 2026-07-20 |
+| Speicherung: destillierte Fakten UND wörtliche Originaltext-Auszüge *(Auszug-Teil weiterhin gültig, siehe Urheberrechts-Entscheidung 2026-07-22; "destillierte Fakten" entfällt mit dem Eintrags-Konzept)* | Bequeme Referenz für KI & Faktencheck; Urheberrecht bleibt offener Punkt | 2026-07-20 |
 | Wissensbasis unabhängig von PROJ-28-Produkten (keine Zwangs-Verknüpfung) | Allgemeines Fachwissen, nicht an einzelne SKUs gebunden | 2026-07-20 |
 | Taxonomie: Werkzeugart (Säge/Fräser/Bohrer) × Material (Holz/Kunststoff/Alu), admin-erweiterbar | Klarer Scope laut PM, aber ausbaubar | 2026-07-20 |
 | Rein internes Tool, keine öffentliche Ansicht in dieser Spec | Öffentliche Ausspielung ist PROJ-32 | 2026-07-20 |
 | Startzustand: initial nur Leitz-Lexikon, jederzeit um weitere Hersteller erweiterbar | Fundament wächst über die Zeit, kein Big-Bang-Import nötig | 2026-07-20 |
+| **Kern-Mechanik vereinfacht:** kein strukturierter „Wissens-Eintrag" mit Technik-Feldern/Entwurf-Geprüft-Workflow mehr — stattdessen PDF → automatische Text-Konvertierung → sofort aktives, getaggtes Dokument | Inhaltliche Auswertung (Themen finden) passiert ohnehin wöchentlich gebündelt in PROJ-30; ein zusätzlicher Struktur-/Freigabeschritt pro PDF wäre nur Mehraufwand ohne Nutzen | 2026-07-22 |
+| Kein Freigabe-Workflow beim Dokumenten-Upload — Hochladen = sofort aktiv | Qualitätskontrolle passiert sinnvoller später bei Themen-Freigabe (PROJ-30) und Artikel-Freigabe (PROJ-31) | 2026-07-22 |
+| Dokumente werden beim Upload mit Werkzeugart/Material getaggt (admin-erweiterbare Taxonomie) | Ermöglicht gezielte Filterung trotz Wegfall strukturierter Einträge | 2026-07-22 |
+| Originaltext bleibt rein intern gespeichert, nie öffentlich zitiert; anwaltliche Prüfung vor Massenimport empfohlen | Urheberrechtliches Risiko minimieren, ohne die Entwicklung zu blockieren | 2026-07-22 |
+| Duplikate (gleicher Begriff, mehrere Hersteller) bleiben getrennte Dokumente, kein Auto-Merge | Verhindert unbemerktes Vermischen/Verfälschen von Fakten aus unterschiedlichen Quellen | 2026-07-22 |
 
 ### Technical Decisions
 <!-- Added by /architecture -->
 | Decision | Rationale | Date |
 |----------|-----------|------|
-| _wird in /architecture ergänzt_ | | |
+| Rolle „Redaktion" als achte Rolle im bestehenden `USER_ROLES`-Array (nicht separates Berechtigungssystem) | Nutzt komplette vorhandene Auth-/RLS-Infrastruktur weiter, keine Duplikation | 2026-07-23 |
+| Hersteller/Quelle als Freitext-Feld, keine Verknüpfung zur PROJ-28-Herstellertabelle | Hält Wissensbasis wie im Product-Decision-Log festgelegt entkoppelt von Produktstammdaten | 2026-07-23 |
+| Neue Kategorien-Tabelle (Werkzeugart/Material) mit n:m-Zuordnung zu Dokumenten, admin-pflegbar | Gleiches bewährtes Muster wie Hersteller-Verwaltung (PROJ-28); erweiterbar ohne Code-Änderung | 2026-07-23 |
+| Supabase Storage (privater Bucket) für Original-PDFs — erstes Storage-Feature im Projekt | Kein bestehendes Muster vorhanden, wird hier neu etabliert | 2026-07-23 |
+| Text-Extraktion läuft asynchron im Hintergrund nach dem Upload, kein OCR | Vermeidet Timeouts bei großen PDFs; OCR bewusst außen vor gelassen (mit dir bestätigt) — gescannte PDFs gelten als Fehlerfall | 2026-07-23 |
+| Postgres-Volltextsuche (statt einfaches Text-Pattern-Matching wie in anderen Modulen) | Bestehendes Pattern-Matching ist für lange PDF-Fließtexte zu langsam/unpräzise bei wachsender Dokumentenmenge | 2026-07-23 |
+| Dokument-Verarbeitungsstatus (Wird verarbeitet / Aktiv / Fehler) als rein technisches Feld, getrennt von jeglichem inhaltlichen Freigabe-Konzept | Bildet die asynchrone Verarbeitung ab, ohne den bewusst abgeschafften Entwurf/Geprüft-Workflow wieder einzuführen | 2026-07-23 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### A) Komponentenstruktur
+
+```
+Wissensbasis-Seite (nur Rollen Redaktion/Admin)
+├─ Upload-Bereich
+│   ├─ Datei-Auswahl (PDF)
+│   ├─ Werkzeugart-Auswahl (Mehrfachauswahl, aus Taxonomie)
+│   ├─ Material-Auswahl (Mehrfachauswahl, aus Taxonomie)
+│   └─ Hersteller/Quelle-Eingabe (Freitext)
+├─ Dokumenten-Liste (Tabelle)
+│   ├─ Suchfeld (durchsucht Volltext, Dateiname, Quelle)
+│   ├─ Filter (Werkzeugart, Material)
+│   ├─ Zeile: Dateiname, Quelle, Tags, Upload-Datum, Verarbeitungsstatus
+│   ├─ Tags nachträglich bearbeiten
+│   └─ Dokument löschen
+├─ Leerzustand ("Erstes Dokument hochladen")
+└─ Kategorien-Verwaltung (nur Admin) — Werkzeugart/Material pflegen
+    (gleiches Muster wie die bestehende Hersteller-Verwaltung aus PROJ-28)
+```
+
+### B) Datenmodell (fachlich beschrieben)
+
+**Wissensbasis-Dokument** — pro Upload ein Eintrag:
+- Dateiname, Hersteller/Quelle (Freitext — bewusst kein Verweis auf die PROJ-28-Herstellertabelle,
+  um die Wissensbasis wie im Decision Log festgelegt von Produktstammdaten entkoppelt zu halten)
+- Original-PDF (Verweis auf die abgelegte Datei)
+- Extrahierter Volltext
+- Werkzeugart-Tag(s) und Material-Tag(s) (mehrere pro Dokument möglich)
+- Hochgeladen von, Upload-Datum
+- **Verarbeitungsstatus** (technisch, kein inhaltlicher Freigabe-Status!): "Wird verarbeitet" →
+  "Aktiv" oder "Fehler bei der Verarbeitung". Nötig, weil die Text-Umwandlung bei großen PDFs etwas
+  dauern darf (siehe Edge Cases) und im Hintergrund läuft, statt den Upload-Vorgang zu blockieren.
+
+**Kategorie** — admin-gepflegte Taxonomie-Werte:
+- Art (Werkzeugart oder Material) + Name (z.B. "Säge", "Holz")
+- Frei erweiterbar durch Admin, analog zur bestehenden Hersteller-Verwaltung (PROJ-28)
+
+Ein Dokument kann mehrere Kategorien beider Art zugeordnet bekommen (Mehrfachauswahl beim Upload).
+
+### C) Tech-Entscheidungen (mit Begründung)
+
+- **Neue Rolle „Redaktion":** wird als achte Rolle in das bestehende Rollen-Array aufgenommen
+  (gleiches Muster wie die 7 Werkstatt-Rollen) statt eines separaten Berechtigungssystems — nutzt
+  die komplette vorhandene Auth-/RLS-Infrastruktur wieder, statt sie zu duplizieren. Das ist eine
+  kleine Erweiterung des bereits deployten PROJ-1-Rollenmodells, kein eigener Spec-Vorlauf nötig.
+- **Datei-Ablage:** Supabase Storage, privater Bucket, Zugriff nur für Redaktion/Admin. Dies ist der
+  erste Storage-Anwendungsfall im Projekt — es gibt noch kein bestehendes Muster dafür, wir
+  etablieren hier den ersten.
+- **Text-Extraktion:** einfache serverseitige PDF-zu-Text-Umwandlung (kein KI-Modell, siehe
+  Open Questions in der Spec — bereits als hinfällig markiert). Läuft **im Hintergrund** nach dem
+  Upload, damit große Dateien den Upload-Vorgang nicht blockieren oder zum Timeout führen.
+- **Kein OCR:** Nur PDFs mit echtem Textlayer werden unterstützt (Entscheidung mit dir bestätigt).
+  Gescannte Bild-PDFs ohne Textlayer werden wie ein Extraktions-Fehler behandelt. OCR kann bei
+  Bedarf später nachgerüstet werden.
+- **Volltextsuche:** Postgres-Volltextsuche (kein einfaches Text-Pattern-Matching) über den
+  extrahierten Text. Bestehende Suchen im Projekt nutzen nur einfaches Text-Pattern-Matching, das
+  reicht für kurze Felder wie Namen — für längere, durchsuchte Fließtexte aus PDFs ist das bei
+  wachsender Dokumentenmenge zu langsam und unpräzise.
+- **Taxonomie-Verwaltung:** eigene, admin-pflegbare Kategorien-Tabelle mit Mehrfachzuordnung pro
+  Dokument (statt fester Auswahlliste im Code) — gleiches bewährtes Muster wie die
+  Hersteller-Verwaltung aus PROJ-28, damit neue Werkzeugarten/Materialien ohne Code-Änderung
+  ergänzt werden können.
+
+### D) Abhängigkeiten (neue Pakete)
+
+- Eine PDF-Text-Extraktions-Bibliothek für serverseitige Verarbeitung (konkrete Bibliothek wird in
+  `/backend` ausgewählt und installiert).
+- Keine KI-/Sprachmodell-Anbindung nötig für dieses Feature (durch die Scope-Vereinfachung entfällt
+  dieser Bedarf komplett — spart Kosten und Komplexität gegenüber der ursprünglichen Planung).
+
+## Frontend-Implementierung (2026-07-23)
+
+Umgesetzt gemäß Tech Design:
+- **Rolle „Redaktion"** in `src/lib/roles.ts` ergänzt (8. Rolle), `isRedaktion()`-Helper hinzugefügt,
+  Test in `src/lib/roles.test.ts` aktualisiert.
+- **Seite** `/verwaltung/wissensbasis` (`src/app/(app)/verwaltung/wissensbasis/page.tsx`),
+  zugänglich für Redaktion + Admin.
+- **Komponenten** unter `src/components/wissensbasis/`: `wissensbasis-admin-page.tsx`
+  (Orchestrierung), `document-table.tsx` (Tabelle + Suche/Filter + Upload-/Tag-/Lösch-Dialoge),
+  `category-manager-dialog.tsx` (Admin-only Taxonomie-Pflege).
+- **Navigation:** neue Sektion „Redaktion" im Burger-Menü (`app-header.tsx`), sichtbar für
+  Redaktion/Admin.
+- **Abweichung vom Tech Design (bewusst, nur für diese Frontend-Phase):** Die Server Actions in
+  `src/lib/actions/knowledge-documents.ts` nutzen einen **temporären In-Memory-Speicher** statt
+  echtem Supabase Storage/Postgres-Volltextsuche, damit die UI schon jetzt testbar ist. Das
+  Verarbeitungsstatus-Feld sowie die Fehlerbehandlung bei leerem/unlesbarem Text sind bereits nach
+  Tech Design modelliert; `/backend` ersetzt nur die Datenhaltung, nicht die Schnittstellen/Typen.
+- **Verifiziert:** `npm run lint`, `npm run build` (inkl. TypeScript-Check) und `npm test`
+  (34 Unit-Tests) laufen grün. **Nicht verifiziert:** interaktives Durchklicken im Browser — dieses
+  Worktree hat keine `.env.local` mit Supabase-Zugangsdaten, `npm run dev` schlägt daher schon auf
+  `/login` fehl ("Your project's URL and Key are required..."). Das ist eine Umgebungs-Einschränkung
+  dieses Worktrees, keine Eigenschaft von PROJ-29 — sollte vor `/qa` mit echten Zugangsdaten
+  nachgeholt werden.
 
 ## QA Test Results
 _To be added by /qa_

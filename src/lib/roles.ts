@@ -9,6 +9,7 @@ export const USER_ROLES = [
   "qs",
   "warenausgang",
   "fahrer",
+  "redaktion",
 ] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
@@ -22,6 +23,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   qs: "Qualitätssicherung",
   warenausgang: "Warenausgang",
   fahrer: "Fahrer",
+  redaktion: "Redaktion",
 };
 
 /** Startseite je Rolle nach dem Login. */
@@ -33,6 +35,7 @@ export const ROLE_HOME: Record<UserRole, string> = {
   qs: "/dashboard",
   warenausgang: "/dashboard",
   fahrer: "/dashboard",
+  redaktion: "/verwaltung/wissensbasis",
 };
 
 export function roleLabel(role: UserRole): string {
@@ -47,6 +50,11 @@ export function rolesLabel(roles: UserRole[]): string {
 /** Hat der Nutzer (mindestens) die Admin-Rolle? */
 export function isAdmin(roles: UserRole[] | null | undefined): boolean {
   return !!roles?.includes("admin");
+}
+
+/** Hat der Nutzer (mindestens) die Redaktion-Rolle? */
+export function isRedaktion(roles: UserRole[] | null | undefined): boolean {
+  return !!roles?.includes("redaktion");
 }
 
 /** Kontostatus eines Nutzers. */
