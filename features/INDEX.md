@@ -32,7 +32,7 @@
 | PROJ-30 | Themenvorschläge (wöchentlich, KI) | 🔵 Roadmap — Content-Epic: 1×/Woche ~20 Themenvorschläge aus der Wissensbasis unter Berücksichtigung bereits behandelter Themen; Themen müssen freigegeben werden, bevor Content entsteht | 2026-07-20 |
 | PROJ-31 | Content-Studio (Generierung + Redaktion + Lern-Loop) | 🔵 Planned — Alle Open Questions geklärt (2026-07-24): Regler nur Länge+Fachtiefe, Lern-Mechanik via Few-Shot, Neutralität per Prompt-Vorgabe, nur Kern-Artikel (Kanal-Varianten in PROJ-32), ein globaler Tonalitäts-Anker, keine KI-Bildgenerierung (nur manueller Upload). Durchsucht Wissensbasis-Dokumente selbst (Retrieval statt geprüfter Fakten), zeigt Quellen im Entwurf an. Nur für freigegebene Themen (PROJ-30), speist PROJ-32; wartet auf „approved" für `/architecture` | 2026-07-24 |
 | PROJ-32 | Publishing (Blog / Social Media / Newsletter) | 🔵 Roadmap — Content-Epic: freigegebene Inhalte auf allen Kanälen (Webseiten-Blog, Social Media, Newsletter) ausspielen | 2026-07-20 |
-| PROJ-33 | Löschschutz für Partners | 🟠 In Review — Hotfix fertig & gepusht (Branch `claude/session-yomvzd`), Deploy steht noch aus (Session ohne Server-Zugriff). BEFORE DELETE Trigger auf `tms.partners` blockiert jeden Löschversuch, Partner können nur auf inaktiv (`is_active = false`) gesetzt werden. Migration: `20260721120000_PROJ-33_partners_no_delete.sql` — Deploy-Anleitung siehe Feature-Spec | 2026-07-21 |
+| PROJ-33 | Löschschutz für Partners | ✅ Deployed — Migration live verifiziert: Trigger `trg_partners_prevent_delete` aktiv auf `tms.partners` (BEFORE DELETE, blockiert jeden Löschversuch, Partner können nur auf inaktiv `is_active = false` gesetzt werden). Migration: `20260721120000_PROJ-33_partners_no_delete.sql` | 2026-07-25 |
 
 ## Architektur-Dokumente
 

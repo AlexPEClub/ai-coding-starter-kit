@@ -1,6 +1,6 @@
 # PROJ-33: Löschschutz für Partners
 
-**Status:** 🟠 In Review — Code/Migration fertig & gepusht (Branch `claude/session-yomvzd`), Deploy steht noch aus (wartet auf Server-Zugriff)
+**Status:** ✅ Deployed — Migration live angewendet & verifiziert (Trigger `trg_partners_prevent_delete` existiert auf `tms.partners`)
 **Projekt:** TMS 2.0 / Kundenverwaltung
 **Priorität:** Hoch
 **Typ:** Hotfix (Ausnahme vom vollen Workflow, explizit vom User angefordert)
