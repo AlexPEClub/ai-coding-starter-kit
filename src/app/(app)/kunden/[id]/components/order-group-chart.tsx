@@ -3,14 +3,12 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart as PieChartIcon } from "lucide-react";
-import type { OrderGroupStat } from "@/lib/actions/orders-helpers";
+import { CHART_GROUP_COLORS as CHART_COLORS, type OrderGroupStat } from "@/lib/actions/orders-helpers";
 
 /* ═══════════════════════════════════════════
    Donut-Chart: Bestellpositionen je Artikelgruppe
    Klick auf ein Segment filtert die Bestellhistorie
    ═══════════════════════════════════════════ */
-
-const CHART_COLORS = ["#FF6B6D", "#4ECDC4", "#7C6CFF", "#F59F00", "#4DABF7", "#2FB344"];
 
 interface OrderGroupChartProps {
   stats: OrderGroupStat[];

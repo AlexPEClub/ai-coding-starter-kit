@@ -19,14 +19,16 @@ test.describe('Umsatz-Tab', () => {
 
     test.skip(!TEST_KUNDE_ID, 'PROJ11_TEST_KUNDE_ID nicht gesetzt — Testkunde erforderlich');
     await page.goto(`http://localhost:3000/kunden/${TEST_KUNDE_ID}`);
-    await page.getByRole('tab', { name: /Umsatz/i }).click();
+    await page.getByRole('tab', { name: /Ums/i }).click();
     await page.waitForLoadState('networkidle');
   });
 
   test('KPI-Kacheln zeigen Gesamtumsatz, Handelsumsatz und Serviceumsatz', async ({ page }) => {
-    await expect(page.getByText('Gesamtumsatz')).toBeVisible();
-    await expect(page.getByText('Handelsumsatz')).toBeVisible();
-    await expect(page.getByText('Serviceumsatz')).toBeVisible();
+    // Titel-Text existiert je nach Viewport nur als Kurz- oder Langform
+    // (Mobile-Fix, siehe revenue-chart.tsx KpiCard) — daher per data-testid.
+    await expect(page.getByTestId('kpi-total')).toContainText(/Gesamt/);
+    await expect(page.getByTestId('kpi-handel')).toContainText(/Handel/);
+    await expect(page.getByTestId('kpi-service')).toContainText(/Service/);
   });
 
   test('Standard-Zeitraum ist "Letzte 12 Monate"', async ({ page }) => {
@@ -51,23 +53,23 @@ test.describe('Umsatz-Tab', () => {
   });
 
   test('Klick auf Handelsumsatz togglet die Rabattgruppen-Aufschlüsselung und zurück', async ({ page }) => {
-    await page.getByText('Handelsumsatz').click();
+    await page.getByTestId('kpi-handel').click();
     await expect(page.getByText('Handelsumsatz nach Rabattgruppe')).toBeVisible();
 
-    await page.getByText('Handelsumsatz').click();
+    await page.getByTestId('kpi-handel').click();
     await expect(page.getByText('Umsatzentwicklung')).toBeVisible();
   });
 
   test('Klick auf Serviceumsatz togglet die Rabattgruppen-Aufschlüsselung', async ({ page }) => {
-    await page.getByText('Serviceumsatz').click();
+    await page.getByTestId('kpi-service').click();
     await expect(page.getByText('Serviceumsatz nach Rabattgruppe')).toBeVisible();
   });
 
   test('Klick auf Gesamtumsatz setzt eine aktive Kategorie-Aufschlüsselung zurück', async ({ page }) => {
-    await page.getByText('Handelsumsatz').click();
+    await page.getByTestId('kpi-handel').click();
     await expect(page.getByText('Handelsumsatz nach Rabattgruppe')).toBeVisible();
 
-    await page.getByText('Gesamtumsatz').click();
+    await page.getByTestId('kpi-total').click();
     await expect(page.getByText('Umsatzentwicklung')).toBeVisible();
   });
 
@@ -77,7 +79,7 @@ test.describe('Umsatz-Tab', () => {
       if (msg.type() === 'error') errors.push(msg.text());
     });
     await page.reload();
-    await page.getByRole('tab', { name: /Umsatz/i }).click();
+    await page.getByRole('tab', { name: /Ums/i }).click();
     await page.waitForLoadState('networkidle');
     expect(errors).toEqual([]);
   });

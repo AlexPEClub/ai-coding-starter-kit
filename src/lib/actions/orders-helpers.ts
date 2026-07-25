@@ -16,6 +16,9 @@ export interface OrderGroupStat {
   count: number;
 }
 
+/** Design-System-Chartfarben, verbindliche Reihenfolge (docs/design-system.md). */
+export const CHART_GROUP_COLORS = ["#FF6B6D", "#4ECDC4", "#7C6CFF", "#F59F00", "#4DABF7", "#2FB344"];
+
 export type ProductGroupInfo = { group_id: number | null; group_name: string | null };
 
 /**

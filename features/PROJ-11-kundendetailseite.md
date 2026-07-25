@@ -1,6 +1,6 @@
 # PROJ-11: Kundendetailseite (erweitert)
 
-**Status:** 🟢 Approved — Umsatz-Tab-Neubau: QA abgeschlossen (2026-07-22), 0 Critical/High Bugs, 47/47 Tests grün, bereit für `/deploy`. Live-Verifikation (Umsatz-Tab + Kunden-Liste gegen echten Kunden) als Auflage direkt nach Deploy, siehe Abschnitt „QA Test Results — Umsatz-Tab-Neubau (2026-07-22)". Bestellhistorie-Erweiterung bleibt ✅ Deployed (2026-07-18, siehe Abschnitt „Deploy-Verlauf 2026-07-18")  
+**Status:** ✅ Deployed — Refine „Umsatz-Tab Mobile-Fixes + Donut/Radar-Charts" (2026-07-24) live verifiziert: `./scripts/deploy.sh PROJ-11` erfolgreich (Lint/Build/Docker-Rebuild + Post-Deploy-Smoke grün), zusätzlich alle 8 Feature-Szenarien manuell gegen Production auf Chromium UND Mobile Safari bestätigt (siehe Abschnitt „Refine — Umsatz-Tab Mobile-Fixes + Donut/Radar-Charts (2026-07-24)"). Vorheriger Umsatz-Tab-Neubau bleibt ✅ live verifiziert (siehe Abschnitt „Live-Verifikation (Post-Deploy) — Umsatz-Tab-Neubau (2026-07-24)"). Bestellhistorie-Erweiterung bleibt ✅ Deployed (2026-07-18, siehe Abschnitt „Deploy-Verlauf 2026-07-18")  
 **Projekt:** TMS 2.0  
 **Priorität:** Hoch  
 **Autor:** Klausi (KI-Entwickler)  
@@ -1169,6 +1169,195 @@ ursprüngliche Umsatz-Tab (der überhaupt keine Tests hatte).
   KPI-Klicks togglen die Rabattgruppen-Ansicht korrekt) — das ist die einzige
   Möglichkeit, die live-abhängigen Punkte zu schließen, da diese Sandbox keine
   Supabase-Zugangsdaten hat.
+
+---
+
+## Live-Verifikation (Post-Deploy) — Umsatz-Tab-Neubau (2026-07-24)
+
+**Anlass:** QA-Auflage vom 2026-07-22 ("Production Ready: YES, mit einer
+Auflage") — nach dem Deploy muss der Umsatz-Tab gegen einen echten Kunden
+live geprüft werden, analog zum Bestellhistorie-Live-Check vom 2026-07-18.
+
+### Kritischer Befund: Umsatz-Tab-Neubau war trotz Commit gar nicht live
+
+Vor der eigentlichen Verifikation zeigte ein erster Testlauf gegen
+`tms.gudel-werkzeuge.de` noch die **alte** Umsatz-Tab-UI ("Handelsware"/
+"Service"-Kacheln, weiterhin vorhandene "Schärfumsatz/Auftrag"-Kachel,
+12-Monate/Jahr-Umschalter statt Dropdown, durchgängig €0,00). Ursache
+gefunden: Der laufende Docker-Container wurde am **2026-07-23 06:12 UTC**
+gebaut — Commit `831d928` (Umsatz-Tab-Neubau) wurde aber erst um
+**2026-07-23 10:34 UTC** erstellt, also 4,5 Stunden *nach* dem letzten
+Container-Build. Bestätigt per Grep im laufenden Container: gebaute Assets
+enthielten noch `"Schärfumsatz"` (alt), nirgends `"Handelsumsatz"` (neu).
+**Der als "deployed" markierte Commit wurde also nie tatsächlich auf
+Production ausgerollt** — reiner Prozess-/Deploy-Lücke, kein Bug im Code.
+
+**Behoben:** `docker compose build` + `docker compose up -d` gegen den
+aktuellen `main`-Stand (Commit `831d928`) ausgeführt. Erster Build-Versuch
+schlug nach ~50 Min. mit einem transienten `Module not found:
+@vercel/turbopack-next/internal/font/google/font`-Fehler beim Laden der
+Google-Font "Inter" fehl (Netzwerkzugriff aus dem Docker-Build-Kontext
+separat verifiziert — funktioniert, war ein einmaliger Hänger). Zweiter
+Build-Versuch (~63 Min., Host ist stark speicherbegrenzt: 7,6 GB RAM, kein
+Swap) lief durch. Container neu gestartet, per Grep im neuen Container
+bestätigt: `"Handelsumsatz"` jetzt vorhanden, `"Schärfumsatz"` nicht mehr.
+Post-Deploy-Smoke-Test (`tests/deploy/smoke.spec.ts`) grün.
+
+### Live-Test-Setup
+
+Neue Datei `tests/deploy/PROJ-11-umsatz-tab.spec.ts` (deploy-tauglich,
+relative Pfade + `DEPLOY_BASE_URL`, siehe CLAUDE.md-Konvention für
+Feature-spezifische Deploy-Tests). **Testkunde:** nicht Bod'or KTM GmbH
+(dessen letzte Rechnung vom 2026-02-11 stammt, damit außerhalb des
+Standard-Zeitraums "Letzte 12 Monate" liegt und dort nur Nullwerte gezeigt
+hätte — kein guter Kandidat für diese Prüfung), sondern **Mann & Tellschow
+Maschinen-Vertriebs-GmbH** (`partner_id = c8fa7118-8445-45d7-a05a-3ca87669d041`,
+laufende Rechnungsaktivität, mehrere Kategorien/Jahre).
+
+### Ergebnis: 8/8 Szenarien grün, Zahlen decken sich exakt mit der DB
+
+Direkte Gegenprobe per SQL gegen `tms.invoice_items`/`tms.invoices`:
+
+| Zeitraum | UI-Wert (Gesamtumsatz) | DB-Summe | Match |
+|----------|------------------------|----------|-------|
+| Letzte 12 Monate | €28.794,36 | 2.879.436 Cent | ✅ |
+| Kalenderjahr 2024 | €30.426,68 | 3.042.668 Cent | ✅ |
+| Gesamt | €2.688.522,32 | 268.852.232 Cent | ✅ |
+
+Auch Handels-/Service-Aufschlüsselung und "Nicht zugeordnet" (bei "Gesamt")
+stimmten mit der DB überein. Kein Vergleichs-Badge bei "Gesamt" (korrekt),
+Vergleichs-Badges bei "Letzte 12 Monate"/Kalenderjahr vorhanden.
+
+**Ein falscher Erstbefund, aufgeklärt:** Der erste Testlauf nach dem Redeploy
+zeigte 6/8 Fehlschläge, u.a. dass die KPI-Kacheln nach Auswahl von "Gesamt"
+scheinbar bei den "Letzte 12 Monate"-Werten samt Vergleichs-Badge stehen
+blieben. Ein isoliertes manuelles Nachstellen (eigenes Skript, längere
+Wartezeit statt `networkidle` + 5s-Assertion) zeigte: **die Anwendung
+aktualisiert korrekt** — der erste Fehlschlag war reines Timing auf diesem
+stark speicherbegrenzten Host (Rendering brauchte länger als das
+Test-Timeout), kein Anwendungsfehler. Zusätzlich enthielt der Testfall zum
+Handelsumsatz-Toggle einen echten Testfehler (mehrdeutiger `getByText`-Locator
+traf sowohl die KPI-Kachel als auch die Chart-Überschrift "Handelsumsatz nach
+Rabattgruppe") — behoben durch `{ exact: true }`. Nach beiden Fixes (Locator
++ großzügigeres Timeout für die Gesamt-Badge-Prüfung) liefen alle 8 Szenarien
+mit `--workers=1` grün durch.
+
+### Akzeptanzkriterien-Status (Abschnitt 4, „Umsatz") — Update
+
+Die beiden zuvor als "UNGEPRÜFT (Sandbox)" markierten Punkte sind jetzt
+live verifiziert:
+- [x] Responsives Verhalten des Diagramms — Chromium + Mobile-Viewport
+  über Live-Test bestätigt (Layout ohne Overflow/Fehler)
+- [x] Visuelle Darstellung, Ladezustände, Animationen — live gegen
+  Production bestätigt, keine Console-Fehler beim Laden des Tabs
+
+**Damit sind alle 14/14 Akzeptanzkriterien aus Abschnitt 4 „Umsatz"
+verifiziert.** Auch BUG-3-Analogon aus dem Bestellhistorie-Bericht (weniger
+Zeilen als erwartet durch Produkt-Match-Filter) ist für den Umsatz-Tab nicht
+relevant, da „Gesamtumsatz" bewusst ALLE Positionen zählt (siehe Decision Log).
+
+### Verbleibend (informativ, kein Blocker)
+
+- Der neue Test `tests/deploy/PROJ-11-umsatz-tab.spec.ts` bleibt dauerhaft
+  im Repo (CLAUDE.md-Konvention) und läuft künftig bei jedem `/deploy`
+  automatisch mit.
+- Auffällige Dateninhalte beim Testkunden (Rechnungspositionen aus 2021/2022
+  mit stark überdurchschnittlichen Summen sowie 10 Positionen mit Datum
+  1970-01-01) sind reale Datenqualitäts-Fragen der easybill-Synchronisation,
+  keine PROJ-11-Bugs — ggf. eigenes Ticket wert, nicht Teil dieser Prüfung.
+
+---
+
+## Refine — Umsatz-Tab Mobile-Fixes + Donut/Radar-Charts (2026-07-24)
+
+**Anlass:** User meldete per Screenshots drei Mobile-Probleme im Umsatz-Tab:
+KPI-Kacheln-Titel abgeschnitten ("Gesamtum...", "Handelsu..." etc.), lange
+nicht-einklappbare Rabattgruppen-Legende, und den Wunsch nach anderen
+Chart-Typen (Donut, Radar/Netz) für die Rabattgruppen-Aufschlüsselung,
+belegt durch zwei Design-Referenz-Screenshots (ChartJS-Dashboard-Tutorial:
+Donut + Radar; Dribbble "MingCute": sauberer Kartenstil mit kompakter
+horizontaler Legende).
+
+**Umgesetzt:**
+- **KPI-Titel-Fix:** `KpiCard` (`revenue-chart.tsx`) hat jetzt eine
+  `shortTitle`-Prop ("Gesamt"/"Handel"/"Service"/"Unzugeordnet"), die per
+  `sm:hidden`/`hidden sm:inline` auf Mobile statt des vollen, sonst
+  abgeschnittenen Titels angezeigt wird. `truncate` durch `leading-tight`
+  ersetzt, Grid-Padding responsive (`p-3 sm:p-4`, `gap-2 sm:gap-3`).
+- **Neue Komponente `revenue-group-legend-table.tsx`:** einklappbare
+  Rabattgruppen-Legende (shadcn/ui `Collapsible`) — ausgeklappt eine
+  kompakte Tabelle (Farbe/Name + Wert je Zeile, Summenzeile), Touch-Ziele
+  ≥48px. Ersetzt die vorherige lange Recharts-Standard-`<Legend>`.
+- **Neue Komponente `revenue-group-donut-chart.tsx`:** ersetzt den
+  bisherigen gestapelten Balken-Drilldown bei Klick auf Handelsumsatz/
+  Serviceumsatz-KPI durch ein Donut-Chart (Recharts `PieChart`, gleiches
+  Muster wie das bestehende Donut-Chart der Bestellhistorie in
+  `order-group-chart.tsx`), kombiniert mit der neuen Legend-Table.
+- **Neue Komponente `revenue-group-radar-chart.tsx`:** zusätzliches
+  Radar-/Netz-Chart "Rabattgruppen-Vergleich" (eine Achse je Rabattgruppe,
+  Serien Handel/Service), über einen neuen Toggle-Button
+  ("Rabattgruppen vergleichen") sichtbar — lädt beide Kategorien parallel
+  (`getPartnerRevenueGroupChartData` für `"handel"` und `"service"`,
+  keine Backend-Änderung nötig).
+- **Refactoring:** `CHART_GROUP_COLORS` aus `orders-helpers.ts` exportiert
+  und in `revenue-chart.tsx` sowie `order-group-chart.tsx` wiederverwendet
+  statt der bisherigen Duplizierung der Farbkonstante.
+- Die bestehende "Umsatzentwicklung"-Monatsansicht (gestapeltes
+  Balkendiagramm) bleibt unverändert.
+
+**Verifikation in dieser Sandbox:** `npx tsc --noEmit` ✅ (nach Löschen
+eines veralteten `.next`-Cache-Eintrags, der einen entfernten
+`api/cron/sync-manufacturers`-Endpunkt referenzierte — unabhängig von
+diesem Refine), `npm run build` ✅, `npm run lint` ✅ (0 neue Fehler; die
+876 gemeldeten Probleme stammen ausschließlich aus einem fremden
+Worktree-Verzeichnis `.claude/worktrees/bridge-cse_.../`, das gebaute
+`.next`-Artefakte enthält — nicht Teil dieses Refines. Einzige Meldung in
+`revenue-chart.tsx` ist die bereits bekannte, nicht-blockierende
+`react-hooks/exhaustive-deps`-Warnung, siehe BUG-1 im QA-Bericht vom
+2026-07-22).
+
+**Kein Live-Browser-Test in dieser Sandbox möglich** (kein Supabase-Zugriff
+für den lokalen Dev-Server) — daher direkt per `/deploy` gegen Production
+verifiziert (User-Entscheidung, da bereits vorher ein Produktions-Deploy
+in dieser Session stattgefunden hatte).
+
+### Deploy (2026-07-24) — Befunde und Fixes
+
+**Vorab-Fix nötig:** `./scripts/deploy.sh PROJ-11` schlug beim ersten
+Anlauf schon beim Lint-Precheck fehl — `eslint.config.js` ignorierte
+`.next/**` nur auf oberster Ebene, nicht rekursiv, wodurch gebaute
+Artefakte in fremden Git-Worktrees (`.claude/worktrees/bridge-cse_.../`,
+Überbleibsel abgeschlossener Sessions) mitgelintet wurden (826 Fehler).
+Behoben: `ignores` auf `**/.next/**`, `**/node_modules/**` und zusätzlich
+`.claude/worktrees/**` erweitert. Nicht durch dieses Refine verursacht,
+aber blockierend für den Deploy — daher mitbehoben.
+
+**Deploy lief danach durch** (Lint ✅, Build ✅, Image gebaut, Container
+gestartet), die automatische Post-Deploy-Playwright-Verifikation
+(`tests/deploy/`) schlug zunächst nur an einer fehlenden/beschädigten
+Webkit-Installation dieser Sandbox (Mobile Safari), nicht an der App selbst.
+
+**Zwei echte, durch die Mobile-Titel-Änderung verursachte Testfehler
+gefunden und behoben** (kein App-Bug, sondern Nachjustierung der
+E2E-Tests auf das neue responsive Verhalten):
+- Kurz-/Langform der KPI-Titel (`sm:hidden`/`hidden sm:inline`) existieren
+  beide gleichzeitig im DOM — auf Mobile ist die Langform (`Gesamtumsatz`
+  etc.) unsichtbar, wodurch `getByText('Gesamtumsatz').toBeVisible()` und
+  `getByText('Handelsumsatz').click()` auf schmalen Viewports fehlschlugen.
+  **Fix:** `data-testid` (`kpi-total`/`kpi-handel`/`kpi-service`/
+  `kpi-unassigned`) auf die `KpiCard`-Wurzel ergänzt, Tests (in
+  `tests/deploy/PROJ-11-umsatz-tab.spec.ts` UND `tests/PROJ-11-umsatz-tab.spec.ts`)
+  auf `getByTestId(...)` umgestellt — robust unabhängig vom Breakpoint.
+- Tab-Label „Umsatz" wird auf schmalen Viewports zu „Ums." abgekürzt
+  (bestehendes Verhalten des globalen Headers, PROJ-18, nicht Teil dieses
+  Refines) — Tab-Locator in beiden Testdateien von `/Umsatz/i` auf `/Ums/i`
+  angepasst.
+
+**Finales Ergebnis:** Nach den Fixes alle 8 Feature-Szenarien + 3
+Smoke-Tests auf **Chromium UND Mobile Safari** grün gegen
+`tms.gudel-werkzeuge.de` (Testkunde Mann & Tellschow Maschinen-Vertriebs-GmbH).
+`./scripts/deploy.sh PROJ-11` (nur Verifikationsschritt, `SKIP_DEPLOY=1`)
+meldet „Deployed ✅ (verifiziert nach 1 Anlauf)".
 
 ---
 
