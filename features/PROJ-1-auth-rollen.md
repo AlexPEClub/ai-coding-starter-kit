@@ -34,6 +34,10 @@
 
 > Eine Rolle pro Nutzer im MVP. Mehrfachrollen sind ein späteres Erweiterungsthema (Non-Goal hier).
 
+> **Erweiterung durch PROJ-29 (2026-07-23):** eine 8. Rolle **`redaktion`** (Content-Team,
+> getrennt von den 7 Werkstatt-Rollen oben) wurde als weiterer Wert in `src/lib/roles.ts`
+> ergänzt. Details/Berechtigungen siehe `features/PROJ-29-wissensbasis.md`.
+
 ## 3. Acceptance Criteria
 
 ### Login / Logout
