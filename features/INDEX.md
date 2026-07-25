@@ -25,7 +25,7 @@
 | PROJ-18 | Globaler Header mit Navigation | ✅ Deployed | 2026-07-03 |
 | PROJ-19 | Auftragsverwaltung | ✅ Deployed | 2026-07-05 |
 | PROJ-20 | Logistik & Abholung | ✅ Deployed | 2026-07-06 |
-| PROJ-21 | Fahrer-Seite | ✅ Deployed — DB-Erweiterung Driver-Tour-Lifecycle (Status `unterwegs`/`angekommen`/`problem` + Spalte `tms.tours.abgeschlossen_am`) am 2026-07-22 live angewendet & verifiziert | 2026-07-22 |
+| PROJ-21 | Fahrer-Seite | 🟠 In Review — Basis-Fahrer-Seite weiter ✅ live. Erweiterung „Navi-Start + Erledigt-Bestätigung" QA-geprüft (Code-/Schema-Review, kein Live-Browser-Test möglich): 4/4 Akzeptanzkriterien bestanden, DB-Spalten live verifiziert. Critical-Sicherheitsfund BUG-1 (unauthentifizierte Debug-Endpunkte `/api/debug/*`, `/api/test-drivers` leaken Touren-/Partnerdaten) als Hotfix behoben — Routen komplett entfernt (waren unbenutzte Debug-Leftover), lint/build grün. Deploy (Erweiterung + Hotfix zusammen) steht noch aus | 2026-07-25 |
 | PROJ-22 | Kalender für blockierte Tage | ✅ Deployed | 2026-07-07 |
 | PROJ-28 | Hersteller-Verwaltung & Artikel-Zuordnung | ✅ Deployed | 2026-07-10 |
 | PROJ-29 | Wissensbasis (KI-Content-Fundament) | 🟡 In Progress — Frontend gebaut: Rolle „Redaktion", Seite `/verwaltung/wissensbasis`, Upload/Suche/Filter/Tags/Kategorien-Verwaltung. Actions nutzen vorübergehend In-Memory-Speicher statt echtem Supabase Storage/FTS (kommt in `/backend`). Lint/Build/Tests grün; Browser-Test steht noch aus (Worktree ohne `.env.local`) | 2026-07-23 |

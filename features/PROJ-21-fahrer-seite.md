@@ -1,6 +1,6 @@
 # PROJ-21 — Fahrer-Seite
 
-**Status:** ✅ Deployed  
+**Status:** 🟠 In Review — Basis-Seite live; Erweiterung „Navi-Start + Erledigt-Bestätigung" QA-geprüft; Critical-Bug BUG-1 (Debug-Endpunkte) am 2026-07-25 als Hotfix behoben, Deploy steht noch aus  
 **Erstellt:** 2026-07-06  
 **Zielversion:** MVP  
 **Unteraufgaben:** Mehrere (Spec → Architektur → Frontend → Backend → QA → Deploy)
@@ -276,6 +276,112 @@ Gespeichert in: Supabase (`tms.tours`), damit die Verwaltung es in Echtzeit sieh
 | 2026-07-22 | Jan Bernd | Spec-Erweiterung „Navi-Start + Erledigt-Bestätigung" geschrieben (🟠 In Review). Scope reduziert: kein `problem`/`angekommen`-Ablauf; Navi→`unterwegs`+Zeit/Ort, Erledigt→Modal→`erledigt`+`abgeschlossen_am`/Fahrer/Ort. Spec approved. |
 | 2026-07-22 | Jan Bernd | Tech-Design (Architektur) ergänzt: shadcn `AlertDialog`, Browser-Geolocation (best-effort), keine neuen Pakete, +2 Spalten `abschluss_lat/lon`. Architektur approved. Anzeige-Frage geklärt: vorerst nur Erfassen, Auswertungs-Dashboard als späteres Folge-Feature. |
 | 2026-07-22 | Klausi | Umgesetzt: Migration `20260722140000_PROJ-21_abschluss_geo.sql` (abschluss_lat/lon) live angewendet. Backend `driver-tours.ts`: neue Action `markTourEnRoute` (Status `unterwegs`, Startzeit/Ort), `markTourAsCollected` um `abgeschlossen_am`+Abschluss-Ort erweitert, Besitz-Prüfung (nur zugewiesener Fahrer), Listen-Filter zeigen nun `geplant`+`unterwegs`. Frontend `driver-tour-card.tsx`: „Navi"-Button meldet unterwegs, „Erledigt" mit Bestätigungs-Modal, echtes Status-Badge. Lint + Build grün. Noch nicht deployed. |
+
+---
+
+## QA Test Results — Erweiterung „Navi-Start + Erledigt-Bestätigung"
+
+**Tested:** 2026-07-25
+**App URL:** http://localhost:3000 (lokaler Dev-Server in dieser Session nicht startbar — `.env.local` unvollständig, siehe Testing-Hinweis unten)
+**Tester:** QA Engineer (AI)
+
+### Testing-Hinweis (Einschränkung dieser QA-Runde)
+
+In dieser Session konnte **kein Live-Browser-/E2E-Test** gefahren werden: `.env.local` enthält
+nicht die vollständigen Supabase-Zugangsdaten, der Dev-Server bricht beim Start mit
+„Your project's URL and Key are required to create a Supabase client!" ab (`middleware.ts`).
+Playwright-Testerkennung funktioniert (48 Tests in 5 Dateien gefunden, keine Vermischung mit
+`.claude/worktrees/**`), aber `npx playwright test` gegen `localhost` schlägt am WebServer-Start fehl.
+Stattdessen wurde geprüft:
+- **Code-Review** von `driver-tours.ts` und `driver-tour-card.tsx` gegen jedes Akzeptanzkriterium
+- **Live-Schema-Check** der Datenbank (read-only SQL) — Spalten `tour_startzeit`, `tour_start_lat/lon`,
+  `abschluss_lat/lon`, `abgeschlossen_am` sowie Enum-Werte `unterwegs`/`erledigt`/`angekommen`/`problem`
+  existieren tatsächlich in `tms.tours` bzw. `public.order_status` (waren nur per `exec_sql` ohne
+  zugehörige Migration-Historie nachvollziehbar — s. BUG-3)
+- **RLS-Policy-Check** auf `tms.tours` (siehe Security-Audit)
+- `npm run lint` und `npm run build` (beide grün)
+- **Empfehlung:** Vor dem nächsten Feature auf `/fahrer` einmal echten Browser-Test nachholen,
+  sobald eine Session mit vollständiger `.env.local` verfügbar ist.
+
+### Acceptance Criteria Status
+
+#### AC-1: „Navi"-Button setzt Status `unterwegs` + Zeit/Ort (best-effort)
+- [x] Button ist ein `<a href={mapsUrl}>` mit `target="_blank"` → öffnet Google-Maps-Navigation, blockiert die App-Seite nicht
+- [x] `onClick` ruft `markTourEnRoute(tourId, coords)` auf → setzt `status: "unterwegs"`, `tour_startzeit: now()`
+- [x] Standort wird nur gesetzt, wenn `coords` vorhanden ist (`if (coords) { ... }`) — kein Fehler/Abbruch bei fehlender Erlaubnis (`getCoordsBestEffort()` resolved bei Ablehnung/Timeout auf `undefined`, wirft nie)
+- [x] Geolocation-Timeout ist mit 8s begrenzt, `maximumAge: 60000` — Button hängt nicht endlos
+
+#### AC-2: „Erledigt"-Button mit Bestätigungs-Modal
+- [x] Klick öffnet `AlertDialog` „Wirklich erledigt?" mit Ja/Abbrechen (shadcn-Komponente, kein Eigenbau)
+- [x] „Abbrechen" (`AlertDialogCancel`) hat keinen `onClick` → keine Statusänderung
+- [x] „Ja, erledigt" ruft `markTourAsCollected(tourId, coords)` auf → setzt `status: "erledigt"`, `abgeschlossen_am`, `tatsaechliches_abholdatum`, optional `abschluss_lat/lon`
+
+#### AC-3: Status-Badge zeigt echten Status
+- [x] `STATUS_BADGE`-Map deckt `geplant→Offen`, `unterwegs→Unterwegs`, `erledigt→Erledigt` ab; unbekannter Status fällt auf neutralen Badge mit Rohwert zurück (kein Crash)
+
+#### AC-4: Arbeitslisten zeigen `unterwegs` weiterhin an
+- [x] `getDriverToursForToday` und `getDriverToursForDateRange` filtern auf `.in("status", ["geplant", "unterwegs"])` — ein gestarteter Stopp verschwindet nicht aus der Liste
+
+### Edge Cases Status
+
+#### EC-1: Standort verweigert/nicht verfügbar
+- [x] `getCoordsBestEffort()` löst in jedem Fehlerfall (kein `navigator.geolocation`, Ablehnung, Timeout) mit `undefined` auf — Aktion schlägt nie fehl, es wird nur Zeit+Status gespeichert (deckt Spec-Vorgabe „Halle ohne Empfang" ab)
+
+#### EC-2: Doppelklick / Race Conditions
+- [x] `isRouting`/`isCollecting`-State verhindert Doppel-Submit während eine Aktion läuft (Button-Disable bzw. früher Return in `handleNavi`)
+
+#### EC-3: Tour gehört einem anderen Fahrer
+- [x] `assertTourOwnedByCurrentUser` prüft `tour.fahrer_id !== user.id` server-seitig vor jedem Update — clientseitig manipulierte Tour-ID eines fremden Fahrers wird mit „Diese Tour ist dir nicht zugewiesen." abgelehnt
+
+### Security Audit Results (Red-Team)
+- [x] Authentifizierung: `markTourEnRoute`/`markTourAsCollected`/`getDriverTours*` prüfen `supabase.auth.getUser()` zuerst, geben bei fehlendem User einen Error zurück statt zu crashen
+- [x] Autorisierung (IDOR): Ownership-Check verhindert, dass Fahrer A die Tour von Fahrer B abschließt — auch wenn der Service-Role-Client (`createAdminClient`) die RLS-Policies der Tabelle umgeht, wird die Berechtigung explizit in der Server Action geprüft
+- [x] Kein Rollen-Bypass nötig, da laut Spec bewusst rollenoffen („keine Rollen-Einschränkung") — aber Fremdzugriff auf Touren ist trotzdem durch `fahrer_id`-Check blockiert
+- [x] **BUG-1 (Critical, aber außerhalb dieser Erweiterung):** behoben — siehe unten (Hotfix 2026-07-25)
+
+### Regression-Test
+- `npm run lint` → grün (1 vorbestehende, nicht zugehörige Warnung in `revenue-chart.tsx`)
+- `npm run build` → grün, `/fahrer` wird als dynamische Route korrekt gebaut
+- `npm test` (Vitest) → **schlägt komplett fehl** (0 Tests ausgeführt, 64 Errors) — siehe BUG-2
+- Bekannte, bewusst nicht in dieser Erweiterung behobene Alt-Bugs (siehe Spec-Abschnitt „Bewusst NICHT Teil dieser Erweiterung") weiterhin vorhanden, unverändert:
+  - `"geplan"`-Tippfehler in `pickup-tours.ts:186,246`
+  - Statistik zählt `abgeholt`/`archiviert`, Fahrer schreibt `erledigt` (Inkonsistenz)
+  - `DriverMap` zeigt aktuell keine echten Pins (nur leere Deutschlandkarte + Hinweistext) — vorbestehende Lücke aus dem ursprünglichen Teil 3 der Spec, nicht Teil dieser Erweiterung
+
+### Bugs Found
+
+#### BUG-1: Unauthentifizierte Debug-API-Routen leaken Touren-/Partnerdaten in Produktion
+- **Severity:** Critical
+- **Steps to Reproduce:**
+  1. Ohne Login (kein Cookie/Session) `GET /api/debug/pickup-test` auf der Live-Domain aufrufen
+  2. Erwartet: 401/404 oder gar keine Route
+  3. Tatsächlich: Route existiert (bestätigt im Production-Build als `ƒ /api/debug/pickup-test`), nutzt `createAdminClient` (Service-Role, umgeht RLS) und gibt Kundennamen, Touren-Status/-Termine und Rabatt-Defaults eines konkreten Kunden ("Büsken") als JSON zurück — ganz ohne Auth-Check
+  4. Gleiches Muster bei `GET /api/debug/drivers` und `GET /api/test-drivers` (leaken die volle Fahrer-Liste)
+- **Priority:** Fix before deployment (unabhängig von dieser Erweiterung — bereits jetzt live in Produktion, sollte als eigener Hotfix behandelt werden)
+- **Status: Behoben (Hotfix 2026-07-25).** Alle drei Routen (`src/app/api/debug/pickup-test/route.ts`,
+  `src/app/api/debug/drivers/route.ts`, `src/app/api/test-drivers/route.ts`) waren reine Debug-/Test-
+  Leftover ohne echten Verwendungszweck (keine andere Codestelle referenzierte sie) — komplett
+  gelöscht statt nur mit Auth-Check versehen, da sie ohnehin keine legitime Produktionsfunktion
+  hatten. `npm run lint` und `npm run build` weiterhin grün nach der Entfernung. **Deploy steht noch
+  aus** (siehe INDEX.md).
+
+#### BUG-2: `npm test` komplett blockiert durch fremde Worktrees
+- **Severity:** Medium (Infrastruktur/Testfähigkeit, kein Produktionsrisiko)
+- **Steps to Reproduce:**
+  1. `npm test` im Hauptverzeichnis ausführen
+  2. Erwartet: reguläre Vitest-Suite läuft
+  3. Tatsächlich: Vitest versucht auch `src/lib/roles.test.ts` in `.claude/worktrees/bridge-cse_*/` zu starten (fremde, isolierte Session-Worktrees) und läuft dort in Worker-Timeouts → 64 Errors, „no tests" insgesamt
+  4. Ursache: `vitest.config.ts` hat (anders als `eslint.config.js`, dort am 2026-07-24 für PROJ-11 bereits gefixt) kein `.claude/worktrees/**`-Exclude
+- **Priority:** Fix in next sprint (analog zum bereits gefixten eslint-Ignore-Bug)
+
+### Summary
+- **Acceptance Criteria (Erweiterung Navi/Erledigt):** 4/4 per Code-Review bestanden (kein Live-Browser-Test möglich, s. Testing-Hinweis)
+- **Edge Cases:** 3/3 per Code-Review bestanden
+- **Bugs Found:** 2 total (1 Critical — außerhalb des Erweiterungs-Codes, 1 Medium — Infrastruktur)
+- **Security:** Erweiterungs-Code selbst sauber (Ownership-Check korrekt); aber Critical-Fund im Umfeld (Debug-Endpunkte)
+- **Production Ready (nur Navi/Erledigt-Erweiterung):** Code-seitig JA, aber **kein Live-Test durchgeführt**
+- **Production Ready (Gesamtsystem):** JA, sobald Hotfix (BUG-1) deployed ist — Fix ist im Code, aber noch nicht live
+- **Recommendation:** Navi/Erledigt-Erweiterung + BUG-1-Hotfix zusammen deployen (`/deploy PROJ-21`).
 
 ---
 
