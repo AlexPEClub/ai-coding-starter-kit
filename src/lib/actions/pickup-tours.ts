@@ -183,7 +183,7 @@ export async function createPickupTour(
 
   const payload = {
     partner_id: partnerId,
-    status: "geplan",
+    status: "geplant",
     geplantes_abholdatum: values.geplantes_abholdatum,
     fahrer_id: values.fahrer_id || defaults?.driver_id || null,
     zugang: defaults?.zugang || "Bringen",
@@ -243,7 +243,7 @@ export async function autoCreateNextPickup(
 
   const payload = {
     partner_id: partnerId,
-    status: "geplan",
+    status: "geplant",
     geplantes_abholdatum: dateResult.date,
     fahrer_id: defaults.driver_id || null,
     zugang: defaults.zugang || "Bringen",

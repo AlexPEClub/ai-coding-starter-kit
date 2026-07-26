@@ -17,6 +17,7 @@ export type DriverTour = {
     zip: string | null;
     city: string | null;
   };
+  coordinates: { lat: number; lng: number } | null;
 };
 
 export type DriverToursResult =
@@ -97,7 +98,7 @@ async function enrichToursWithPartnerData(
     
     const { data: addressesData } = await serviceClient
       .from("partner_addresses")
-      .select("partner_id, street, postal_code, city")
+      .select("partner_id, street, postal_code, city, geoapify_lat, geoapify_lon")
       .in("partner_id", partnerIds)
       .eq("address_type", "shipping");
     
@@ -111,7 +112,10 @@ async function enrichToursWithPartnerData(
   return tourData.map((item: any) => {
     const partner = partnersMap.get(item.partner_id);
     const address = addressesMap.get(item.partner_id);
-    
+
+    const hasCoords =
+      address?.geoapify_lat != null && address?.geoapify_lon != null;
+
     return {
       id: item.id,
       status: item.status,
@@ -125,6 +129,9 @@ async function enrichToursWithPartnerData(
         zip: address?.postal_code || null,
         city: address?.city || null,
       },
+      coordinates: hasCoords
+        ? { lat: Number(address.geoapify_lat), lng: Number(address.geoapify_lon) }
+        : null,
     };
   });
 }

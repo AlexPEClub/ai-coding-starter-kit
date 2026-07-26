@@ -13,6 +13,8 @@ export function DriverMap({ tours }: DriverMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const hasPins = tours.some((t) => t.coordinates !== null);
+
   useEffect(() => {
     let map: any;
 
@@ -31,6 +33,46 @@ export function DriverMap({ tours }: DriverMapProps) {
             '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
           maxZoom: 19,
         }).addTo(map);
+
+        const pinnedTours = tours.filter(
+          (t): t is DriverTour & { coordinates: { lat: number; lng: number } } =>
+            t.coordinates !== null
+        );
+
+        if (pinnedTours.length > 0) {
+          const markers = pinnedTours.map((tour) => {
+            const color = tour.status === "erledigt" ? "#16a34a" : "#FF6B6D";
+            const marker = L.circleMarker(
+              [tour.coordinates.lat, tour.coordinates.lng],
+              {
+                radius: 9,
+                color: "#ffffff",
+                weight: 2,
+                fillColor: color,
+                fillOpacity: 0.9,
+              }
+            ).addTo(map);
+
+            marker.bindPopup(
+              `<strong>${tour.partner.company_name}</strong><br />${
+                tour.partner.street || ""
+              }<br />${[tour.partner.zip, tour.partner.city]
+                .filter(Boolean)
+                .join(" ")}`
+            );
+
+            return marker;
+          });
+
+          if (markers.length === 1) {
+            map.setView(markers[0].getLatLng(), 12);
+          } else {
+            const bounds = L.latLngBounds(
+              markers.map((m) => m.getLatLng())
+            );
+            map.fitBounds(bounds, { padding: [32, 32] });
+          }
+        }
 
         setIsLoading(false);
       } catch (err) {
@@ -61,11 +103,10 @@ export function DriverMap({ tours }: DriverMapProps) {
         )}
         <div ref={mapRef} className="h-full w-full" />
 
-        {/* Hinweis: Pins bei Bedarf später hinzufügen */}
-        {!isLoading && (
+        {!isLoading && !hasPins && (
           <div className="absolute bottom-2 left-2 z-[400] rounded-md bg-white/90 px-3 py-2 text-xs shadow-md">
             <MapPin className="mr-1 inline h-3 w-3 text-muted-foreground" />
-            Karten-Pins mit Kunden-Adressen folgen bei Bedarf
+            Für die heutigen Touren liegen keine Adress-Koordinaten vor
           </div>
         )}
       </div>

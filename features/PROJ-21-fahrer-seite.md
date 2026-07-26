@@ -1,6 +1,6 @@
 # PROJ-21 — Fahrer-Seite
 
-**Status:** 🟠 In Review — Basis-Seite live; Erweiterung „Navi-Start + Erledigt-Bestätigung" QA-geprüft; Critical-Bug BUG-1 (Debug-Endpunkte) am 2026-07-25 als Hotfix behoben, Deploy steht noch aus  
+**Status:** 🟠 In Review — Basis-Seite live; Erweiterung „Navi-Start + Erledigt-Bestätigung" QA-geprüft; Critical-Bug BUG-1 (Debug-Endpunkte) am 2026-07-25 als Hotfix behoben; die drei bekannten Alt-Bugs (Tippfehler, Status-Inkonsistenz, fehlende Kartenpins) am 2026-07-26 geklärt (siehe „Bugfix-Runde" unten); Deploy steht noch aus  
 **Erstellt:** 2026-07-06  
 **Zielversion:** MVP  
 **Unteraufgaben:** Mehrere (Spec → Architektur → Frontend → Backend → QA → Deploy)
@@ -76,10 +76,14 @@ Neue Fahrer-Seite in TMS 2.0. Ein Fahrer sieht seine geplanten Abholungen für h
 | `partners.street` | `tms.partners` | Straße |
 | `partners.zip` | `tms.partners` | PLZ |
 | `partners.city` | `tms.partners` | Ort |
-| `partners.latitude` | `tms.partners` | Breitengrad (für Karte) |
-| `partners.longitude` | `tms.partners` | Längengrad (für Karte) |
+| `partner_addresses.geoapify_lat` | `tms.partner_addresses` | Breitengrad (für Karte) |
+| `partner_addresses.geoapify_lon` | `tms.partner_addresses` | Längengrad (für Karte) |
 
-> **Hinweis:** `latitude` und `longitude` müssen ggf. in `partners` ergänzt werden, falls noch nicht vorhanden.
+> **Update 2026-07-26:** Keine neue Spalte nötig — `tms.partner_addresses` hat bereits
+> `geoapify_lat`/`geoapify_lon` aus einer bestehenden, produktiv befüllten
+> Adress-Validierungs-Pipeline (nicht Teil des `src/`-Codes, vermutlich Easybill-Import-
+> Enrichment). Alle 2588 `shipping`-Adressen haben Koordinaten. Die Karte liest diese
+> Spalten direkt, siehe „Bugfix-Runde" unten.
 
 ---
 
@@ -276,6 +280,7 @@ Gespeichert in: Supabase (`tms.tours`), damit die Verwaltung es in Echtzeit sieh
 | 2026-07-22 | Jan Bernd | Spec-Erweiterung „Navi-Start + Erledigt-Bestätigung" geschrieben (🟠 In Review). Scope reduziert: kein `problem`/`angekommen`-Ablauf; Navi→`unterwegs`+Zeit/Ort, Erledigt→Modal→`erledigt`+`abgeschlossen_am`/Fahrer/Ort. Spec approved. |
 | 2026-07-22 | Jan Bernd | Tech-Design (Architektur) ergänzt: shadcn `AlertDialog`, Browser-Geolocation (best-effort), keine neuen Pakete, +2 Spalten `abschluss_lat/lon`. Architektur approved. Anzeige-Frage geklärt: vorerst nur Erfassen, Auswertungs-Dashboard als späteres Folge-Feature. |
 | 2026-07-22 | Klausi | Umgesetzt: Migration `20260722140000_PROJ-21_abschluss_geo.sql` (abschluss_lat/lon) live angewendet. Backend `driver-tours.ts`: neue Action `markTourEnRoute` (Status `unterwegs`, Startzeit/Ort), `markTourAsCollected` um `abgeschlossen_am`+Abschluss-Ort erweitert, Besitz-Prüfung (nur zugewiesener Fahrer), Listen-Filter zeigen nun `geplant`+`unterwegs`. Frontend `driver-tour-card.tsx`: „Navi"-Button meldet unterwegs, „Erledigt" mit Bestätigungs-Modal, echtes Status-Badge. Lint + Build grün. Noch nicht deployed. |
+| 2026-07-26 | Claude | **Bugfix-Runde** (vor dem ausstehenden Deploy): (1) `"geplan"`-Tippfehler in `pickup-tours.ts` behoben — per Live-DB-Check bestätigt, dass `'geplan'` kein gültiger Wert des Enums `public.order_status` ist, d.h. `createPickupTour`/`autoCreateNextPickup` sind bisher immer mit hartem DB-Fehler fehlgeschlagen (kein Backfill nötig, da nie erfolgreich falsch gespeichert). (2) Status-Inkonsistenz `abgeholt`/`archiviert` vs. `erledigt` geprüft — bereits gelöst, kein Code-Bezug mehr vorhanden, kein Handlungsbedarf. (3) Kartenpins: `DriverMap` rendert jetzt echte Pins (Leaflet `circleMarker`, grün bei `erledigt`, sonst Markenfarbe, Popup mit Firma/Adresse, `fitBounds`) — dafür genügt es, die bereits vorhandenen, produktiv befüllten Spalten `partner_addresses.geoapify_lat/geoapify_lon` zu lesen; keine neue Geokodierung/Migration/Infrastruktur nötig. `npm run lint`/`npm run build` grün. |
 
 ---
 
@@ -343,10 +348,10 @@ Stattdessen wurde geprüft:
 - `npm run lint` → grün (1 vorbestehende, nicht zugehörige Warnung in `revenue-chart.tsx`)
 - `npm run build` → grün, `/fahrer` wird als dynamische Route korrekt gebaut
 - `npm test` (Vitest) → **schlägt komplett fehl** (0 Tests ausgeführt, 64 Errors) — siehe BUG-2
-- Bekannte, bewusst nicht in dieser Erweiterung behobene Alt-Bugs (siehe Spec-Abschnitt „Bewusst NICHT Teil dieser Erweiterung") weiterhin vorhanden, unverändert:
-  - `"geplan"`-Tippfehler in `pickup-tours.ts:186,246`
-  - Statistik zählt `abgeholt`/`archiviert`, Fahrer schreibt `erledigt` (Inkonsistenz)
-  - `DriverMap` zeigt aktuell keine echten Pins (nur leere Deutschlandkarte + Hinweistext) — vorbestehende Lücke aus dem ursprünglichen Teil 3 der Spec, nicht Teil dieser Erweiterung
+- Bekannte Alt-Bugs aus dieser QA-Runde — **Status nach Bugfix-Runde 2026-07-26:**
+  - `"geplan"`-Tippfehler in `pickup-tours.ts:186,246` → **behoben**
+  - Statistik zählt `abgeholt`/`archiviert`, Fahrer schreibt `erledigt` (Inkonsistenz) → **geprüft, war bereits gelöst, kein Code-Bezug mehr vorhanden**
+  - `DriverMap` zeigte keine echten Pins → **behoben**, nutzt jetzt vorhandene `geoapify_lat/lon`
 
 ### Bugs Found
 
