@@ -1,6 +1,6 @@
 # PROJ-34: Werkzeug-/Auftrags-Fundament, Fahrer-Auftragserfassung & Wareneingang
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-07-27
 **Last Updated:** 2026-07-28
 
@@ -661,4 +661,9 @@ Alle vier Bugs wurden im Anschluss an diese QA-Runde bearbeitet:
 - **Recommendation:** `/qa PROJ-34` erneut ausführen zur Abschluss-Bestätigung, danach `/deploy`.
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed:** 2026-07-28
+**Production URL:** https://tms.gudel-werkzeuge.de
+**Verifikation:** `./scripts/deploy.sh PROJ-34` — Pre-Checks (Lint+Build) grün, Docker-Image gebaut, Container neu gestartet, Post-Deploy-Playwright-Smoke erfolgreich im ersten Anlauf (`Deployed ✅`). Zusätzlich manuell geprüft: `/fahrer`, `/wareneingang`, `/login`, `/dashboard` liefern alle `200` mit korrektem Login-Redirect (kein 500er), keine Fehler in den Container-Logs.
+
+**Hinweis:** Kein Staging vorhanden (`docker-compose.yml` hat nur einen Produktions-Service) — Deploy ging direkt gegen `tms.gudel-werkzeuge.de`. Der interaktive Browser-Test aus der QA-Runde steht weiterhin aus (Umgebungslimit, siehe QA Test Results) und sollte vom User zeitnah in echter Nutzung nachgeholt werden — insbesondere der QR-Scan-Flow (Kamera) und ein erster echter Testdruck über PrintNode (bewusst nicht während QA/Deploy ausgelöst, um kein Etikettenmaterial zu verbrauchen).
