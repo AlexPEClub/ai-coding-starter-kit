@@ -6,6 +6,7 @@ import { DriverTourList } from "@/components/driver/driver-tour-list";
 import { DriverCalendarView } from "@/components/driver/driver-calendar-view";
 import { EmptyState } from "@/components/driver/empty-state";
 import { DriverMap } from "@/components/driver/driver-map";
+import { PrintQrCodesButton } from "@/components/werkzeug-auftrag/print-qr-codes-button";
 
 export const metadata: Metadata = {
   title: "Fahrer — TMS 2.0",
@@ -20,6 +21,11 @@ export default async function DriverPage({
 
   if (!profile) {
     redirect("/login");
+  }
+
+  // PROJ-34: Fahrer-Auftragserfassung ist Fahrer/Admin vorbehalten.
+  if (!profile.roles?.some((r) => r === "fahrer" || r === "admin")) {
+    redirect("/dashboard");
   }
 
   const params = await searchParams;
@@ -46,13 +52,16 @@ export default async function DriverPage({
   return (
     <div className="container mx-auto max-w-4xl px-4 py-6">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">
-          🚚 Meine Abholungen
-        </h1>
-        <p className="text-muted-foreground">
-          {todayFormatted}
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            🚚 Meine Abholungen
+          </h1>
+          <p className="text-muted-foreground">
+            {todayFormatted}
+          </p>
+        </div>
+        <PrintQrCodesButton />
       </div>
 
       {/* Tabs */}

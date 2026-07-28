@@ -13,6 +13,7 @@ import { getNextPickupTour } from "@/lib/actions/pickup-tours";
 import { NextPickupCard } from "./components/next-pickup-card";
 import { OrderDefaultsCard } from "./components/order-defaults-card";
 import { PartnerDiscountsCard } from "./components/discounts-card";
+import { KommissionSettingsCard } from "./components/kommission-settings-card";
 
 export default async function KundeDetailPage({
   params,
@@ -282,6 +283,8 @@ function OrderDefaultsTab({
         hasAbholservice={hasAbholservice}
         hasPlannedTour={hasPlannedTour}
       />
+
+      <KommissionSettingsCard partnerId={partnerId} isAdmin={isAdmin} />
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
+export type KommissionTyp = "statisch" | "dynamisch";
+
 export type OrderDefault = {
   id: string;
   partner_id: string;
@@ -16,6 +18,14 @@ export type OrderDefault = {
   source: string | null;
   created_at: string | null;
   updated_at: string | null;
+  kommission_pflicht: boolean;
+  kommission_typ: KommissionTyp;
+};
+
+export type KommissionEinstellung = {
+  partner_id: string;
+  pflicht: boolean;
+  typ: KommissionTyp;
 };
 
 export type DriverOption = {
@@ -138,6 +148,63 @@ export async function upsertPartnerOrderDefault(
 
   if (error) {
     console.error("[upsertPartnerOrderDefault]", error);
+    return { ok: false, error: "Speichern fehlgeschlagen." };
+  }
+
+  revalidatePath(`/kunden/${partnerId}`);
+  return { ok: true };
+}
+
+/** PROJ-34: Kommissions-Einstellung ist Teil derselben Auftrags-Standardeinstellungen-Zeile. */
+export async function getKommissionEinstellung(partnerId: string): Promise<KommissionEinstellung> {
+  const result = await getPartnerOrderDefault(partnerId);
+  if (!result.ok || !result.data) {
+    return { partner_id: partnerId, pflicht: false, typ: "dynamisch" };
+  }
+  return {
+    partner_id: partnerId,
+    pflicht: result.data.kommission_pflicht ?? false,
+    typ: result.data.kommission_typ ?? "dynamisch",
+  };
+}
+
+export async function setKommissionEinstellung(
+  partnerId: string,
+  values: { pflicht: boolean; typ: KommissionTyp },
+): Promise<UpsertResult> {
+  const supabase = await createClient();
+  const { data: isAdmin, error: adminError } = await supabase.rpc("is_active_admin");
+
+  if (adminError || !isAdmin) {
+    return { ok: false, error: "Nur Admins dürfen Kommissions-Einstellungen bearbeiten." };
+  }
+
+  const serviceClient = createAdminClient({ schema: "tms" });
+
+  const { data: existing } = await serviceClient
+    .from("partner_order_defaults")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .maybeSingle();
+
+  const payload = {
+    partner_id: partnerId,
+    kommission_pflicht: values.pflicht,
+    kommission_typ: values.typ,
+  };
+
+  let error;
+  if (existing) {
+    ({ error } = await serviceClient
+      .from("partner_order_defaults")
+      .update(payload)
+      .eq("partner_id", partnerId));
+  } else {
+    ({ error } = await serviceClient.from("partner_order_defaults").insert(payload));
+  }
+
+  if (error) {
+    console.error("[setKommissionEinstellung]", error);
     return { ok: false, error: "Speichern fehlgeschlagen." };
   }
 

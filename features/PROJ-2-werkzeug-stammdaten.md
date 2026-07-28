@@ -1,10 +1,15 @@
 # PROJ-2: Werkzeug-Stammdaten (CRUD + Suche)
 
-**Status:** Spec geschrieben — wartet auf Review/Approval  
+**Status:** Superseded — aufgegangen in PROJ-34  
 **Projekt:** TMS 2.0  
 **Priorität:** Hoch (Blocker — benötigt für alle weiteren Features)  
 **Autor:** Klausi (KI-Entwickler)  
-**Datum:** 2026-07-01
+**Datum:** 2026-07-01  
+**Superseded am:** 2026-07-27 — diese Spec deckte nur flaches Stammdaten-CRUD ab
+und hatte kein Auftrags-, Stations- oder QR-Konzept. Das Kernstück
+(Werkzeug-Auftragsverwaltung & Stations-Workflow, inkl. Werkzeug-Stammdaten)
+wird jetzt als ein zusammenhängendes Feature **PROJ-34** neu geplant. Diese
+Datei bleibt als historische Referenz für das Stammdaten-Feldmodell erhalten.
 
 ---
 

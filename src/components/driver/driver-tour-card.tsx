@@ -8,6 +8,7 @@ import {
   markTourEnRoute,
   type Coords,
 } from "@/lib/actions/driver-tours";
+import { createLeererAuftrag } from "@/lib/actions/werkzeug-auftraege";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -22,6 +23,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useRouter } from "next/navigation";
+import { TourDetailModal } from "./tour-detail-modal";
+import { AuftragErfassungsDialog } from "@/components/werkzeug-auftrag/auftrag-erfassungs-dialog";
+import { toast } from "sonner";
 
 interface DriverTourCardProps {
   tour: DriverTour;
@@ -54,7 +58,22 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
 export function DriverTourCard({ tour }: DriverTourCardProps) {
   const [isCollecting, setIsCollecting] = useState(false);
   const [isRouting, setIsRouting] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [auftragId, setAuftragId] = useState<string | null>(null);
   const router = useRouter();
+
+  async function handleAuftragHinzufuegen() {
+    const result = await createLeererAuftrag({
+      partnerId: tour.partner.id,
+      tourId: tour.id,
+    });
+    if (result.ok) {
+      setDetailOpen(false);
+      setAuftragId(result.data.id);
+    } else {
+      toast.error(result.error);
+    }
+  }
 
   const address = [tour.partner.street, `${tour.partner.zip} ${tour.partner.city}`]
     .filter(Boolean)
@@ -99,21 +118,26 @@ export function DriverTourCard({ tour }: DriverTourCardProps) {
 
   return (
     <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-      {/* Kunden-Name */}
-      <div className="mb-2">
-        <h3 className="text-base font-semibold text-foreground">
-          {tour.partner.company_name}
-        </h3>
-      </div>
-
-      {/* Adresse */}
-      <div className="mb-3 flex items-start gap-2 text-sm text-muted-foreground">
-        <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-        <div>
-          <div>{tour.partner.street}</div>
-          <div>{tour.partner.zip} {tour.partner.city}</div>
+      {/* Kunden-Name + Adresse — antippen öffnet das Abholungs-Detail-Modal */}
+      <button
+        type="button"
+        onClick={() => setDetailOpen(true)}
+        className="mb-3 block w-full text-left"
+        aria-label={`Details zur Abholung bei ${tour.partner.company_name} öffnen`}
+      >
+        <div className="mb-2">
+          <h3 className="text-base font-semibold text-foreground">
+            {tour.partner.company_name}
+          </h3>
         </div>
-      </div>
+        <div className="flex items-start gap-2 text-sm text-muted-foreground">
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <div>{tour.partner.street}</div>
+            <div>{tour.partner.zip} {tour.partner.city}</div>
+          </div>
+        </div>
+      </button>
 
       {/* Status + Buttons */}
       <div className="flex items-center justify-between gap-2">
@@ -167,6 +191,25 @@ export function DriverTourCard({ tour }: DriverTourCardProps) {
           </AlertDialog>
         </div>
       </div>
+
+      <TourDetailModal
+        tour={tour}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onAuftragHinzufuegen={handleAuftragHinzufuegen}
+      />
+
+      {auftragId && (
+        <AuftragErfassungsDialog
+          key={auftragId}
+          open={!!auftragId}
+          onOpenChange={(open) => !open && setAuftragId(null)}
+          auftragId={auftragId}
+          variant="fahrer"
+          onResumeAuftrag={(andererId) => setAuftragId(andererId)}
+          onDone={() => router.refresh()}
+        />
+      )}
     </div>
   );
 }
