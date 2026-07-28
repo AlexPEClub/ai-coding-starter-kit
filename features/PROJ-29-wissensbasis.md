@@ -1,8 +1,8 @@
 # PROJ-29: Wissensbasis (KI-Content-Fundament)
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-07-20
-**Last Updated:** 2026-07-23
+**Last Updated:** 2026-07-27
 
 > Erstes Feature des **Content-Epics** (PROJ-29 → PROJ-30 → PROJ-31 → PROJ-32).
 > Ziel des Epics: eine große, durchsuchbare Text-Basis zu Themen der
@@ -280,8 +280,173 @@ Umgesetzt gemäß Tech Design:
   dieses Worktrees, keine Eigenschaft von PROJ-29 — sollte vor `/qa` mit echten Zugangsdaten
   nachgeholt werden.
 
+## Backend-Implementierung (2026-07-26)
+
+In-Memory-Speicher durch echtes Supabase Storage + Postgres ersetzt; alle Server-Action-
+Signaturen/Rückgabeformen unverändert (Frontend unangetastet). Neu:
+
+- **Migration** `supabase/migrations/20260726100000_PROJ-29_wissensbasis_backend.sql`
+  (idempotent, versöhnt undokumentierte Live-DB-Drift): Enum-Rolle `redaktion` abgesichert;
+  obsolete Tabellen `knowledge_entries`/`knowledge_chunks` entfernt; `is_content_manager()`
+  mit `SET search_path = public` gehärtet; `knowledge_documents` umgebaut (neue Spalten
+  `source`/`full_text`/`uploaded_by_name`, stale Spalten entfernt, Status-Check
+  `verarbeitung/aktiv/fehler` + Default, generierte `full_text_search`-tsvector-Spalte
+  (Deutsch) + GIN-Index, `created_at`-Index, `updated_at`-Trigger via `set_updated_at()`);
+  `knowledge_categories` case-insensitive Unique-Index + Schreib-Policy auf **Admin-only**
+  verschärft (Lesen bleibt Redaktion+Admin); Join-Tabelle `knowledge_document_categories`
+  (n:m, ON DELETE CASCADE) + RLS; Storage-Bucket `wissensbasis` + 3 Policies auf
+  `storage.objects` (SELECT/INSERT/DELETE, `is_content_manager()`); RPCs
+  `search_knowledge_documents(text, uuid[])` (ILIKE Dateiname/Quelle + `websearch_to_tsquery`
+  Volltext, Kategorie-Filter „muss ALLE tragen", neueste zuerst) und
+  `set_document_categories(uuid, uuid[])` (atomarer Tag-Austausch + `updated_at`-Bump);
+  6 Basis-Kategorien idempotent geseedet. **Live angewendet und Schema verifiziert.**
+- **PDF-Textextraktion:** `unpdf` (reines JS, alpine-tauglich) + `src/lib/knowledge/extract-text.ts`.
+- **`next.config.ts`:** `experimental.serverActions.bodySizeLimit = "25mb"` für PDF-Uploads.
+- **`src/lib/actions/knowledge-documents.ts`:** echte DB-Calls via Admin-Client (Schema `tms`),
+  Auth-Checks `requireRedaktion()`/`requireAdmin()` unverändert. Upload lädt PDF in den Bucket,
+  legt Zeile mit Status `verarbeitung` an, gibt sofort `ok:true` zurück und extrahiert den Text
+  im Hintergrund via `after()` (→ Status `aktiv` mit Volltext bzw. `fehler` mit Meldung).
+  `KnowledgeDocument` additiv um optionale `errorMessage`/`updatedAt` erweitert.
+- **`wissensbasis-admin-page.tsx`:** ~4s-Polling via `useEffect`, solange ein Dokument noch
+  `verarbeitung` ist (keine Prop-/Typ-Änderungen an Kind-Komponenten).
+- **Verifiziert:** `npm run lint` (0 Fehler), `npm run build` (inkl. TS-Check) grün,
+  `npm test` 350/350 Unit-Tests grün (die als „failed" gemeldeten Test-*Dateien* sind
+  Playwright-E2E-Specs, die Vitest fälschlich einsammelt — vorbestehendes Config-Quirk,
+  unabhängig von PROJ-29). DB-Funktionen zusätzlich per SQL-Smoke-Test durchgespielt
+  (FTS, ALL-Kategorien-Filter, ILIKE-Quelle, updated_at-Bump, Cascade-Delete).
+
 ## QA Test Results
-_To be added by /qa_
+
+**Tested:** 2026-07-27
+**App URL:** kein Live-Browser-Test möglich (siehe Hinweis unten) — Code-/Schema-Review + gezielte Node-Verifikation
+**Tester:** QA Engineer (AI)
+
+**Hinweis zum Testumfang:** Ein interaktiver Browser-Test (Playwright gegen `npm run dev`)
+war in dieser Session nicht möglich — der lokale Next.js-Prozess bekommt in der
+Sandbox-Umgebung keinen Zugriff auf die echten `.env.local`-Werte (auch nach expliziter
+Rücksprache mit dem User und Lockerung der Sandbox für den Dev-Server-Start blieb der
+Fehler bestehen; strukturelle Umgebungs-Einschränkung, kein PROJ-29-Fehler). Auf
+User-Wunsch daher wie bei PROJ-21: Code-/Schema-Review statt Live-Test. Ergänzend wurden
+zwei Dinge **tatsächlich ausgeführt** statt nur gelesen, um die größte Unsicherheit
+(funktioniert die echte PDF-Extraktion überhaupt?) zu schließen:
+- `extractTextFromPdf` direkt (ohne Server/DB) gegen die echte
+  Leitz-Anwenderlexikon-PDF ausgeführt → **163.409 Zeichen erfolgreich extrahiert**,
+  Inhalt sichtbar korrekt (Inhaltsverzeichnis, Fachbegriffe). Einzige Nebenwirkung:
+  harmlose `Math.sumPrecise is not a function`-Warnungen von pdf.js (Node-Version hat
+  dieses TC39-Stage-3-API noch nicht) — bricht die Extraktion nicht ab, rein kosmetisch.
+- Dieselbe Funktion gegen eine absichtlich kaputte Datei (kein echtes PDF) ausgeführt →
+  wirft korrekt `Invalid PDF structure.`, was der `catch`-Zweig in `uploadDocument`
+  auffängt und als Status `fehler` verbucht — Fehlerpfad damit real bestätigt, nicht nur
+  gelesen.
+- Alle RLS-Policies zusätzlich unabhängig per Direkt-Query gegen `pg_policies` bestätigt
+  (nicht nur aus dem Migrations-Report übernommen): Kategorien-Schreibrecht ist tatsächlich
+  admin-only, Storage hat tatsächlich 3 Policies für den `wissensbasis`-Bucket.
+- Leerzustand-Kriterium per SQL bestätigt: `tms.knowledge_documents` hat aktuell 0 Zeilen.
+
+E2E-Testdatei `tests/PROJ-29-wissensbasis.spec.ts` wurde geschrieben (deckt alle
+Akzeptanzkriterien unten ab), konnte aber aus obigem Grund **nicht ausgeführt** werden —
+sobald `npm run dev` mit echten Zugangsdaten läuft, sollte sie einmal durchlaufen, bevor
+der Status auf „Approved" wechselt.
+
+### Acceptance Criteria Status
+
+#### Zugang & Rollen
+- [x] Zugriffsverweigerung für Nutzer ohne Redaktion/Admin — code-geprüft (`page.tsx`
+  redirectet, `requireRedaktion()`/`requireAdmin()` gaten jede Server Action), nicht
+  live getestet
+- [x] Redaktion/Admin sehen/bearbeiten Dokumente — code-geprüft
+
+#### Upload & Text-Konvertierung
+- [ ] **Offen:** Initial nur Leitz-Lexikon hinterlegt — Tabelle ist aktuell leer (0
+  Zeilen); der User lädt das echte PDF laut eigener Entscheidung selbst hoch (siehe
+  Backend-Sign-off). Kein Bug, aber Kriterium noch nicht erfüllt bis das passiert ist.
+- [x] Upload+Tagging → Speicherung, automatische Text-Konvertierung, sofort aktiv ohne
+  Freigabeschritt — code-geprüft, Extraktions-Pipeline real gegen echtes PDF verifiziert
+  (s.o.)
+- [x] Unlesbares/leeres PDF → verständliche Fehlermeldung — real verifiziert (s.o.).
+  **Dokumentierte Abweichung vom wörtlichen Spec-Text:** die Zeile wird nicht
+  weggelassen, sondern bleibt mit Status „Fehler" sichtbar (nötig für die
+  Verarbeitungsstatus-Anzeige bei großen PDFs, mit dir beim Backend-Sign-off
+  bereits abgestimmt)
+
+#### Dokument & Metadaten
+- [x] Pflichtfelder vorhanden (Dateiname, Quelle, Datum, Tags, Volltext) — Schema-geprüft
+- [x] Tags bearbeiten mit Zeitstempel — code-geprüft (`set_document_categories`-RPC
+  bumpt `updated_at` atomar mit dem Tag-Austausch)
+- [x] Löschen entfernt aus Wissensbasis — code-geprüft (Storage + DB-Zeile + Join-Cascade)
+
+#### Suche & Filter
+- [x] Filter nach Werkzeugart/Material — code-/schema-geprüft, RPC-Logik smoke-getestet
+- [x] Volltextsuche — code-/schema-geprüft, RPC-Logik smoke-getestet
+- [x] Leerzustand mit Upload-Hinweis — **live per SQL bestätigt** (0 Zeilen aktuell) +
+  code-geprüft
+
+### Edge Cases Status
+- [x] Unlesbares/leeres PDF → real verifiziert (s.o.)
+- [x] Gescanntes Bild-PDF ohne Textlayer → folgt demselben Pfad wie „unlesbar" (kein Text
+  extrahiert → Status Fehler), code-geprüft
+- [x] Off-Topic-Dokument → keine Sonderbehandlung nötig, trivial erfüllt
+- [x] Dublette → keine Auto-Merge-Logik, wie im Decision Log festgelegt
+- [x] Sehr großes PDF → asynchrone Verarbeitung via `after()`, blockiert die Antwort
+  nicht; echte 163k-Zeichen-Extraktion lief in der Verifikation performant durch
+- [x] Gleichzeitige Tag-Bearbeitung → „letzter Schreibvorgang gewinnt" wie im Decision
+  Log akzeptiert; kein optimistisches Locking (bewusst zurückgestellt)
+
+### Security Audit Results
+- [x] Authentication: nicht angemeldeter Zugriff wird von der Middleware abgewiesen
+  (code-geprüft, gleiches Muster wie der Rest der App)
+- [x] Authorization: RLS-Policies **unabhängig per Direkt-Query bestätigt** — Lesen für
+  Redaktion+Admin, Kategorien-Schreiben tatsächlich admin-only, Storage-Policies
+  tatsächlich auf `wissensbasis`-Bucket + `is_content_manager()` gescoped
+- [x] Input validation: Pflichtfelder serverseitig geprüft, ausschließlich parametrisierte
+  Supabase-Query-Builder-Aufrufe (kein rohes SQL-String-Concat im gesamten
+  Actions-File gefunden)
+- [ ] Rate limiting: nicht implementiert — entspricht aber dem Rest der App (nirgends
+  projektweit vorhanden), kein PROJ-29-spezifisches Defizit
+
+### Bugs Found
+
+#### BUG-2: `updateDocumentCategories` lädt alle Dokumente statt nur eins — ✅ Fixed (2026-07-27)
+- **Severity:** Low
+- **Steps to Reproduce:**
+  1. Tags eines Dokuments bearbeiten und speichern
+  2. Erwartet: nur das betroffene Dokument wird nachgeladen
+  3. Tatsächlich: die Funktion ruft `search_knowledge_documents(null, null)` auf und
+     filtert das Ergebnis clientseitig nach der ID — bei „Hunderten bis niedrigen
+     Tausenden" Dokumenten (siehe Tech Requirements) unnötig viel Datenvolumen pro
+     Tag-Edit
+- **Priority:** Nice to have
+- **Fix:** Ersetzt durch gezielten Select des einen Dokuments (`eq("id", id)`) plus
+  gezielten Select der Tag-Zuordnungen aus der Join-Tabelle, statt der kompletten
+  RPC-Liste. `npm run lint`/`npm run build`/`npm test` weiter grün.
+
+#### BUG-3: `deleteDocument` — „Dokument nicht gefunden"-Zweig war unerreichbar — ✅ Fixed (2026-07-27)
+- **Severity:** Low
+- **Steps to Reproduce:**
+  1. Ein Dokument löschen, dessen ID nicht (mehr) existiert
+  2. Erwartet: Meldung „Dokument nicht gefunden."
+  3. Tatsächlich: `.single()` auf 0 Treffern liefert bereits einen Postgres/PostgREST-
+     Fehler, der vorher `throw`t — die eigentliche Not-Found-Prüfung danach wird nie
+     erreicht, Nutzer sieht stattdessen eine generische Fehlermeldung
+- **Priority:** Nice to have
+- **Fix:** `.single()` durch `.maybeSingle()` ersetzt (dieselbe Korrektur zusätzlich in
+  `updateDocumentCategories` angewendet) — bei 0 Treffern kommt jetzt `null` statt eines
+  Fehlers zurück, die Not-Found-Prüfung greift wie vorgesehen. `npm run lint`/
+  `npm run build`/`npm test` weiter grün.
+
+### Summary
+- **Acceptance Criteria:** 9/10 erfüllt (code-/schema-geprüft bzw. real verifiziert),
+  1 offen (Leitz-Lexikon-Initial-Upload steht noch aus — geplanter, manueller Schritt
+  des Users, kein Bug)
+- **Bugs Found:** 2 total (0 critical, 0 high, 0 medium, 2 low) — **beide gefixt (2026-07-27)**
+- **Security:** Pass (Auth/Authorization unabhängig gegen die echte DB verifiziert;
+  Rate-Limiting-Lücke ist projektweit, nicht PROJ-29-spezifisch)
+- **Production Ready:** Bedingt — keine Critical/High-Bugs, aber **kein Live-Browser-Test
+  durchgeführt** (Umgebungs-Einschränkung, siehe oben) und Leitz-Lexikon-Upload steht
+  noch aus
+- **Recommendation:** Status bleibt **In Review** (analog PROJ-21-Präzedenzfall) bis
+  entweder ein Live-Browser-Durchlauf mit echten Zugangsdaten nachgeholt wurde oder der
+  User bewusst ohne diesen Schritt freigibt. Die zwei Low-Bugs blockieren keinen Deploy.
 
 ## Deployment
 _To be added by /deploy_

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,19 @@ export function WissensbasisAdminPage({
     const result = await getCategories();
     if (result.ok) setCategories(result.data);
   }, []);
+
+  // Solange mindestens ein Dokument noch verarbeitet wird (Text-Extraktion läuft
+  // im Hintergrund), regelmäßig neu laden, bis alle „aktiv" oder „fehler" sind.
+  useEffect(() => {
+    const hasProcessing = documents.some((doc) => doc.status === "verarbeitung");
+    if (!hasProcessing) return;
+
+    const interval = setInterval(() => {
+      refreshDocuments();
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [documents, refreshDocuments]);
 
   const handleFilterChange = (next: typeof filters) => {
     setFilters(next);
