@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Table,
   TableBody,
@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertCircle,
@@ -370,11 +371,25 @@ export function UploadDialog({
   const [source, setSource] = useState("");
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Echter Byte-Fortschritt ist über Server Actions nicht ohne Weiteres messbar
+  // (kein direkter XHR-Zugriff) — nähert sich stattdessen asymptotisch 90 % an,
+  // damit bei langsamen mobilen Uploads großer PDFs sichtbar ist, dass etwas
+  // passiert, statt dass die Oberfläche wie eingefroren wirkt.
+  useEffect(() => {
+    if (!loading) return;
+    const interval = setInterval(() => {
+      setUploadProgress((prev) => (prev >= 90 ? prev : prev + (90 - prev) * 0.15));
+    }, 400);
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const reset = () => {
     setSource("");
     setCategoryIds([]);
     setFileName(null);
+    setUploadProgress(0);
   };
 
   const toggleCategory = (id: string, checked: boolean) => {
@@ -412,6 +427,15 @@ export function UploadDialog({
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {loading && (
+              <div className="space-y-2">
+                <Progress value={uploadProgress} />
+                <p className="text-xs text-muted-foreground">
+                  Wird hochgeladen … bei großen Dateien und mobilen Netzwerken kann das
+                  einen Moment dauern.
+                </p>
+              </div>
+            )}
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />

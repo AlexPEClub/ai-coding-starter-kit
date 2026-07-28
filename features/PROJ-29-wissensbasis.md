@@ -485,5 +485,21 @@ postgres` direkt angewendet werden (statt über einen Rollen-Kontext mit vorbest
 explizit selbst mitliefern — sich auf implizite Default-Privileges zu verlassen ist hier
 nicht sicher.
 
+**Nachfrage vom User nach dem Hotfix (2026-07-28, mobil):** Upload des echten
+Leitz-Lexikons über sein Handy — "ändert sich nichts", verbunden mit dem Wunsch nach
+einem Ladebalken. Container-Logs zeigten in einem 45-Minuten-Fenster **keinerlei**
+Server-Aktivität zur Anfrage — die Datei kam serverseitig nie (sichtbar) an. Naheliegendste
+Erklärung: ein 2-MB-Upload über eine langsame/instabile mobile Verbindung dauert spürbar,
+und die Oberfläche gab bis dahin nur einen Button-Text ("Lädt hoch...") als Rückmeldung,
+der bei einem störenden Chrome/Gemini-Overlay leicht übersehen wird — wirkt dann wie
+eingefroren statt wie in Arbeit. **Fix:** `UploadDialog` (`document-table.tsx`) zeigt
+jetzt einen sichtbaren Fortschrittsbalken (`Progress`-Komponente, asymptotisch auf 90 %
+laufend, da echter Byte-Fortschritt über Server Actions nicht ohne Weiteres messbar ist —
+kein direkter XHR-Zugriff) plus erklärenden Hinweistext während des Uploads. Lint/Build/
+Tests grün (375/375 Unit-Tests). Kein serverseitiger Bug zusätzlich zu den beiden oben
+gefundenen identifiziert; sollte der User nach diesem UX-Fix erneut "nichts passiert"
+melden, deutet das auf ein tieferliegendes Problem hin, das einen Live-Repro-Versuch mit
+Log-Mitschnitt in Echtzeit braucht.
+
 ## Deployment
 _To be added by /deploy_
