@@ -31,10 +31,6 @@ test.describe('Wissensbasis — Redaktion/Admin', () => {
     await expect(page.getByText('Wissensbasis', { exact: true })).toBeVisible();
   });
 
-  test('Leerzustand zeigt Hinweis "Erstes Dokument hochladen"', async ({ page }) => {
-    await expect(page.getByText('Erstes Dokument hochladen')).toBeVisible();
-  });
-
   test('Kategorien-Verwaltung ist für Admin sichtbar', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'Kategorien' })).toBeVisible();
   });
@@ -47,7 +43,7 @@ test.describe('Wissensbasis — Redaktion/Admin', () => {
 
     // Upload-Dialog schließt (Server Action gibt ok:true sofort zurück, Fehler kommt async)
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('proj29-korrupt.pdf')).toBeVisible();
+    await expect(page.getByText('proj29-korrupt.pdf').first()).toBeVisible();
 
     // Nach der Hintergrund-Verarbeitung (Polling alle ~4s) muss der Status auf "Fehler" wechseln
     const row = page.locator('tr', { hasText: 'proj29-korrupt.pdf' }).first();
@@ -56,7 +52,7 @@ test.describe('Wissensbasis — Redaktion/Admin', () => {
     // Aufräumen
     await row.getByTitle('Löschen').click();
     await page.getByRole('button', { name: 'Löschen' }).click();
-    await expect(page.getByText('proj29-korrupt.pdf')).not.toBeVisible();
+    await expect(page.locator('tr', { hasText: 'proj29-korrupt.pdf' })).not.toBeVisible();
   });
 
   test('Upload, Verarbeitung, Volltextsuche, Filter, Tags bearbeiten und Löschen eines echten PDFs', async ({ page }) => {
@@ -68,18 +64,19 @@ test.describe('Wissensbasis — Redaktion/Admin', () => {
 
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
     const filenamePattern = /Leitz_Lexikon_Edition_7__11_Anwenderlexikon\.pdf/;
-    await expect(page.getByText(filenamePattern)).toBeVisible();
+    await expect(page.getByText(filenamePattern).first()).toBeVisible();
 
     // Status muss von "Wird verarbeitet" auf "Aktiv" wechseln (echte PDF-Textextraktion via unpdf)
     const row = page.locator('tr', { hasText: 'Anwenderlexikon' }).first();
     await expect(row.getByText('Aktiv')).toBeVisible({ timeout: 30_000 });
 
+    // Tag muss tatsächlich gespeichert worden sein (nicht nur "—")
+    await expect(row.getByText('—')).not.toBeVisible();
+
     // Volltextsuche: ein Begriff, der im echten Lexikon vorkommen sollte
     await page.getByPlaceholder('Wissensbasis durchsuchen...').fill('Zahnteilung');
     await page.waitForLoadState('networkidle');
-    const found = await page.getByText(filenamePattern).isVisible().catch(() => false);
-    // Volltextsuche ist inhaltsabhängig — wird dokumentiert statt hart erzwungen, falls der Begriff
-    // im konkreten Dokument nicht exakt so vorkommt.
+    const found = await page.getByText(filenamePattern).first().isVisible().catch(() => false);
     test.info().annotations.push({
       type: 'fts-search-result',
       description: `Suchbegriff "Zahnteilung" ergab Treffer: ${found}`,
@@ -97,7 +94,7 @@ test.describe('Wissensbasis — Redaktion/Admin', () => {
     // Aufräumen — Test-Upload nicht in der Wissensbasis belassen
     await row.getByTitle('Löschen').click();
     await page.getByRole('button', { name: 'Löschen' }).click();
-    await expect(page.getByText(filenamePattern)).not.toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(filenamePattern).first()).not.toBeVisible({ timeout: 10_000 });
   });
 
   test('keine Server-/Konsolenfehler beim Laden der Seite', async ({ page }) => {

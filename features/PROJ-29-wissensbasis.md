@@ -1,8 +1,8 @@
 # PROJ-29: Wissensbasis (KI-Content-Fundament)
 
-## Status: In Review
+## Status: Deployed
 **Created:** 2026-07-20
-**Last Updated:** 2026-07-27
+**Last Updated:** 2026-07-28
 
 > Erstes Feature des **Content-Epics** (PROJ-29 → PROJ-30 → PROJ-31 → PROJ-32).
 > Ziel des Epics: eine große, durchsuchbare Text-Basis zu Themen der
@@ -447,6 +447,43 @@ der Status auf „Approved" wechselt.
 - **Recommendation:** Status bleibt **In Review** (analog PROJ-21-Präzedenzfall) bis
   entweder ein Live-Browser-Durchlauf mit echten Zugangsdaten nachgeholt wurde oder der
   User bewusst ohne diesen Schritt freigibt. Die zwei Low-Bugs blockieren keinen Deploy.
+
+## Deployment (2026-07-28)
+
+Deployed via `./scripts/deploy.sh PROJ-29` — Pre-Checks (Lint/Build), Docker-Build +
+Neustart, Post-Deploy-Smoke gegen `https://tms.gudel-werkzeuge.de` bestanden.
+
+**Kritischer Live-Fund direkt nach dem Deploy:** Der User meldete "App nicht erreichbar"
+und "Upload/Werkzeugart+Material funktionieren nicht". Reproduktion per Playwright direkt
+gegen die Produktions-URL (echter Login, echtes Formular, echte 2 MB Leitz-Lexikon-PDF)
+bestätigte zwei reale Probleme:
+
+1. **Vor dem Deploy** lief noch der alte In-Memory-Stub live — reale PDFs > 1 MB blieben
+   beim Upload wegen des Next.js-Default-Body-Limits hängen ("Lädt hoch..." ohne Ende).
+   Durch das Deployment dieses Backends (inkl. `bodySizeLimit: "25mb"`) behoben.
+2. **Nach dem Deploy** (neuer Bug, nicht vorher aufgefallen): Die Migration
+   `20260726100000` hatte für die neue Join-Tabelle `tms.knowledge_document_categories`
+   keine `GRANT`-Rechte an `service_role` vergeben (anders als bei `knowledge_documents`/
+   `knowledge_categories`, die diese über ältere `ALTER DEFAULT PRIVILEGES` automatisch
+   bekamen). Live-Fehler: `permission denied for table knowledge_document_categories`
+   (Postgres 42501) bei jedem Dokumente-Laden und jedem Upload mit Tags — erklärt exakt
+   das gemeldete Symptom "Werkzeugart/Material kann man nicht mit hochladen".
+   **Hotfix-Migration** `20260728120000_PROJ-29_grant_knowledge_document_categories.sql`
+   vergibt die fehlenden Rechte nach; direkt auf die Live-DB angewendet und per
+   `information_schema.table_privileges` verifiziert.
+
+**Verifikation nach dem Hotfix:** Vollständiger Playwright-Lauf direkt gegen die Live-URL
+(echter Login, echtes PDF) — alle 5 Tests grün: Zugriffsschutz, Kategorien-Verwaltung,
+Upload eines kaputten PDFs → Status Fehler, **kompletter Zyklus mit echtem PDF** (Upload →
+Verarbeitet → Aktiv → Tags tatsächlich gespeichert → Volltextsuche → Tags bearbeiten →
+Löschen), keine Konsolenfehler. Test-Dokumente danach wieder aus Live-DB entfernt
+(0 Zeilen in `tms.knowledge_documents` nach Abschluss).
+
+**Lektion für künftige Migrationen:** Migrationen, die per `docker compose exec ... psql -U
+postgres` direkt angewendet werden (statt über einen Rollen-Kontext mit vorbestehenden
+`ALTER DEFAULT PRIVILEGES`), müssen für **jede neue Tabelle** ihre `service_role`-GRANTs
+explizit selbst mitliefern — sich auf implizite Default-Privileges zu verlassen ist hier
+nicht sicher.
 
 ## Deployment
 _To be added by /deploy_
