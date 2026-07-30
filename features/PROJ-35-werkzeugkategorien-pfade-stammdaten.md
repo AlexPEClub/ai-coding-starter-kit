@@ -1,8 +1,8 @@
 # PROJ-35: Werkzeugkategorien & Pfade — Stammdaten (Arbeitsvorbereitung, Teil 1/2)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-07-28
-**Last Updated:** 2026-07-29
+**Last Updated:** 2026-07-30
 
 ## Dependencies
 - Requires: PROJ-34 (Werkzeug-/Auftrags-Fundament) — Werkzeug-Stammtabelle, an die Kategorien anknüpfen
@@ -564,4 +564,18 @@ Auf User-Wunsch ("alle Bugs fixen") wurden alle 6 Bugs behoben:
 - **Recommendation:** Deploy. Einziger offener Punkt ist BUG-4 (Dependency-Hinweis für PROJ-40, kein PROJ-35-Blocker) — als Pflicht-Open-Item in der Spec dokumentiert.
 
 ## Deployment
-_To be added by /deploy_
+
+- **Production URL:** https://tms.gudel-werkzeuge.de/verwaltung/werkzeugkategorien
+- **Deployed:** 2026-07-30 (`./scripts/deploy.sh PROJ-35`)
+- **Verifikation:** Post-Deploy-Playwright-Smoke grün im 3. Anlauf (die ersten
+  beiden Anläufe scheiterten an Mobile-Safari-Timeouts während der
+  Container-Warmlaufphase — bekanntes, transientes Muster, kein App-Fehler).
+  Manuell zusätzlich bestätigt: Route liefert `307`-Redirect zu `/login` für
+  nicht angemeldete Zugriffe (Rollen-Gate aktiv), keine Fehler in
+  `docker compose logs`.
+- **Migrationen live:** `20260729150000_PROJ-35_werkzeugkategorien_pfade_stammdaten.sql`,
+  `20260729180000_PROJ-35_bugfixes.sql` (beide bereits vor dem Deploy
+  angewendet und verifiziert, siehe QA/Implementierungsnotizen oben).
+- **Kein Staging vorhanden** — direkt gegen Produktion deployed (wie PROJ-34).
+- Nächster Schritt: `/write-spec PROJ-40` (Arbeitsvorbereitung — AV-Workflow),
+  baut auf diesen Stammdaten auf.
