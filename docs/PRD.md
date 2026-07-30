@@ -40,7 +40,7 @@ Jeder Werkzeug-Status trägt durchgängig die **Stationsfarbe** (siehe Design-Sy
 |----------|---------|--------|
 | P0 (MVP) | PROJ-1 · Auth & Rollen (Invite-only, 7 Rollen, RLS) | ✅ Deployed |
 | P0 (MVP) | PROJ-34 · Werkzeug-/Auftrags-Fundament + Fahrer-Auftragserfassung + Wareneingang — ersetzt PROJ-2–PROJ-6: Werkzeug-Stammdaten, QR-Code-Pool, Auftrag-Entität, Kommission-Konfiguration, Auftrag anlegen beim Kunden (Fahrer), Wareneingang-Scan inkl. Wagen-Anzeige | ✅ Deployed |
-| P0 (MVP) | PROJ-35 · Arbeitsvorbereitung, Teil 1/2 — Stammdaten: Werkzeugkategorien, Geometrie-Parameter-Register, automatische Serviceartikel-Zuordnung über Preisstaffel, Pfade + Dienstleister; baut auf PROJ-34/28 auf | ✅ Deployed |
+| P0 (MVP) | PROJ-35 · Arbeitsvorbereitung, Teil 1/2 — Stammdaten: Werkzeugkategorien, Geometrie-Parameter-Register, automatische Serviceartikel-Zuordnung über Preisstaffel, Pfade + Dienstleister; baut auf PROJ-34/28 auf | Roadmap |
 | P0 (MVP) | PROJ-40 · Arbeitsvorbereitung, Teil 2/2 — AV-Workflow: Scannen, Fahrt aus PROJ-35-Standardpfad bestätigen/anpassen, Extern-Zuweisung pro Werkzeug; baut auf PROJ-35 auf | Roadmap |
 | P0 (MVP) | PROJ-36 · Maschine — Bearbeitungsschritte abarbeiten, Arbeitsliste; baut auf PROJ-34/35/40 auf | Roadmap |
 | P0 (MVP) | PROJ-37 · QS-Station — Freigabe, Rückläufer/Nacharbeit, Ausschuss; baut auf PROJ-34–36 auf | Roadmap |

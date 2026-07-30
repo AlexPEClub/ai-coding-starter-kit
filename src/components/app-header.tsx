@@ -21,7 +21,6 @@ import {
   Factory,
   PackageSearch,
   BookOpen,
-  Layers,
 } from "lucide-react";
 
 import { type UserRole } from "@/lib/roles";
@@ -81,7 +80,6 @@ const adminNavItems: NavItem[] = [
   { href: "/verwaltung/abholungskalender", label: "Abholungskalender", icon: CalendarDays },
   { href: "/verwaltung/hersteller", label: "Hersteller", icon: Factory },
   { href: "/verwaltung/artikel", label: "Artikel", icon: PackageSearch },
-  { href: "/verwaltung/werkzeugkategorien", label: "Werkzeugkategorien", icon: Layers },
 ];
 
 const redaktionNavItems: NavItem[] = [
