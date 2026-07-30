@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentProfile } from "@/lib/supabase/server";
 import { isAdmin } from "@/lib/roles";
+import { escapeOrFilterValue } from "@/lib/actions/orders-helpers";
 
 /* ═══════════════════════════════════════════
    Types
@@ -344,8 +345,9 @@ export async function getProducts(filters?: {
     }
 
     if (filters?.search) {
+      const escaped = escapeOrFilterValue(filters.search);
       query = query.or(
-        `number.ilike.%${filters.search}%,description.ilike.%${filters.search}%`
+        `number.ilike."%${escaped}%",description.ilike."%${escaped}%"`
       );
     }
 

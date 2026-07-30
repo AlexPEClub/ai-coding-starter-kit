@@ -39,12 +39,13 @@ Jeder Werkzeug-Status trägt durchgängig die **Stationsfarbe** (siehe Design-Sy
 | Priority | Feature | Status |
 |----------|---------|--------|
 | P0 (MVP) | PROJ-1 · Auth & Rollen (Invite-only, 7 Rollen, RLS) | ✅ Deployed |
-| P0 (MVP) | PROJ-34 · Werkzeug-/Auftrags-Fundament + Fahrer-Auftragserfassung + Wareneingang — ersetzt PROJ-2–PROJ-6: Werkzeug-Stammdaten, QR-Code-Pool, Auftrag-Entität, Kommission-Konfiguration, Auftrag anlegen beim Kunden (Fahrer), Wareneingang-Scan inkl. Wagen-Anzeige | Planned |
-| P0 (MVP) | PROJ-35 · Arbeitsvorbereitung — Fahrt/Pfad festlegen, Werkzeug-Typ-Standardpfade, Extern-Zuweisung; baut auf PROJ-34 auf | Roadmap |
-| P0 (MVP) | PROJ-36 · Maschine — Bearbeitungsschritte abarbeiten, Arbeitsliste; baut auf PROJ-34/35 auf | Roadmap |
+| P0 (MVP) | PROJ-34 · Werkzeug-/Auftrags-Fundament + Fahrer-Auftragserfassung + Wareneingang — ersetzt PROJ-2–PROJ-6: Werkzeug-Stammdaten, QR-Code-Pool, Auftrag-Entität, Kommission-Konfiguration, Auftrag anlegen beim Kunden (Fahrer), Wareneingang-Scan inkl. Wagen-Anzeige | ✅ Deployed |
+| P0 (MVP) | PROJ-35 · Arbeitsvorbereitung, Teil 1/2 — Stammdaten: Werkzeugkategorien, Geometrie-Parameter-Register, automatische Serviceartikel-Zuordnung über Preisstaffel, Pfade + Dienstleister; baut auf PROJ-34/28 auf | Planned |
+| P0 (MVP) | PROJ-40 · Arbeitsvorbereitung, Teil 2/2 — AV-Workflow: Scannen, Fahrt aus PROJ-35-Standardpfad bestätigen/anpassen, Extern-Zuweisung pro Werkzeug; baut auf PROJ-35 auf | Roadmap |
+| P0 (MVP) | PROJ-36 · Maschine — Bearbeitungsschritte abarbeiten, Arbeitsliste; baut auf PROJ-34/35/40 auf | Roadmap |
 | P0 (MVP) | PROJ-37 · QS-Station — Freigabe, Rückläufer/Nacharbeit, Ausschuss; baut auf PROJ-34–36 auf | Roadmap |
 | P0 (MVP) | PROJ-38 · Warenausgang — Scan, Lieferschein-Erstellung; baut auf PROJ-34–37 auf | Roadmap |
-| P1 | PROJ-39 · Externe Fremdbearbeitung — Tracking & Workflow (Versand, "aktuell extern"-Tabelle, Rückkehr); baut auf PROJ-35 auf | Roadmap |
+| P1 | PROJ-39 · Externe Fremdbearbeitung — Tracking & Workflow (Versand, "aktuell extern"-Tabelle, Rückkehr); baut auf PROJ-35/40 auf | Roadmap |
 | P1 | PROJ-7 · Dashboard & Kennzahlen (Bento, Charts) — baut auf PROJ-34–38 auf | Roadmap |
 | P2 | PROJ-8 · Externe Bearbeitung & Fahrer-Transporte — Fahrer-Seite größtenteils bereits PROJ-21; baut auf PROJ-34/39 auf | Roadmap |
 | P2 | PROJ-9 · Benachrichtigungen (Rückläufer/Engpässe) — baut auf PROJ-34–38 auf | Roadmap |
@@ -65,12 +66,17 @@ einzelnes Feature gesprengt würde:
 Kommission) UND liefert gleich die ersten beiden Stationen mit, weil dort
 Aufträge/Werkzeuge überhaupt erst entstehen und beide Stellen direkt
 ineinandergreifen (Fahrer-Auftragserfassung + Wareneingang).
-→ **PROJ-35** (Arbeitsvorbereitung, vermutlich größter Baustein) →
-**PROJ-36** (Maschine) → **PROJ-37** (QS) → **PROJ-38** (Warenausgang) folgen
-sequenziell dem Werkzeug-Lebenszyklus.
+→ **Arbeitsvorbereitung** wurde selbst noch mal in zwei Teile gesplittet, weil
+während der Anforderungsaufnahme klar wurde, dass sie zu groß für ein Feature
+ist: **PROJ-35** liefert nur die Admin-Stammdaten (Werkzeugkategorien,
+Geometrie-Parameter-Register, automatische Serviceartikel-Zuordnung über eine
+Preisstaffel, Pfade + Dienstleister); **PROJ-40** liefert den eigentlichen
+AV-Tagesworkflow (Scannen, Fahrt bestätigen/anpassen, Extern-Zuweisung), der
+auf PROJ-35 aufbaut. Danach folgen **PROJ-36** (Maschine) → **PROJ-37** (QS) →
+**PROJ-38** (Warenausgang) sequenziell dem Werkzeug-Lebenszyklus.
 → **PROJ-39** (Externe Fremdbearbeitung) ist eigenständig komplex genug
 (eigene Tracking-Tabelle + Workflow) für ein eigenes Folge-Projekt nach den
-5 Kern-Stationen.
+Kern-Stationen.
 → **PROJ-7** (Dashboard) aggregiert die Daten aus PROJ-34–38. **PROJ-8**
 (Fahrer-Transporte, Basis bereits PROJ-21) und **PROJ-9** (Benachrichtigungen)
 sind spätere Erweiterungen. Die Lagerverwaltung (Kommissions-Fach) ist bewusst
