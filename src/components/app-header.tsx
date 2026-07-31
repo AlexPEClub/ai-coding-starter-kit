@@ -11,7 +11,6 @@ import {
   LogOut,
   Menu,
   Home,
-  Truck,
   Package,
   Wrench,
   Cog,
@@ -67,7 +66,6 @@ interface NavItem {
 
 const navigationItems: NavItem[] = [
   { href: "/home", label: "Home", icon: Home },
-  { href: "/fahrer", label: "Fahrer", icon: Truck },
   { href: "/wareneingang", label: "Wareneingang", icon: Package },
   { href: "/arbeitsvorbereitung", label: "Arbeitsvorbereitung", icon: Wrench },
   { href: "/maschine", label: "Maschine", icon: Cog },

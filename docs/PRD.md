@@ -47,7 +47,7 @@ Jeder Werkzeug-Status trägt durchgängig die **Stationsfarbe** (siehe Design-Sy
 | P0 (MVP) | PROJ-38 · Warenausgang — Scan, Lieferschein-Erstellung; baut auf PROJ-34–37 auf | Roadmap |
 | P1 | PROJ-39 · Externe Fremdbearbeitung — Tracking & Workflow (Versand, "aktuell extern"-Tabelle, Rückkehr); baut auf PROJ-35/40 auf | Roadmap |
 | P1 | PROJ-7 · Dashboard & Kennzahlen (Bento, Charts) — baut auf PROJ-34–38 auf | Roadmap |
-| P2 | PROJ-8 · Externe Bearbeitung & Fahrer-Transporte — Fahrer-Seite größtenteils bereits PROJ-21; baut auf PROJ-34/39 auf | Roadmap |
+| P2 | PROJ-8 · Externe Bearbeitung & Fahrer-Transporte — Fahrer-Seite-Basis in PROJ-21 (seit 2026-07-31 in kleine Bausteine aufgeteilt, weitere folgen ab PROJ-41); baut auf PROJ-34/39 auf | Roadmap |
 | P2 | PROJ-9 · Benachrichtigungen (Rückläufer/Engpässe) — baut auf PROJ-34–38 auf | Roadmap |
 | P2 | PROJ-10 · Dark Mode | Roadmap |
 | P2 | PROJ-28 · Hersteller-Verwaltung & Artikel-Zuordnung | ✅ Deployed |
@@ -78,7 +78,8 @@ auf PROJ-35 aufbaut. Danach folgen **PROJ-36** (Maschine) → **PROJ-37** (QS) �
 (eigene Tracking-Tabelle + Workflow) für ein eigenes Folge-Projekt nach den
 Kern-Stationen.
 → **PROJ-7** (Dashboard) aggregiert die Daten aus PROJ-34–38. **PROJ-8**
-(Fahrer-Transporte, Basis bereits PROJ-21) und **PROJ-9** (Benachrichtigungen)
+(Fahrer-Transporte, Basis in PROJ-21 + Folge-Bausteinen ab PROJ-41) und
+**PROJ-9** (Benachrichtigungen)
 sind spätere Erweiterungen. Die Lagerverwaltung (Kommissions-Fach) ist bewusst
 aus PROJ-34 ausgeklammert und bekommt erst eine ID, wenn sie angegangen wird.
 
