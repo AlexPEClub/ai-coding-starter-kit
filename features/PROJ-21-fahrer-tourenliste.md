@@ -1,6 +1,6 @@
 # PROJ-21: Fahrer — Tourenliste (nur Anzeige)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-07-31
 **Last Updated:** 2026-08-01
 
@@ -333,4 +333,18 @@ Features des Projekts, z.B. `pickup-tours.ts`, üblich).
 - **Recommendation:** Deploy. BUG-2 (A11y, Fahrer-Filter-Dropdown ohne zugänglichen Namen) bei nächster Gelegenheit als Polish mitnehmen. Mobile-Safari-Lauf vor `/deploy` bei mehr freiem Host-Speicher wiederholen.
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed:** 2026-08-01
+**Production URL:** https://tms.gudel-werkzeuge.de/fahrer
+**Git Tag:** `v1.21.0-PROJ-21`
+
+- Pre-Checks (Lint + Build) grün, `docker compose build` + `up -d` erfolgreich, Traefik routet weiterhin per Labels.
+- Automatische Post-Deploy-Verifikation (`./scripts/deploy.sh PROJ-21`, `playwright.deploy.config.ts`): **grün im 1. Anlauf** (8 passed, 14 skipped — Skips sind bereits vorhandene, bedingt laufende PROJ-11-Tests, kein PROJ-21-Bezug).
+- Zusätzlich manuell gegen die Live-URL verifiziert (da noch kein dediziertes `tests/deploy/PROJ-21-*.spec.ts` existiert): Login mit dem Playwright-Testaccount, `/fahrer` lädt, Rollen-Gate/Tabs „Ich"+„Tourenplanung" sichtbar, Tab-Wechsel funktioniert, Fahrer-Filter-Dropdown sichtbar.
+- Container-Logs (`docker compose logs`) auf Fehler/Exceptions geprüft — keine gefunden.
+- Kein neuer `tests/deploy/`-Spec für PROJ-21 ergänzt (nice-to-have für einen Folge-Durchgang, siehe Empfehlung unten).
+
+### Bekannte offene Punkte nach Deploy
+- **BUG-2 (Low, A11y):** Fahrer-Filter-Dropdown ohne zugänglichen Namen — weiterhin offen, nicht blockierend.
+- **Mobile Safari (WebKit):** In dieser Session auf dem ressourcenknappen Entwicklungs-Host nicht abschließend testbar (siehe QA-Abschnitt) — Live-Deploy-Verifikation lief aber inkl. Mobile-Safari-Smoke-Tests erfolgreich gegen Produktion (`smoke.spec.ts`, 3/3 grün auf Mobile Safari), damit ist die Kernfunktion auf Mobile Safari in Produktion bestätigt. Die volle PROJ-21-Spec auf Mobile Safari wurde dort nicht erneut gegengetestet — optionaler Nachtrag.
+- Empfehlung für einen Folge-Baustein: dediziertes `tests/deploy/PROJ-21-fahrer-tourenliste.spec.ts` ergänzen, das die Kern-ACs (Rollen-Gate, beide Tabs) automatisiert gegen die Live-URL prüft, statt nur manuell.
