@@ -41,6 +41,7 @@
 | PROJ-38 | Warenausgang — Scan, Lieferschein | 🔵 Roadmap — Teil 6/7. Erzeugt Lieferschein in TMS; Rechnung bleibt bewusst in easybill. Baut auf PROJ-34–37 auf | 2026-07-27 |
 | PROJ-39 | Externe Fremdbearbeitung — Tracking & Workflow | 🔵 Roadmap — Teil 7/7, nach den Kern-Stationen. Versand per Spedition/Post (nicht eigene Fahrer), Rückkehr über normalen Wareneingang-Scan, eigene "aktuell extern"-Tracking-Tabelle. Baut auf PROJ-35/40 auf | 2026-07-28 |
 | PROJ-40 | Arbeitsvorbereitung — AV-Workflow (Fahrt festlegen) | 🔵 Roadmap — Teil 2b/7. Der eigentliche AV-Tagesablauf: Werkzeug scannen, 3-Stufen-Formular (Oberkategorie→Unterkategorie→Geometrie-Daten), automatische Serviceartikel-Zuordnung anhand der PROJ-35-Preisstaffel, Standard-Pfad aus PROJ-35 bestätigen/anpassen (Fahrt), konkreten externen Dienstleister pro Werkzeug zuweisen/überschreiben. Baut auf PROJ-35 auf | 2026-07-28 |
+| PROJ-41 | Fahrer — Fahrt bearbeiten (Fahrer/Datum/Notiz + Änderungsverlauf) | 🔵 Planned — Spec fertig und approved: Klick auf einen Stopp öffnet einen Bearbeiten-Dialog (Fahrer wechseln — Pflichtfeld, kein Zurücksetzen auf "kein Fahrer", Datum ändern, Notiz hinzufügen — neue Spalte statt Wiederverwendung von reschedule_notiz/problem_notiz) samt vollständigem Änderungsverlauf (wer/wann/was, alt→neu, direkt im Dialog, für Fahrer+Admin gleichermaßen sichtbar). Jeder mit Zugriff auf /fahrer darf jeden Stopp bearbeiten (Team-Transparenz). Letzter Speicherstand gewinnt bei Gleichzeit-Bearbeitung (keine Sperre). Details in `features/PROJ-41-fahrt-bearbeiten.md`. Baut auf PROJ-21 auf. Nächster Schritt: `/architecture PROJ-41` | 2026-08-01 |
 
 ## Architektur-Dokumente
 
@@ -68,4 +69,4 @@
 - Vor jeder Code-Änderung: CLAUDE.md, docs/PRD.md und relevante Feature-Datei lesen.
 - Status in INDEX.md und Feature-Header immer synchron halten.
 
-## Next Available ID: PROJ-41
+## Next Available ID: PROJ-42
