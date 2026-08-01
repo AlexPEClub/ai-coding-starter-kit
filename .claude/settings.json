@@ -18,7 +18,25 @@
       "Read(**/.pypirc)",
       "Edit(**/.env*)",
       "Edit(**/secrets/**)",
-      "Edit(**/.ssh/**)"
+      "Edit(**/.ssh/**)",
+      "Write(**/.env*)",
+      "Write(**/.dev.vars*)",
+      "Write(**/*.pem)",
+      "Write(**/*.key)",
+      "Write(**/secrets/**)",
+      "Write(**/credentials/**)",
+      "Write(**/.aws/**)",
+      "Write(**/.ssh/**)",
+      "Write(**/config/database.yml)",
+      "Write(**/config/credentials.json)",
+      "Write(**/.npmrc)",
+      "Write(**/.pypirc)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean:*)",
+      "Bash(git checkout --:*)",
+      "Bash(git restore:*)",
+      "Bash(git branch -D:*)",
+      "Bash(git push --delete:*)"
     ],
     "allow": [
       "Bash(npm install)",
@@ -34,7 +52,10 @@
       "Bash(lsof:*)",
       "Bash(kill:*)",
       "Bash(npx shadcn@latest add:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Edit(**)",
+      "Write(**)",
+      "Bash(git:*)"
     ]
   }
 }
