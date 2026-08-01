@@ -32,16 +32,16 @@ test.describe("PROJ-21 Zugang & Rollen", () => {
     await login(page, FAHRER_EMAIL);
     await page.goto("/fahrer");
     await expect(page).toHaveURL(/\/fahrer/);
-    await expect(page.getByRole("tab", { name: "Ich" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Mir zugewiesen" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Tourenplanung" })).toBeVisible();
   });
 });
 
-test.describe("PROJ-21 Tab Ich", () => {
+test.describe("PROJ-21 Tab Mir zugewiesen", () => {
   test("Leerzustand wird angezeigt, wenn der Fahrer keine offenen Touren hat", async ({ page }) => {
     await login(page, FAHRER_EMAIL);
     await page.goto("/fahrer");
-    // Tab "Ich" ist per defaultValue bereits aktiv.
+    // Tab "Mir zugewiesen" ist per defaultValue bereits aktiv.
     await expect(page.getByText("Keine offenen Touren.")).toBeVisible();
   });
 });
@@ -67,7 +67,9 @@ test.describe("PROJ-21 Tab Tourenplanung", () => {
     await expect(page.getByText("Rhehag GmbH")).toBeVisible();
     await expect(page.getByText("Tönnissen Erich GmbH")).toBeVisible();
     await expect(page.getByText("Verfürth GmbH Schreinereibedarf - Grosshandlung")).toBeVisible();
-    await expect(page.getByText("Geplant").first()).toBeVisible();
+    // Datum (06.07.2026) liegt vor "heute" — Status "geplant" wird deshalb als
+    // "Überfällig" (nicht "Geplant") angezeigt, siehe berechneFahrtBadge().
+    await expect(page.getByText("Überfällig").first()).toBeVisible();
   });
 
   test("Filter nach Fahrer schränkt die Liste ein", async ({ page }) => {

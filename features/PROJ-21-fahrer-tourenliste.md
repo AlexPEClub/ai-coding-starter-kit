@@ -348,3 +348,46 @@ Features des Projekts, z.B. `pickup-tours.ts`, üblich).
 - **BUG-2 (Low, A11y):** Fahrer-Filter-Dropdown ohne zugänglichen Namen — weiterhin offen, nicht blockierend.
 - **Mobile Safari (WebKit):** In dieser Session auf dem ressourcenknappen Entwicklungs-Host nicht abschließend testbar (siehe QA-Abschnitt) — Live-Deploy-Verifikation lief aber inkl. Mobile-Safari-Smoke-Tests erfolgreich gegen Produktion (`smoke.spec.ts`, 3/3 grün auf Mobile Safari), damit ist die Kernfunktion auf Mobile Safari in Produktion bestätigt. Die volle PROJ-21-Spec auf Mobile Safari wurde dort nicht erneut gegengetestet — optionaler Nachtrag.
 - Empfehlung für einen Folge-Baustein: dediziertes `tests/deploy/PROJ-21-fahrer-tourenliste.spec.ts` ergänzen, das die Kern-ACs (Rollen-Gate, beide Tabs) automatisiert gegen die Live-URL prüft, statt nur manuell.
+
+## Refine 2026-08-01 (nach Deploy, direktes Feedback vom PM beim Live-Test)
+
+Drei kleine Anpassungen, alle noch am Deploy-Tag umgesetzt und erneut deployed:
+
+1. **Emoji vor der Überschrift entfernt:** `🚚 Fahrer` → `Fahrer` (`page.tsx`).
+2. **Tab „Ich" umbenannt in „Mir zugewiesen"** — sprachlich klarer, was der Tab zeigt
+   (eigene offene Touren). Interner Tab-`value` (`"ich"`) unverändert, nur das sichtbare
+   Label geändert.
+3. **Neue Fällig/Überfällig-Anzeige für den Status „Geplant":** Nur Fahrten mit Status
+   „geplant" (noch nicht gestartet) werden jetzt zusätzlich anhand des Tour-Datums
+   eingefärbt:
+   - Datum = heute → Badge „Fällig" (neue gelbe/amber `warning`-Variante).
+   - Datum in der Vergangenheit → Badge „Überfällig" (rot, `destructive`).
+   - Datum in der Zukunft oder kein Datum → unverändert „Geplant".
+   - „Unterwegs"/„Angekommen"/„Problem" bleiben unabhängig vom Datum unverändert (PM-Entscheidung:
+     nur der „noch nicht gestartet"-Status soll auf Überfälligkeit hinweisen).
+   - „Heute" wird **serverseitig** in `page.tsx` per `Intl.DateTimeFormat` mit
+     `timeZone: "Europe/Berlin"` bestimmt (nicht `new Date()` im Client) — konsistent mit der
+     bestehenden Architektur-Entscheidung „Offen ist serverseitig bestimmt", vermeidet
+     UTC-Off-by-one-Fehler rund um Mitternacht.
+
+### Technische Umsetzung
+- Neue reine Funktion `berechneFahrtBadge(status, datum, heute)` in `fahrten-helpers.ts`
+  (testbar, kein Server-Client-Import) — löst die bisherigen lokalen `STATUS_LABEL`/
+  `STATUS_VARIANT`-Konstanten in `tour-liste.tsx` ab, die jetzt zentral hier liegen.
+- Neue Badge-Variante `warning` (Amber) in `src/components/ui/badge.tsx` ergänzt (Erweiterung
+  der bestehenden shadcn-Komponente, keine Neuimplementierung) — wiederverwendbar für künftige
+  Fällig/Warn-Anzeigen in anderen Stationen.
+- `heute` wird in `page.tsx` einmal berechnet und über `TourListe`/`TourenplanungClient`
+  durchgereicht (Props), damit „Ich" und „Tourenplanung" konsistent denselben Tageswert nutzen.
+- 5 neue Unit-Tests für `berechneFahrtBadge` (Fällig/Überfällig/Geplant-Zukunft/kein Datum/andere
+  Status), E2E-Suite entsprechend angepasst (bekannte Produktivtour vom 06.07.2026 zeigt jetzt
+  „Überfällig" statt „Geplant", da das Datum inzwischen in der Vergangenheit liegt — mit
+  Screenshot gegen echte Daten visuell verifiziert).
+
+### Verifikation
+- Lint + Build grün, Unit-Tests 9/9 grün, E2E-Suite 8/8 grün (Chromium, gegen Live-Daten).
+- Visuell per Screenshot bestätigt: Überschrift ohne Icon, Tab „Mir zugewiesen", alle 7 Stopps
+  der überfälligen Tour (06.07.2026) zeigen den roten „Überfällig"-Badge.
+- „Fällig" (gelb, Datum = heute) hat aktuell keine passenden Live-Daten zum visuellen
+  Gegenprüfen (keine offene „geplant"-Fahrt mit heutigem Datum in der Produktion) — Logik ist
+  aber über den Unit-Test exakt abgedeckt.

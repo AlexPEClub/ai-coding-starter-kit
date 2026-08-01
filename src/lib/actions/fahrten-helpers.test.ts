@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { gruppiereZuTouren, type RohFahrt } from "./fahrten-helpers";
+import { berechneFahrtBadge, gruppiereZuTouren, type RohFahrt } from "./fahrten-helpers";
 
 function fahrt(overrides: Partial<RohFahrt>): RohFahrt {
   return {
@@ -54,5 +54,52 @@ describe("gruppiereZuTouren", () => {
     ]);
 
     expect(touren.map((t) => t.fahrten[0].id)).toEqual(["frueher", "spaeter", "ohne-datum"]);
+  });
+});
+
+describe("berechneFahrtBadge", () => {
+  const HEUTE = "2026-08-01";
+
+  it("zeigt 'Fällig' (warning) für geplante Fahrten mit heutigem Datum", () => {
+    expect(berechneFahrtBadge("geplant", "2026-08-01", HEUTE)).toEqual({
+      label: "Fällig",
+      variant: "warning",
+    });
+  });
+
+  it("zeigt 'Überfällig' (destructive) für geplante Fahrten mit vergangenem Datum", () => {
+    expect(berechneFahrtBadge("geplant", "2026-07-06", HEUTE)).toEqual({
+      label: "Überfällig",
+      variant: "destructive",
+    });
+  });
+
+  it("lässt geplante Fahrten mit zukünftigem Datum unverändert (Geplant/secondary)", () => {
+    expect(berechneFahrtBadge("geplant", "2026-08-05", HEUTE)).toEqual({
+      label: "Geplant",
+      variant: "secondary",
+    });
+  });
+
+  it("lässt geplante Fahrten ohne Datum unverändert (Geplant/secondary)", () => {
+    expect(berechneFahrtBadge("geplant", null, HEUTE)).toEqual({
+      label: "Geplant",
+      variant: "secondary",
+    });
+  });
+
+  it("lässt Status ungleich 'geplant' unabhängig vom Datum unverändert", () => {
+    expect(berechneFahrtBadge("unterwegs", "2026-07-06", HEUTE)).toEqual({
+      label: "Unterwegs",
+      variant: "default",
+    });
+    expect(berechneFahrtBadge("angekommen", "2026-07-06", HEUTE)).toEqual({
+      label: "Angekommen",
+      variant: "default",
+    });
+    expect(berechneFahrtBadge("problem", "2026-07-06", HEUTE)).toEqual({
+      label: "Problem",
+      variant: "destructive",
+    });
   });
 });

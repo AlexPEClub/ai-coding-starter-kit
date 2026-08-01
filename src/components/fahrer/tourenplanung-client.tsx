@@ -18,9 +18,10 @@ const OHNE_FAHRER = "__ohne__";
 interface TourenplanungClientProps {
   touren: Tour[];
   fahrerOptionen: FahrerOption[];
+  heute: string;
 }
 
-export function TourenplanungClient({ touren, fahrerOptionen }: TourenplanungClientProps) {
+export function TourenplanungClient({ touren, fahrerOptionen, heute }: TourenplanungClientProps) {
   const [fahrerFilter, setFahrerFilter] = useState<string>(ALLE_FAHRER);
   const [datumFilter, setDatumFilter] = useState<string>("");
 
@@ -82,6 +83,7 @@ export function TourenplanungClient({ touren, fahrerOptionen }: TourenplanungCli
         touren={gefiltert}
         zeigeFahrer
         leerTitel="Keine Touren für diese Auswahl."
+        heute={heute}
       />
     </div>
   );

@@ -14,6 +14,11 @@ export const metadata: Metadata = {
   title: "Fahrer — TMS 2.0",
 };
 
+/** Heutiges Datum in Europe/Berlin (YYYY-MM-DD) — serverseitig bestimmt, siehe "Offen ist serverseitig bestimmt". */
+function heutigesDatumBerlin(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" }).format(new Date());
+}
+
 export default async function FahrerPage() {
   const profile = await getCurrentProfile();
 
@@ -32,15 +37,17 @@ export default async function FahrerPage() {
     listFahrerOptionen(),
   ]);
 
+  const heute = heutigesDatumBerlin();
+
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="text-2xl font-bold text-foreground">🚚 Fahrer</h1>
+      <h1 className="text-2xl font-bold text-foreground">Fahrer</h1>
       <p className="mb-6 text-muted-foreground">Offene Touren</p>
 
       <Tabs defaultValue="ich">
         <TabsList>
           <TabsTrigger value="ich" className="min-h-[40px]">
-            Ich
+            Mir zugewiesen
           </TabsTrigger>
           <TabsTrigger value="tourenplanung" className="min-h-[40px]">
             Tourenplanung
@@ -51,7 +58,7 @@ export default async function FahrerPage() {
           {!eigeneResult.ok ? (
             <p className="text-sm text-destructive">{eigeneResult.error}</p>
           ) : (
-            <TourListe touren={eigeneResult.data} leerTitel="Keine offenen Touren." />
+            <TourListe touren={eigeneResult.data} leerTitel="Keine offenen Touren." heute={heute} />
           )}
         </TabsContent>
 
@@ -62,6 +69,7 @@ export default async function FahrerPage() {
             <TourenplanungClient
               touren={alleResult.data}
               fahrerOptionen={fahrerOptionenResult.ok ? fahrerOptionenResult.data : []}
+              heute={heute}
             />
           )}
         </TabsContent>

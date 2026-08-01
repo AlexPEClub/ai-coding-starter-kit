@@ -53,3 +53,46 @@ export function gruppiereZuTouren(fahrten: RohFahrt[]): Tour[] {
     return a.datum.localeCompare(b.datum);
   });
 }
+
+export type FahrtBadgeVariant = "secondary" | "default" | "destructive" | "warning";
+
+export interface FahrtBadgeInfo {
+  label: string;
+  variant: FahrtBadgeVariant;
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  geplant: "Geplant",
+  unterwegs: "Unterwegs",
+  angekommen: "Angekommen",
+  problem: "Problem",
+};
+
+const STATUS_VARIANT: Record<string, FahrtBadgeVariant> = {
+  geplant: "secondary",
+  unterwegs: "default",
+  angekommen: "default",
+  problem: "destructive",
+};
+
+/**
+ * Nur "geplant" (noch nicht gestartete) Fahrten werden anhand des Datums
+ * umgefärbt: "Fällig" (gelb) wenn heute, "Überfällig" (rot) wenn in der
+ * Vergangenheit. Alle anderen Status (unterwegs/angekommen/problem) und
+ * "geplant" mit zukünftigem oder fehlendem Datum bleiben unverändert.
+ */
+export function berechneFahrtBadge(
+  status: string,
+  datum: string | null,
+  heute: string
+): FahrtBadgeInfo {
+  if (status === "geplant" && datum) {
+    if (datum < heute) return { label: "Überfällig", variant: "destructive" };
+    if (datum === heute) return { label: "Fällig", variant: "warning" };
+  }
+
+  return {
+    label: STATUS_LABEL[status] ?? status,
+    variant: STATUS_VARIANT[status] ?? "secondary",
+  };
+}

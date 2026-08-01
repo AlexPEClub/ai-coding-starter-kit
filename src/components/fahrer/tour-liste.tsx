@@ -8,20 +8,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import type { Fahrt, Tour } from "@/lib/actions/fahrten";
-
-const STATUS_LABEL: Record<string, string> = {
-  geplant: "Geplant",
-  unterwegs: "Unterwegs",
-  angekommen: "Angekommen",
-  problem: "Problem",
-};
-
-const STATUS_VARIANT: Record<string, "secondary" | "default" | "destructive"> = {
-  geplant: "secondary",
-  unterwegs: "default",
-  angekommen: "default",
-  problem: "destructive",
-};
+import { berechneFahrtBadge } from "@/lib/actions/fahrten-helpers";
 
 function formatDatum(datum: string | null): string {
   if (!datum) return "Ohne Datum";
@@ -44,9 +31,11 @@ interface TourListeProps {
   leerTitel?: string;
   /** Im Tab "Tourenplanung": Fahrername (bzw. "Kein Fahrer zugewiesen") zusätzlich anzeigen. */
   zeigeFahrer?: boolean;
+  /** Heutiges Datum (Europe/Berlin, YYYY-MM-DD), serverseitig bestimmt — für Fällig/Überfällig. */
+  heute: string;
 }
 
-export function TourListe({ touren, leerTitel, zeigeFahrer }: TourListeProps) {
+export function TourListe({ touren, leerTitel, zeigeFahrer, heute }: TourListeProps) {
   if (touren.length === 0) {
     return <p className="text-sm text-muted-foreground">{leerTitel ?? "Keine offenen Touren."}</p>;
   }
@@ -74,6 +63,7 @@ export function TourListe({ touren, leerTitel, zeigeFahrer }: TourListeProps) {
               <ul className="space-y-2">
                 {tour.fahrten.map((fahrt) => {
                   const adresse = formatAdresse(fahrt.kunde);
+                  const badge = berechneFahrtBadge(fahrt.status, tour.datum, heute);
                   return (
                     <li
                       key={fahrt.id}
@@ -83,9 +73,7 @@ export function TourListe({ touren, leerTitel, zeigeFahrer }: TourListeProps) {
                         <p className="font-medium text-foreground">{fahrt.kunde.name}</p>
                         {adresse && <p className="text-sm text-muted-foreground">{adresse}</p>}
                       </div>
-                      <Badge variant={STATUS_VARIANT[fahrt.status] ?? "secondary"}>
-                        {STATUS_LABEL[fahrt.status] ?? fahrt.status}
-                      </Badge>
+                      <Badge variant={badge.variant}>{badge.label}</Badge>
                     </li>
                   );
                 })}
