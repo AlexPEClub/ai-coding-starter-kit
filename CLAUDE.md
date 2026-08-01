@@ -89,7 +89,11 @@ aber die Spec/INDEX muss danach trotzdem aktualisiert werden.
 ## Anforderungsaufnahme (Phase 1) — vor `/write-spec`
 
 Bevor eine Spec geschrieben wird, wird die Anforderung strukturiert erhoben.
-Leitfaden mit 10 Themen (1–5 an TMS 2.0 angepasst, dienen als Vorschlag):
+Dafür wird der `grill-me`-Skill aufgerufen, der den User Frage für Frage
+(mit Empfehlung je Frage) interviewt, bis ein gemeinsames Verständnis steht.
+
+Leitfaden mit 10 Themen (1–5 an TMS 2.0 angepasst) — dienen `grill-me` als
+inhaltlicher Fahrplan, nicht als starre Checkliste:
 
 1. **Ziel & Nutzen** — welches Problem löst das Feature, welcher Mehrwert?
 2. **Rollen & Rechte** — welche der 7 Rollen sind betroffen, welche RLS-Regeln?
@@ -102,7 +106,8 @@ Leitfaden mit 10 Themen (1–5 an TMS 2.0 angepasst, dienen als Vorschlag):
 9. **Statistiken & Reporting** — welche Kennzahlen sollen messbar sein?
 10. **Performance & Datenmenge** — erwartetes Volumen, Antwortzeiten.
 
-**Stopp-Kriterium:** mindestens 6–8 geklärte Fragen — oder der User sagt „Genug".
+**Stopp-Kriterium:** keine feste Fragenanzahl — `grill-me` läuft, bis alle
+relevanten Themen geklärt sind, oder der User „Genug" sagt.
 Erst danach folgt `/write-spec`.
 
 ## Technische Grundhaltung — Secure by Design
