@@ -84,43 +84,70 @@ export function WissensbasisAdminPage({
   const handleUpload = async (formData: FormData) => {
     setLoading(true);
     setUploadError(null);
-    const result = await uploadDocument(formData);
-    if (result.ok) {
-      toast.success(`"${result.data.filename}" hochgeladen.`);
-      setUploadOpen(false);
-      await refreshDocuments();
-    } else {
-      setUploadError(result.error);
+    try {
+      const result = await uploadDocument(formData);
+      if (result.ok) {
+        toast.success(`"${result.data.filename}" hochgeladen.`);
+        setUploadOpen(false);
+        await refreshDocuments();
+      } else {
+        setUploadError(result.error);
+      }
+    } catch (err) {
+      setUploadError(
+        err instanceof Error
+          ? `Netzwerkfehler: ${err.message}`
+          : "Unerwarteter Fehler beim Hochladen. Bitte erneut versuchen."
+      );
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSaveTags = async (categoryIds: string[]) => {
     if (!editingDoc) return;
     setLoading(true);
-    const result = await updateDocumentCategories(editingDoc.id, categoryIds);
-    if (result.ok) {
-      toast.success("Tags aktualisiert.");
-      setEditingDoc(null);
-      await refreshDocuments();
-    } else {
-      toast.error(result.error);
+    try {
+      const result = await updateDocumentCategories(editingDoc.id, categoryIds);
+      if (result.ok) {
+        toast.success("Tags aktualisiert.");
+        setEditingDoc(null);
+        await refreshDocuments();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? `Netzwerkfehler: ${err.message}`
+          : "Unerwarteter Fehler beim Speichern. Bitte erneut versuchen."
+      );
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleConfirmDelete = async () => {
     if (!deletingDoc) return;
     setLoading(true);
-    const result = await deleteDocument(deletingDoc.id);
-    if (result.ok) {
-      toast.success(`"${deletingDoc.filename}" gelöscht.`);
-      setDeletingDoc(null);
-      await refreshDocuments();
-    } else {
-      toast.error(result.error);
+    try {
+      const result = await deleteDocument(deletingDoc.id);
+      if (result.ok) {
+        toast.success(`"${deletingDoc.filename}" gelöscht.`);
+        setDeletingDoc(null);
+        await refreshDocuments();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? `Netzwerkfehler: ${err.message}`
+          : "Unerwarteter Fehler beim Löschen. Bitte erneut versuchen."
+      );
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (

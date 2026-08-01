@@ -2,7 +2,7 @@
 
 ## Status: Deployed
 **Created:** 2026-07-20
-**Last Updated:** 2026-07-28
+**Last Updated:** 2026-07-29
 
 > Erstes Feature des **Content-Epics** (PROJ-29 → PROJ-30 → PROJ-31 → PROJ-32).
 > Ziel des Epics: eine große, durchsuchbare Text-Basis zu Themen der
@@ -500,6 +500,105 @@ Tests grün (375/375 Unit-Tests). Kein serverseitiger Bug zusätzlich zu den bei
 gefundenen identifiziert; sollte der User nach diesem UX-Fix erneut "nichts passiert"
 melden, deutet das auf ein tieferliegendes Problem hin, das einen Live-Repro-Versuch mit
 Log-Mitschnitt in Echtzeit braucht.
+
+## Refine (2026-07-29) — Hotfix: Upload eines großen PDFs blieb hängen
+
+**Auslöser:** User meldete, dass der Upload des echten Leitz-Lexikons
+(Edition 7-11, 35 Seiten) auf dem Handy kurz vor Ende hängen blieb
+(Ladebalken stoppte bei ~90 %) und danach kein Dokument in der Wissensbasis
+ankam — auch nicht nach Reload. Ursprünglicher Wunsch: Text-Extraktion nicht
+mehr synchron beim Upload laufen zu lassen, sondern erst danach im
+Hintergrund.
+
+**Befund:** Die Hintergrund-Extraktion (`after()`) war bereits seit dem
+Backend-Sign-off vom 2026-07-26 so gebaut — der Upload selbst blockiert die
+Antwort nicht. Das eigentliche Problem lag woanders: direkt aus den
+Produktions-Logs verifiziert wurde ein `fetch failed — getaddrinfo EAI_AGAIN
+supabase.gudel-werkzeuge.de` im `tms`-Container, zeitlich unmittelbar vor dem
+gemeldeten Upload-Versuch. Parallel zeigten die Traefik-Zugriffslogs für
+genau dieses Zeitfenster (17:45–17:47 Uhr) ungewöhnlich lange Ladezeiten
+(4–10 s statt ~150 ms) und vom Client abgebrochene Anfragen (Status 499) für
+dieselbe Seite — die eigentliche Upload-POST-Anfrage erschien in den Logs
+**nie**, sie hing also schon vor der Server-Antwort fest.
+
+**Root Cause:** Alle server-seitigen Supabase-Aufrufe (Admin-Client,
+Server-Actions, Middleware — nicht nur bei PROJ-29, sondern **projektweit**)
+liefen über die öffentliche Domain `https://supabase.gudel-werkzeuge.de`,
+obwohl der `tms`-Container und `supabase-kong` im selben internen
+Docker-Netz (`web`) laufen und sich direkt erreichen könnten. Jeder
+Server-Aufruf machte also einen unnötigen Umweg über externe DNS-Auflösung
+und öffentliches Internet — anfällig für genau die beobachtete Instabilität,
+und bei einem langen mobilen Upload ist das Zeitfenster für so eine Störung
+länger offen als bei kurzen Anfragen.
+
+**Fix (mit dem User als Hotfix abgestimmt, explizit "Hotfix"-Freigabe
+erhalten):**
+- Neue Umgebungsvariable `SUPABASE_INTERNAL_URL=http://supabase-kong:8000`
+  in `docker-compose.yml` (kein Secret, daher direkt im Compose-File statt
+  in `.env.production`).
+- `src/lib/supabase/admin.ts`, `src/lib/supabase/server.ts`,
+  `src/lib/supabase/middleware.ts` nutzen jetzt
+  `process.env.SUPABASE_INTERNAL_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL`
+  — server-seitige Aufrufe gehen über das interne Docker-Netz, lokale
+  Entwicklung ohne diese Variable fällt unverändert auf die öffentliche URL
+  zurück. `src/lib/supabase/client.ts` (Browser-Client) bewusst unverändert
+  — der Browser braucht weiterhin die öffentliche HTTPS-Adresse.
+- **Verifiziert:** `npm run lint`/`npm run build` grün. Direkter Vergleich
+  `supabase-kong:8000` vs. öffentliche Domain per `wget` aus dem laufenden
+  `tms`-Container liefert identische PostgREST-Antwort. Nach Rebuild +
+  Neustart des `tms`-Containers: Login-Seite (200) und Middleware-Redirect
+  auf `/dashboard` (307, 59 ms, keine Fehler in den Logs) gegen die Live-URL
+  bestätigt.
+- **Nicht verifiziert:** ein erneuter Live-Upload derselben 35-seitigen
+  Leitz-Lexikon-PDF durch den User selbst, um den ursprünglich gemeldeten
+  Fehler als behoben zu bestätigen (Datei liegt nur lokal beim User, kein
+  Testexemplar im Repo).
+
+**Einordnung:** Dieser Fund betrifft nicht nur PROJ-29, sondern die
+Zuverlässigkeit sämtlicher Server↔Supabase-Aufrufe der App. Als Hotfix im
+Rahmen dieser Refine-Session behoben statt eines eigenen Spec-Durchlaufs,
+da klar umrissen (interne statt öffentliche Adresse) und vom User explizit
+als Hotfix freigegeben.
+
+## Refine (2026-07-29, Fortsetzung) — Hotfix Nr. 2: fehlende Fehlerbehandlung beim Upload
+
+**Auslöser:** Nach dem ersten Hotfix (s.o.) meldete der User zweimal in
+Folge "hängt wieder" — einmal über Mobilfunk, einmal über WLAN, identisches
+Symptom. Live-Mitschnitt der Produktions-Logs während beider Versuche zeigte:
+die Upload-Anfrage kommt in **keinem** Fall server-seitig an (kein Eintrag
+bei Traefik, tms, Supabase Storage oder Kong; keine aktive TCP-Verbindung).
+Das Problem liegt also vor dem Server, zwischen Klick auf "Hochladen" und
+dem tatsächlichen Verlassen des Geräts — unabhängig vom Netzwerktyp.
+
+**Root Cause:** Beim Lesen von `wissensbasis-admin-page.tsx` fehlte in
+`handleUpload`, `handleSaveTags` und `handleConfirmDelete` jeweils ein
+try/catch um den awaited Server-Action-Aufruf. Schlägt der Aufruf clientseitig
+fehl (z.B. durch einen Netzwerkfehler beim Senden), wird das als unbehandelte
+Promise-Rejection nie gefangen — `setLoading(false)` wird nie erreicht, der
+Dialog bleibt für immer auf "Lädt hoch..." stehen (Ladebalken pendelt sich
+assymptotisch bei 90% ein), ohne sichtbare Fehlermeldung. Verstößt gegen die
+im Projekt bereits dokumentierte Regel (`.claude/rules/frontend.md`): "Always
+reset loading state in all code paths (success, error, finally)".
+
+**Fix (Hotfix, mit dem User abgestimmt):** Alle drei Handler in
+`src/components/wissensbasis/wissensbasis-admin-page.tsx` um try/catch/finally
+ergänzt — Fehler werden jetzt sichtbar gemacht (Fehlermeldung bzw. Toast),
+`setLoading(false)` läuft garantiert in jedem Codepfad.
+
+**Verifiziert:** `npm run lint`/`npm run build` grün, Docker-Image neu
+gebaut, Container neu gestartet, Login-Seite (200, 324ms) gegen die Live-URL
+bestätigt.
+
+**Wichtig — noch nicht abschließend verifiziert:** Dieser Fix behebt
+garantiert das stille Einfrieren, zeigt aber noch nicht zwingend, *warum*
+die Anfrage clientseitig überhaupt fehlschlägt — das bleibt ggf. ein
+tieferliegendes Netzwerk-/Infra-Thema. Nächster Schritt: der User versucht
+den Upload erneut; entweder gelingt er jetzt, oder es erscheint erstmals
+eine konkrete Fehlermeldung, die den nächsten Diagnose-Schritt liefert.
+
+**Nicht geprüft (Hinweis für später):** ob dasselbe fehlende
+try/catch-Muster auch in anderen Server-Action-Aufrufen im Projekt vorkommt
+— eigener, separater Rundgang bei Bedarf.
 
 ## Deployment
 _To be added by /deploy_

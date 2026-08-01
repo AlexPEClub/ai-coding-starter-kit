@@ -11,6 +11,11 @@ services:
     env_file:
       - .env.production
       - .env.local
+    environment:
+      # Server-seitige Supabase-Aufrufe (Admin-Client, Server-Actions, Middleware)
+      # laufen über das interne Docker-Netz statt über die öffentliche Domain —
+      # vermeidet DNS-/Internet-Umweg-Fehler (siehe PROJ-29-Hotfix 2026-07-29).
+      - SUPABASE_INTERNAL_URL=http://supabase-kong:8000
     networks:
       - web
     labels:
