@@ -391,3 +391,9 @@ Drei kleine Anpassungen, alle noch am Deploy-Tag umgesetzt und erneut deployed:
 - „Fällig" (gelb, Datum = heute) hat aktuell keine passenden Live-Daten zum visuellen
   Gegenprüfen (keine offene „geplant"-Fahrt mit heutigem Datum in der Produktion) — Logik ist
   aber über den Unit-Test exakt abgedeckt.
+
+### Re-Deploy 2026-08-01
+**Git Tag:** `v1.21.1-PROJ-21`
+`./scripts/deploy.sh PROJ-21` erneut grün im 1. Anlauf (Post-Deploy-Smoke). Zusätzlich live
+gegen Produktion geprüft: Überschrift ohne Icon, Tab „Mir zugewiesen" sichtbar, bekannte
+überfällige Tour (06.07.2026) zeigt „Überfällig". Keine Fehler in den Container-Logs.
