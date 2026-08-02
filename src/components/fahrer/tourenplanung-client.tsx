@@ -84,6 +84,7 @@ export function TourenplanungClient({ touren, fahrerOptionen, heute }: Tourenpla
         zeigeFahrer
         leerTitel="Keine Touren für diese Auswahl."
         heute={heute}
+        fahrerOptionen={fahrerOptionen}
       />
     </div>
   );

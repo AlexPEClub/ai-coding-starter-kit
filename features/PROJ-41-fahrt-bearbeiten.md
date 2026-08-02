@@ -1,8 +1,8 @@
 # PROJ-41: Fahrer — Fahrt bearbeiten (Fahrer/Datum/Notiz + Änderungsverlauf)
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-08-01
-**Last Updated:** 2026-08-01
+**Last Updated:** 2026-08-02
 
 > Folge-Baustein zu PROJ-21 (Fahrer — Tourenliste, nur Anzeige, bereits deployed).
 > Dort waren Stopps innerhalb einer Tour bewusst rein informativ — Bearbeiten war
@@ -139,11 +139,11 @@
 - **Keine Sperr-/Concurrency-Mechanismen** nötig (siehe Edge Cases).
 
 ## Open Questions
-- [ ] Genaues Zeichenlimit für die Notiz — technische Festlegung, wird in
-  `/architecture` entschieden.
-- [ ] Exaktes RLS-/Grant-Schema der neuen Verlaufstabelle (Vorbild:
-  `tms.werkzeug_status_historie`) — technische Festlegung, wird in
-  `/architecture` entschieden.
+- [x] Genaues Zeichenlimit für die Notiz — entschieden: 500 Zeichen, siehe
+  Technical Decisions.
+- [x] Exaktes RLS-/Grant-Schema der neuen Verlaufstabelle — entschieden:
+  gleiches Muster wie `tms.tours` selbst (kein Zugriff für die normale
+  Nutzer-Rolle, nur das interne System), siehe Technical Decisions.
 
 ## Decision Log
 
@@ -164,12 +164,133 @@
 <!-- Added by /architecture -->
 | Decision | Rationale | Date |
 |----------|-----------|------|
+| Bearbeiten öffnet sich als Pop-up-Fenster (Dialog), keine eigene Unterseite | Gleiches Muster wie die bestehende Hersteller-Verwaltung im Projekt; kein Seitenwechsel nötig, passt zur Terminal-Tauglichkeit (wenige Klicks) | 2026-08-01 |
+| Datum als einfaches Datums-Eingabefeld, kein grafischer Kalender-Auswähler | Im Projekt gibt es aktuell keinen grafischen Kalender-Baustein; ein einfaches Datumsfeld ist auf allen Geräten zuverlässig und ausreichend | 2026-08-01 |
+| Fahrerauswahl nutzt die bereits bestehende Fahrerliste der Seite (dieselbe wie beim Filtern in "Tourenplanung") | Kein neuer Datenabruf nötig, ein Ort der Wahrheit für "welche Fahrer gibt es" | 2026-08-01 |
+| Berechtigungsprüfung (nur Fahrer/Admin dürfen speichern) läuft serverseitig, nicht nur im Dialog selbst | Vermeidet von Anfang an die Art von Lücke, die im letzten QA-Durchgang von PROJ-21 gefunden und behoben wurde (BUG-1) | 2026-08-01 |
+| Änderungsverlauf wird beim Speichern gezielt festgehalten (nicht automatisch von der Datenbank selbst) | Nur so trägt der Eintrag zuverlässig den tatsächlich handelnden Nutzer, nicht nur "irgendein Systemzugriff" — gleiches Muster wie an einer bestehenden Stelle im Projekt (Werkzeug-Status-Verlauf, PROJ-34) | 2026-08-01 |
+| Notiz auf 500 Zeichen begrenzt | Reicht für eine kurze Betriebsnotiz, verhindert versehentliches Einfügen langer Texte; keine bestehende Begrenzung an anderer Stelle im Projekt, die man hätte übernehmen können | 2026-08-01 |
+| Neue Verlaufstabelle bekommt kein Zugriffsrecht für normale Nutzer-Logins direkt (nur das interne System darf lesen/schreiben) | Konsistent mit der Touren-Tabelle selbst, die genauso funktioniert — die eigentliche Rechteprüfung (wer darf was sehen/ändern) passiert bereits vollständig im Anwendungscode dieser Seite, ein zusätzlicher Datenbank-Zugriffsweg für normale Logins würde hier nichts beitragen | 2026-08-01 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### A) Komponenten-Struktur
+
+```
+/fahrer Seite
+├─ Tab "Mir zugewiesen" / Tab "Tourenplanung" (unverändert aus PROJ-21)
+│  └─ Touren-Liste (Akkordeon, unverändert)
+│     └─ Stopp-Zeile — NEU: antippbar
+│        └─ Bearbeiten-Dialog — NEU (Pop-up-Fenster)
+│           ├─ Fahrer-Auswahl (Pflichtfeld, aus bestehender Fahrerliste)
+│           ├─ Datum-Feld (Pflichtfeld)
+│           ├─ Notiz-Feld (optional, Freitext, max. 500 Zeichen)
+│           ├─ Änderungsverlauf-Bereich ("wer hat wann was geändert",
+│           │  neueste zuerst; Hinweis "Noch keine Änderungen" wenn leer)
+│           └─ Speichern / Abbrechen
+```
+
+### B) Datenmodell (in normaler Sprache)
+
+- Jeder Stopp (bestehende Zeile in der Touren-Tabelle) bekommt ein neues
+  Feld: eine kurze Notiz (Freitext, max. 500 Zeichen, darf leer sein).
+- Neue Tabelle „Änderungen an Stopps": Für jede tatsächlich geänderte
+  Eigenschaft eines Stopps (Fahrer, Datum oder Notiz) entsteht ein Eintrag —
+  welcher Stopp, welche Eigenschaft, alter Wert, neuer Wert, wer hat
+  geändert, wann. Nur geänderte Eigenschaften werden protokolliert, nicht
+  alle drei bei jeder Speicherung (siehe Product Decisions).
+- Kein neues Feld/keine neue Tabelle für den Status — das bleibt weiterhin
+  ein Folge-Baustein.
+
+### C) Technische Entscheidungen (Begründung)
+
+- **Bestehende Bausteine wiederverwenden:** Pop-up-Fenster, Auswahlliste,
+  Textfeld und Fehleranzeige sind bereits vorhandene Bausteine im
+  Projekt-Design-System (genutzt z. B. in der Hersteller-Verwaltung) —
+  nichts Neues zu gestalten.
+- **Rechteprüfung serverseitig:** Wie im gesamten `/fahrer`-Bereich wird
+  geprüft, ob der handelnde Nutzer wirklich Fahrer oder Admin ist, bevor
+  irgendetwas gespeichert wird — nicht nur, ob der Bearbeiten-Dialog
+  angezeigt wird.
+- **Kein Sperrmechanismus bei Gleichzeit-Bearbeitung:** Bewusste
+  Vereinfachung (siehe Spec-Entscheidung), kein zusätzlicher technischer
+  Aufwand für ein bei 5–10 Fahrern seltenes Szenario.
+- **Liste aktualisiert sich automatisch nach dem Speichern** (kein
+  manuelles Neuladen der Seite durch den Nutzer nötig) — die bestehende
+  Fällig/Überfällig-Anzeige aus PROJ-21 reagiert dabei automatisch auf ein
+  geändertes Datum, ohne dass dafür etwas Neues gebaut werden muss.
+
+### D) Abhängigkeiten (Pakete)
+
+- Keine neuen Pakete — Pop-up-Fenster, Auswahlliste, Datumsfeld, Textfeld
+  und Fehleranzeige sind bereits vorhandene Bausteine im Projekt.
+
+## Implementation Notes (Frontend + Backend)
+
+Umgesetzt am 2026-08-02 (Frontend, Server Actions und Migration in einem
+Durchgang, analog zu PROJ-21 — kein separater `/backend`-Schritt nötig, siehe
+unten):
+
+- **Migration:** `supabase/migrations/20260802070000_PROJ-41_fahrt_bearbeiten.sql`
+  — neue Spalte `tours.notiz` (text, `CHECK (char_length(notiz) <= 500)`),
+  neue Tabelle `tms.tour_aenderungen` (`tour_id`, `feld`, `alter_wert`,
+  `neuer_wert`, `geaendert_von`, `geaendert_am`), RLS aktiviert ohne Policies
+  für `authenticated` (gleiches Muster wie `tms.tours` selbst).
+- **Wichtiger Fund direkt nach der Migration:** Genau wie schon einmal bei
+  `tms.knowledge_document_categories` (PROJ-29-Hotfix) erbte die neue Tabelle
+  die `ALTER DEFAULT PRIVILEGES` nicht, weil die Migration direkt als
+  `postgres` ausgeführt wurde — jeder Zugriff über den Admin-Client schlug mit
+  „permission denied for table tour_aenderungen" fehl. Fix per
+  Folge-Migration `20260802071500_PROJ-41_grant_tour_aenderungen.sql`
+  (`GRANT ... TO service_role`), live angewendet und verifiziert.
+- **Server Actions (`src/lib/actions/fahrten.ts`):** neue Funktionen
+  `bearbeiteFahrt()` (Rollen-Check via `pruefeFahrerZugriff()` → aktuelle
+  Werte lesen → Update → pro geändertem Feld ein Verlaufs-Eintrag →
+  `revalidatePath("/fahrer")`) und `getFahrtAenderungen()` (Verlauf lesen,
+  Fahrer-Namen für `fahrer_id`-Änderungen auflösen). `notiz` in die
+  bestehenden Lese-Funktionen ergänzt.
+- **Frontend:** neue Komponente
+  `src/components/fahrer/fahrt-bearbeiten-dialog.tsx` (Dialog, Fahrer-Select,
+  Datum-Input, Notiz-Textarea mit Zeichenzähler, Verlaufsliste). Jede
+  Stopp-Zeile in `tour-liste.tsx` ist jetzt ein Button, der den Dialog mit
+  den aktuellen Werten öffnet; `fahrerOptionen` wird jetzt auch im Tab „Mir
+  zugewiesen" durchgereicht (vorher nur in „Tourenplanung").
+- **Echter Bug gefunden + behoben während der Live-Verifikation:** Nach
+  erfolgreichem Speichern zeigte ein sofort wieder geöffneter Dialog
+  kurzzeitig noch die alten Werte — `revalidatePath()` allein stößt beim
+  Client keinen Nachlade-Vorgang an, wenn die Server Action nicht über eine
+  `<form action>`-Bindung aufgerufen wird. Fix: `router.refresh()` im
+  Erfolgsfall im Dialog ergänzt. Die Datenbank war zu jedem Zeitpunkt bereits
+  korrekt (mehrfach direkt verifiziert) — betroffen war nur die
+  Wiederanzeige im UI.
+
+### Verifikation
+- `npm run lint` grün, `npm run build` grün, bestehende Unit-Tests weiterhin
+  9/9 grün.
+- Live gegen echte Produktionsdaten verifiziert (kein Staging vorhanden):
+  Fahrer ändern, Datum ändern (inkl. Verschieben in neue Tourengruppe),
+  Notiz ändern, Änderungsverlauf (alt→neu, wer, wann) — jeweils mehrfach über
+  direkte Datenbankabfragen bestätigt, nicht nur über die UI. Alle
+  Test-Änderungen wurden danach auf den Ausgangszustand zurückgesetzt
+  (Fahrer/Datum/Notiz der betroffenen echten Stopps unverändert gegenüber
+  vorher).
+- Neue Datei `tests/PROJ-41-fahrt-bearbeiten.spec.ts` mit 6 E2E-Tests (Dialog
+  öffnet mit vorausgefüllten Werten, Abbrechen speichert nicht, Validierung
+  leeres Datum, Validierung fehlender Fahrer bei zuvor unzugewiesenem Stopp,
+  Notiz ändern + Verlauf + Zurücksetzen, Fahrer/Datum ändern + Umgruppierung
+  + Zurücksetzen). Jeder einzelne Test wurde isoliert grün verifiziert.
+- **Bekannte Einschränkung:** Der Entwicklungs-Host war während dieser
+  Session akut speicherknapp (`free -h` zeitweise < 300 MB frei, ein
+  OOM-Kill des lokalen Dev-Servers im Kernel-Log gefunden) — ein
+  vollständiger Batch-Lauf aller 6 Tests hintereinander war deshalb nicht
+  durchgängig stabil zu bekommen, obwohl jeder Test einzeln zuverlässig grün
+  lief und die Kernlogik mehrfach direkt in der Datenbank bestätigt wurde.
+  Dies ist eine Umgebungs-, keine Produktbefund (siehe auch PROJ-21-QA-Notiz
+  zum selben Host). Empfehlung: E2E-Suite im `/qa`-Schritt erneut laufen
+  lassen, idealerweise nach dem nächtlichen Aufräum-Cronjob (04:15 Uhr).
 
 ## QA Test Results
 _To be added by /qa_

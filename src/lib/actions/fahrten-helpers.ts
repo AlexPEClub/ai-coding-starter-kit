@@ -7,6 +7,7 @@ export interface Fahrt {
   id: string;
   status: string;
   geplantesAbholdatum: string | null;
+  notiz: string | null;
   kunde: {
     name: string;
     strasse: string | null;

@@ -6,6 +6,7 @@ function fahrt(overrides: Partial<RohFahrt>): RohFahrt {
     id: "fahrt-1",
     status: "geplant",
     geplantesAbholdatum: "2026-08-05",
+    notiz: null,
     fahrerId: "fahrer-1",
     fahrerName: "Max Mustermann",
     kunde: { name: "Kunde GmbH", strasse: null, plz: null, ort: null },

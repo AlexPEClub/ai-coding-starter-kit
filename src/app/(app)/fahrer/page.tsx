@@ -58,7 +58,12 @@ export default async function FahrerPage() {
           {!eigeneResult.ok ? (
             <p className="text-sm text-destructive">{eigeneResult.error}</p>
           ) : (
-            <TourListe touren={eigeneResult.data} leerTitel="Keine offenen Touren." heute={heute} />
+            <TourListe
+              touren={eigeneResult.data}
+              leerTitel="Keine offenen Touren."
+              heute={heute}
+              fahrerOptionen={fahrerOptionenResult.ok ? fahrerOptionenResult.data : []}
+            />
           )}
         </TabsContent>
 
