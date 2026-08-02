@@ -1,6 +1,6 @@
 # PROJ-41: Fahrer — Fahrt bearbeiten (Fahrer/Datum/Notiz + Änderungsverlauf)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-08-01
 **Last Updated:** 2026-08-02
 
@@ -377,4 +377,29 @@ Alle Live-Tests liefen gegen echte Produktions-Stopps (Rhehag GmbH, Tönnissen E
 - **Recommendation:** Deploy. Optional: den Live-Autorisierungstest bei Gelegenheit mit korrektem Next.js-Server-Action-Wireformat wiederholen, um die Code-Review-Einschätzung auch empirisch zu bestätigen.
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed:** 2026-08-02
+**Production URL:** https://tms.gudel-werkzeuge.de/fahrer
+**Git Tag:** `v1.41.0-PROJ-41`
+
+- Pre-Checks (Lint + Build) grün, `docker compose build` + `up -d` erfolgreich.
+- Automatische Post-Deploy-Verifikation (`./scripts/deploy.sh PROJ-41`): grün im
+  **2. Anlauf** (1. Anlauf: zwei Mobile-Safari-Timeouts direkt nach dem
+  Container-Neustart, klassisches Warmlauf-Verhalten — genau das eingebaute
+  Backoff/Retry hat gegriffen; 2. Anlauf 8/8 grün).
+- Zusätzlich manuell gegen die Live-URL verifiziert (kein dediziertes
+  `tests/deploy/PROJ-41-*.spec.ts` vorhanden, siehe Empfehlung unten): Login,
+  `/fahrer` → Tourenplanung → bekannter Stopp → Bearbeiten-Dialog öffnet,
+  zeigt korrekt „Noch keine Änderungen." (Verlauf für diesen Stopp war durch
+  die QA-Aufräumaktion leer).
+- Container-Logs (`docker compose logs`) auf Fehler/Exceptions geprüft —
+  keine gefunden.
+
+### Bekannte offene Punkte nach Deploy
+- **BUG-1** wurde bereits vor diesem Deploy gefixt (siehe QA Test Results).
+- Empfehlung für einen Folge-Baustein: dediziertes
+  `tests/deploy/PROJ-41-fahrt-bearbeiten.spec.ts` ergänzen (analog zur
+  PROJ-21-Empfehlung), das die Kern-Flows automatisiert gegen die Live-URL
+  prüft.
+- Optional: den in der QA methodisch nicht schlüssigen Live-Autorisierungstest
+  bei Gelegenheit mit korrektem Next.js-Server-Action-Wireformat wiederholen.
