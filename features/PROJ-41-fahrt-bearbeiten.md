@@ -359,19 +359,22 @@ Alle Live-Tests liefen gegen echte Produktions-Stopps (Rhehag GmbH, Tönnissen E
 
 #### BUG-1: fahrerId wird serverseitig nicht auf Rolle "fahrer" geprüft
 - **Severity:** Low
+- **Status:** ✅ Fixed (2026-08-02, direkt im Anschluss an die QA-Runde)
 - **Steps to Reproduce (Code-Review, nicht live exploitiert):**
   1. `bearbeiteFahrt()` in `src/lib/actions/fahrten.ts` lesen
   2. `eingabe.fahrerId` wird nur auf Wahrheitswert geprüft (`if (!eingabe.fahrerId)`), nicht darauf, ob die ID zu einem Profil mit Rolle `fahrer` gehört
   3. Erwartet: Zurückweisung, wenn die ID keinem echten Fahrer entspricht
   4. Tatsächlich: Jede existierende `auth.users`-ID wird akzeptiert (nur per DB-Fremdschlüssel abgesichert, nicht rollenspezifisch)
-- **Priority:** Nice to have / nächster kleiner Polish-Durchgang — UI kann das ohnehin nicht auslösen (Dropdown zeigt nur echte Fahrer), nur bei direktem, manuellem Aktionsaufruf relevant
+- **Fix:** `bearbeiteFahrt()` prüft jetzt vor dem Update explizit, ob `eingabe.fahrerId` zu einem Profil mit Rolle `fahrer` gehört (`public.profiles`, `.contains("roles", ["fahrer"])` — dieselbe Abfrage-Logik wie `listFahrerOptionen()`). Bei ungültiger ID: `{ ok: false, error: "Ungültiger Fahrer ausgewählt." }`, kein Update, kein Verlaufs-Eintrag.
+- **Verifikation nach Fix:** `npm run lint`/`npm run build` grün, komplette E2E-Suite (`tests/PROJ-41-fahrt-bearbeiten.spec.ts`) erneut 6/6 grün (happy path unverändert funktionsfähig, per zusätzlicher DB-Abfrage bestätigt) — keine Regression durch den Fix. Der negative Pfad (ungültige Fahrer-ID) wurde per Code-Review verifiziert, nicht erneut live exploitiert (gleiche methodische Einschränkung wie beim ursprünglichen Fund, siehe Security Audit oben).
+- **Priority:** Erledigt
 
 ### Summary
 - **Acceptance Criteria:** 9/9 Gruppen bestanden (1 davon teilweise nur per Code-Review wegen fehlender Live-Daten für 3 von 4 Status)
-- **Bugs Found:** 1 total (0 Critical, 0 High, 0 Medium, 1 Low)
+- **Bugs Found:** 1 total (0 Critical, 0 High, 0 Medium, 1 Low) — **BUG-1 noch am selben Tag gefixt und re-verifiziert**
 - **Security:** Rollen-Check strukturell korrekt (Code-Review bestätigt), Live-Exploit-Versuch methodisch nicht schlüssig (siehe methodische Einschränkung) — kein Critical/High-Fund
 - **Production Ready:** YES
-- **Recommendation:** Deploy. BUG-1 (Low) bei nächster Gelegenheit beheben (Fahrer-Rolle serverseitig nachprüfen, z. B. gegen dieselbe Abfrage wie `listFahrerOptionen()`). Optional: den Live-Autorisierungstest bei Gelegenheit mit korrektem Next.js-Server-Action-Wireformat wiederholen, um die Code-Review-Einschätzung auch empirisch zu bestätigen.
+- **Recommendation:** Deploy. Optional: den Live-Autorisierungstest bei Gelegenheit mit korrektem Next.js-Server-Action-Wireformat wiederholen, um die Code-Review-Einschätzung auch empirisch zu bestätigen.
 
 ## Deployment
 _To be added by /deploy_

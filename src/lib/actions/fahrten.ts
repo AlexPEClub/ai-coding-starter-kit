@@ -260,6 +260,25 @@ export async function bearbeiteFahrt(
 
   const adminClient = createAdminClient({ schema: "tms" });
 
+  // QA-Fund BUG-1: fahrerId muss zu einem echten Nutzer mit Rolle "fahrer"
+  // gehören, nicht nur zu irgendeinem existierenden Account (die DB-FK auf
+  // auth.users allein prüft das nicht).
+  const { data: fahrerProfil, error: fahrerFehler } = await adminClient
+    .schema("public")
+    .from("profiles")
+    .select("id")
+    .eq("id", eingabe.fahrerId)
+    .contains("roles", ["fahrer"])
+    .maybeSingle();
+
+  if (fahrerFehler) {
+    console.error("bearbeiteFahrt (Fahrer-Prüfung) error:", fahrerFehler);
+    return { ok: false, error: "Fahrer konnte nicht geprüft werden." };
+  }
+  if (!fahrerProfil) {
+    return { ok: false, error: "Ungültiger Fahrer ausgewählt." };
+  }
+
   const { data: aktuelleFahrt, error: leseFehler } = await adminClient
     .from("tours")
     .select("fahrer_id, geplantes_abholdatum, notiz")
