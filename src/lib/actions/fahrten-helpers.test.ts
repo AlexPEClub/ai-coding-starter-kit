@@ -9,6 +9,11 @@ function fahrt(overrides: Partial<RohFahrt>): RohFahrt {
     notiz: null,
     fahrerId: "fahrer-1",
     fahrerName: "Max Mustermann",
+    routeOrder: null,
+    berechneteAnkunftszeit: null,
+    routeCalculatedAt: null,
+    routeDistanzMeter: null,
+    routeDauerSekunden: null,
     kunde: { name: "Kunde GmbH", strasse: null, plz: null, ort: null },
     ...overrides,
   };
@@ -55,6 +60,94 @@ describe("gruppiereZuTouren", () => {
     ]);
 
     expect(touren.map((t) => t.fahrten[0].id)).toEqual(["frueher", "spaeter", "ohne-datum"]);
+  });
+
+  // PROJ-42 — Routenberechnung
+  it("sortiert Stopps nach routeOrder statt Anlage-Reihenfolge, wenn alle Stopps denselben routeCalculatedAt tragen", () => {
+    const touren = gruppiereZuTouren([
+      fahrt({
+        id: "zweiter-stopp",
+        fahrerId: "fahrer-1",
+        geplantesAbholdatum: "2026-08-05",
+        routeOrder: 2,
+        routeCalculatedAt: "2026-08-02T10:00:00.000Z",
+        routeDistanzMeter: 5000,
+        routeDauerSekunden: 900,
+      }),
+      fahrt({
+        id: "erster-stopp",
+        fahrerId: "fahrer-1",
+        geplantesAbholdatum: "2026-08-05",
+        routeOrder: 1,
+        routeCalculatedAt: "2026-08-02T10:00:00.000Z",
+        routeDistanzMeter: 5000,
+        routeDauerSekunden: 900,
+      }),
+    ]);
+
+    expect(touren).toHaveLength(1);
+    expect(touren[0].fahrten.map((f) => f.id)).toEqual(["erster-stopp", "zweiter-stopp"]);
+    expect(touren[0].gesamtDistanzMeter).toBe(5000);
+    expect(touren[0].gesamtDauerSekunden).toBe(900);
+  });
+
+  it("fällt auf Datums-/Anlage-Reihenfolge zurück und zeigt keine Distanz/Fahrzeit, wenn die Berechnung unvollständig ist", () => {
+    const touren = gruppiereZuTouren([
+      fahrt({
+        id: "a",
+        fahrerId: "fahrer-1",
+        geplantesAbholdatum: "2026-08-05",
+        routeOrder: 1,
+        routeCalculatedAt: "2026-08-02T10:00:00.000Z",
+      }),
+      // Zweiter Stopp derselben Tour hat KEINE Berechnung -> Tour insgesamt "unvollständig"
+      fahrt({ id: "b", fahrerId: "fahrer-1", geplantesAbholdatum: "2026-08-05" }),
+    ]);
+
+    expect(touren).toHaveLength(1);
+    expect(touren[0].fahrten.map((f) => f.id)).toEqual(["a", "b"]);
+    expect(touren[0].gesamtDistanzMeter).toBeNull();
+    expect(touren[0].gesamtDauerSekunden).toBeNull();
+  });
+
+  it("fällt auf Datums-Reihenfolge zurück, wenn die Stopps unterschiedliche (veraltete) routeCalculatedAt-Werte tragen", () => {
+    const touren = gruppiereZuTouren([
+      fahrt({
+        id: "a",
+        fahrerId: "fahrer-1",
+        geplantesAbholdatum: "2026-08-05",
+        routeOrder: 2,
+        routeCalculatedAt: "2026-08-01T10:00:00.000Z",
+      }),
+      fahrt({
+        id: "b",
+        fahrerId: "fahrer-1",
+        geplantesAbholdatum: "2026-08-05",
+        routeOrder: 1,
+        routeCalculatedAt: "2026-08-02T10:00:00.000Z",
+      }),
+    ]);
+
+    expect(touren[0].fahrten.map((f) => f.id)).toEqual(["a", "b"]);
+    expect(touren[0].gesamtDistanzMeter).toBeNull();
+  });
+
+  it("gibt berechneteAnkunftszeit je Stopp durch, ohne interne Routing-Felder auf Fahrt-Ebene zu leaken", () => {
+    const touren = gruppiereZuTouren([
+      fahrt({
+        id: "a",
+        fahrerId: "fahrer-1",
+        geplantesAbholdatum: "2026-08-05",
+        routeOrder: 1,
+        routeCalculatedAt: "2026-08-02T10:00:00.000Z",
+        berechneteAnkunftszeit: "2026-08-05T07:15:00.000Z",
+      }),
+    ]);
+
+    expect(touren[0].fahrten[0].berechneteAnkunftszeit).toBe("2026-08-05T07:15:00.000Z");
+    expect(touren[0].fahrten[0]).not.toHaveProperty("routeCalculatedAt");
+    expect(touren[0].fahrten[0]).not.toHaveProperty("routeDistanzMeter");
+    expect(touren[0].fahrten[0]).not.toHaveProperty("routeDauerSekunden");
   });
 });
 

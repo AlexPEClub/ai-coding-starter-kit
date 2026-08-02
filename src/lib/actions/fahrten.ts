@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentProfile, type Profile } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { gruppiereZuTouren, type FahrerOption, type RohFahrt, type Tour } from "./fahrten-helpers";
+import { loeseNeuberechnungAus } from "@/lib/routing/tour-route";
 
 const NOTIZ_MAX_LAENGE = 500;
 
@@ -92,6 +93,11 @@ export async function getEigeneOffeneTouren(): Promise<FahrtenResult> {
       geplantes_abholdatum,
       notiz,
       partner_id,
+      route_order,
+      route_calculated_at,
+      route_distance_meters,
+      route_duration_seconds,
+      berechnete_ankunftszeit,
       partners:partner_id ( display_name, company_name )
     `
     )
@@ -119,6 +125,11 @@ export async function getEigeneOffeneTouren(): Promise<FahrtenResult> {
       notiz: row.notiz ?? null,
       fahrerId: profile.id,
       fahrerName: null,
+      routeOrder: row.route_order ?? null,
+      routeCalculatedAt: row.route_calculated_at ?? null,
+      routeDistanzMeter: row.route_distance_meters ?? null,
+      routeDauerSekunden: row.route_duration_seconds ?? null,
+      berechneteAnkunftszeit: row.berechnete_ankunftszeit ?? null,
       kunde: {
         name: row.partners?.display_name ?? row.partners?.company_name ?? "Unbekannter Kunde",
         ...adresse,
@@ -146,6 +157,11 @@ export async function getAlleOffeneTouren(): Promise<FahrtenResult> {
       notiz,
       fahrer_id,
       partner_id,
+      route_order,
+      route_calculated_at,
+      route_distance_meters,
+      route_duration_seconds,
+      berechnete_ankunftszeit,
       partners:partner_id ( display_name, company_name )
     `
     )
@@ -193,6 +209,11 @@ export async function getAlleOffeneTouren(): Promise<FahrtenResult> {
       notiz: row.notiz ?? null,
       fahrerId: row.fahrer_id,
       fahrerName: row.fahrer_id ? fahrerNamen.get(row.fahrer_id) ?? "Unbekannter Fahrer" : null,
+      routeOrder: row.route_order ?? null,
+      routeCalculatedAt: row.route_calculated_at ?? null,
+      routeDistanzMeter: row.route_distance_meters ?? null,
+      routeDauerSekunden: row.route_duration_seconds ?? null,
+      berechneteAnkunftszeit: row.berechnete_ankunftszeit ?? null,
       kunde: {
         name: row.partners?.display_name ?? row.partners?.company_name ?? "Unbekannter Kunde",
         ...adresse,
@@ -342,6 +363,20 @@ export async function bearbeiteFahrt(
       // Verlaufs-Eintrag soll das nicht rückgängig machen, aber sichtbar sein.
       console.error("bearbeiteFahrt (Verlauf) error:", verlaufFehler);
     }
+  }
+
+  // PROJ-42: Fahrer/Datum-Änderung löst Neuberechnung von alter UND neuer
+  // Tourengruppe aus — Notiz-only ändert nichts. Läuft nach dem erfolgreichen
+  // Speichern und blockiert dieses unter keinen Umständen (siehe
+  // loeseNeuberechnungAus: fängt alle Fehler intern ab, wirft nie).
+  const fahrerOderDatumGeaendert = aenderungen.some(
+    (a) => a.feld === "fahrer_id" || a.feld === "geplantes_abholdatum"
+  );
+  if (fahrerOderDatumGeaendert) {
+    await loeseNeuberechnungAus(adminClient, [
+      { fahrerId: aktuelleFahrt.fahrer_id, datum: aktuelleFahrt.geplantes_abholdatum },
+      { fahrerId: eingabe.fahrerId, datum: eingabe.datum },
+    ]);
   }
 
   revalidatePath("/fahrer");

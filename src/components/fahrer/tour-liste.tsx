@@ -31,6 +31,28 @@ function formatAdresse(kunde: Fahrt["kunde"]): string | null {
   return teile.length > 0 ? teile.join(", ") : null;
 }
 
+/** PROJ-42: Gesamtstrecke einer berechneten Tour, z. B. "12,3 km". */
+function formatDistanz(distanzMeter: number): string {
+  return `${(distanzMeter / 1000).toLocaleString("de-DE", { maximumFractionDigits: 1 })} km`;
+}
+
+/** PROJ-42: Gesamtfahrzeit einer berechneten Tour, z. B. "1 Std. 15 Min." oder "45 Min.". */
+function formatDauer(dauerSekunden: number): string {
+  const minuten = Math.round(dauerSekunden / 60);
+  const stunden = Math.floor(minuten / 60);
+  const restMinuten = minuten % 60;
+  return stunden > 0 ? `${stunden} Std. ${restMinuten} Min.` : `${restMinuten} Min.`;
+}
+
+/** PROJ-42: berechnete Ankunftszeit an einem Stopp, z. B. "09:15". */
+function formatAnkunftszeit(ankunftszeit: string): string {
+  return new Date(ankunftszeit).toLocaleTimeString("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Berlin",
+  });
+}
+
 interface TourListeProps {
   touren: Tour[];
   leerTitel?: string;
@@ -66,6 +88,12 @@ export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptione
                   <p className="text-sm text-muted-foreground">
                     {fahrerLabel ? `${fahrerLabel} — ` : ""}
                     {tour.fahrten.length} {tour.fahrten.length === 1 ? "Stopp" : "Stopps"}
+                    {tour.gesamtDistanzMeter !== null && tour.gesamtDauerSekunden !== null && (
+                      <span className="tabular-nums">
+                        {" — "}
+                        {formatDistanz(tour.gesamtDistanzMeter)} · {formatDauer(tour.gesamtDauerSekunden)}
+                      </span>
+                    )}
                   </p>
                 </div>
               </AccordionTrigger>
@@ -91,7 +119,14 @@ export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptione
                             <p className="font-medium text-foreground">{fahrt.kunde.name}</p>
                             {adresse && <p className="text-sm text-muted-foreground">{adresse}</p>}
                           </div>
-                          <Badge variant={badge.variant}>{badge.label}</Badge>
+                          <div className="flex flex-col items-end gap-1">
+                            {fahrt.berechneteAnkunftszeit && (
+                              <span className="text-sm tabular-nums text-muted-foreground">
+                                {formatAnkunftszeit(fahrt.berechneteAnkunftszeit)} Uhr
+                              </span>
+                            )}
+                            <Badge variant={badge.variant}>{badge.label}</Badge>
+                          </div>
                         </button>
                       </li>
                     );

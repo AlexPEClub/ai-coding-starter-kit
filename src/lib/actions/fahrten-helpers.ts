@@ -14,6 +14,10 @@ export interface Fahrt {
     plz: string | null;
     ort: string | null;
   };
+  /** PROJ-42: Position in der berechneten Route (1, 2, 3, ...), null ohne Berechnung. */
+  routeOrder: number | null;
+  /** PROJ-42: berechnete Ankunftszeit an diesem Stopp (ISO), null ohne Berechnung. */
+  berechneteAnkunftszeit: string | null;
 }
 
 export interface Tour {
@@ -21,6 +25,10 @@ export interface Tour {
   fahrerId: string | null;
   fahrerName: string | null;
   fahrten: Fahrt[];
+  /** PROJ-42: Gesamtstrecke der Tour in Metern, null ohne vollständige Berechnung. */
+  gesamtDistanzMeter: number | null;
+  /** PROJ-42: Gesamtfahrzeit der Tour in Sekunden, null ohne vollständige Berechnung. */
+  gesamtDauerSekunden: number | null;
 }
 
 export interface FahrerOption {
@@ -31,11 +39,26 @@ export interface FahrerOption {
 export interface RohFahrt extends Fahrt {
   fahrerId: string | null;
   fahrerName: string | null;
+  /** PROJ-42: identisch für alle Stopps einer erfolgreich berechneten Tour. */
+  routeCalculatedAt: string | null;
+  routeDistanzMeter: number | null;
+  routeDauerSekunden: number | null;
 }
 
-/** Bündelt Fahrten zu Touren nach Fahrer+Datum, sortiert nach Datum (ohne Datum ans Ende). */
+/**
+ * Bündelt Fahrten zu Touren nach Fahrer+Datum, sortiert nach Datum (ohne
+ * Datum ans Ende). PROJ-42: hat eine Tourengruppe für JEDEN ihrer Stopps
+ * denselben, nicht-null `routeCalculatedAt`-Zeitstempel (garantiert durch die
+ * Alles-oder-nichts-Schreiblogik der Routenberechnung), werden die Stopps
+ * nach `routeOrder` sortiert und Gesamtstrecke/-fahrzeit ausgegeben — sonst
+ * bleibt es beim bisherigen Datums-/Anlage-Reihenfolge-Fallback ohne
+ * Distanz-/Fahrzeit-Anzeige.
+ */
 export function gruppiereZuTouren(fahrten: RohFahrt[]): Tour[] {
-  const gruppen = new Map<string, Tour>();
+  const gruppen = new Map<
+    string,
+    { datum: string | null; fahrerId: string | null; fahrerName: string | null; fahrten: RohFahrt[] }
+  >();
   for (const fahrt of fahrten) {
     const key = `${fahrt.fahrerId ?? "ohne-fahrer"}|${fahrt.geplantesAbholdatum ?? "ohne-datum"}`;
     const gruppe = gruppen.get(key) ?? {
@@ -48,11 +71,34 @@ export function gruppiereZuTouren(fahrten: RohFahrt[]): Tour[] {
     gruppen.set(key, gruppe);
   }
 
-  return Array.from(gruppen.values()).sort((a, b) => {
-    if (!a.datum) return 1;
-    if (!b.datum) return -1;
-    return a.datum.localeCompare(b.datum);
-  });
+  return Array.from(gruppen.values())
+    .map((gruppe): Tour => {
+      const routeVollstaendig =
+        gruppe.fahrten.length > 0 &&
+        gruppe.fahrten.every((f) => f.routeOrder !== null && f.routeCalculatedAt !== null) &&
+        new Set(gruppe.fahrten.map((f) => f.routeCalculatedAt)).size === 1;
+
+      const sortierteFahrten = routeVollstaendig
+        ? [...gruppe.fahrten].sort((a, b) => (a.routeOrder ?? 0) - (b.routeOrder ?? 0))
+        : gruppe.fahrten;
+
+      return {
+        datum: gruppe.datum,
+        fahrerId: gruppe.fahrerId,
+        fahrerName: gruppe.fahrerName,
+        fahrten: sortierteFahrten.map(
+          ({ fahrerId: _fahrerId, fahrerName: _fahrerName, routeCalculatedAt: _rc, routeDistanzMeter: _rd, routeDauerSekunden: _rs, ...fahrt }) =>
+            fahrt
+        ),
+        gesamtDistanzMeter: routeVollstaendig ? gruppe.fahrten[0].routeDistanzMeter : null,
+        gesamtDauerSekunden: routeVollstaendig ? gruppe.fahrten[0].routeDauerSekunden : null,
+      };
+    })
+    .sort((a, b) => {
+      if (!a.datum) return 1;
+      if (!b.datum) return -1;
+      return a.datum.localeCompare(b.datum);
+    });
 }
 
 export type FahrtBadgeVariant = "secondary" | "default" | "destructive" | "warning";

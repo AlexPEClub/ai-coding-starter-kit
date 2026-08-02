@@ -14,6 +14,9 @@ interface NextPickupCardProps {
   partnerId: string;
   hasAbholservice: boolean;
   hasPlannedTour: boolean;
+  /** QA-Fund BUG-1 (PROJ-42): Anlegen/Ändern/Löschen ist Admin vorbehalten — server-seitig in
+   * pickup-tours.ts erzwungen, hier nur zusätzlich die UI ausgeblendet (Defense in Depth). */
+  isAdmin: boolean;
 }
 
 export function NextPickupCard({
@@ -22,6 +25,7 @@ export function NextPickupCard({
   partnerId,
   hasAbholservice,
   hasPlannedTour,
+  isAdmin,
 }: NextPickupCardProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -110,7 +114,7 @@ export function NextPickupCard({
           <Calendar className="h-4 w-4" />
           Nächste Abholung
         </h3>
-        {tour && !isEditing && (
+        {tour && !isEditing && isAdmin && (
           <button
             onClick={() => {
               setIsEditing(true);
@@ -242,7 +246,7 @@ export function NextPickupCard({
                 Keine Abholung geplant
               </p>
 
-              {!hasPlannedTour && (
+              {!hasPlannedTour && isAdmin && (
                 <Button
                   variant="outline"
                   size="sm"

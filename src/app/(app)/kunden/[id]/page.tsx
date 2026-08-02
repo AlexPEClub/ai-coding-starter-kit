@@ -282,6 +282,7 @@ function OrderDefaultsTab({
         partnerId={partnerId}
         hasAbholservice={hasAbholservice}
         hasPlannedTour={hasPlannedTour}
+        isAdmin={isAdmin}
       />
 
       <KommissionSettingsCard partnerId={partnerId} isAdmin={isAdmin} />

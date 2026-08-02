@@ -1,9 +1,26 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentProfile, type Profile } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { calculateEasterSunday, calculateHolidays } from "@/lib/pickup-utils";
+import { loeseNeuberechnungAus } from "@/lib/routing/tour-route";
+
+/**
+ * QA-Fund BUG-1 (PROJ-42): createPickupTour/updatePickupTour/deletePickupTour
+ * prüften bisher nur "eingeloggt", nicht die Rolle — jeder Nutzer konnte
+ * fremde Abholungen anlegen/ändern/löschen. Analog zu pruefeFahrerZugriff()
+ * (fahrten.ts): Abholungen anlegen/ändern/löschen ist Admin vorbehalten.
+ */
+async function pruefeAdminZugriff(): Promise<
+  { ok: true; profile: Profile } | { ok: false; error: string }
+> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { ok: false, error: "Nicht eingeloggt." };
+  if (profile.status !== "aktiv") return { ok: false, error: "Konto ist nicht aktiv." };
+  if (!profile.roles?.includes("admin")) return { ok: false, error: "Keine Berechtigung." };
+  return { ok: true, profile };
+}
 
 export type Tour = {
   id: string;
@@ -164,6 +181,9 @@ export async function createPickupTour(
   partnerId: string,
   values: CreateTourPayload,
 ): Promise<UpsertResult> {
+  const zugriff = await pruefeAdminZugriff();
+  if (!zugriff.ok) return zugriff;
+
   const serviceClient = createAdminClient({ schema: "tms" });
 
   // Lade Defaults für Vorausfüllung
@@ -172,14 +192,6 @@ export async function createPickupTour(
     .select("zugang, ruecksendung, driver_id, abholzyklus_wochen, abholservice")
     .eq("partner_id", partnerId)
     .maybeSingle();
-
-  // Lade aktuellen User
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { ok: false, error: "Nicht eingeloggt." };
-  }
 
   const payload = {
     partner_id: partnerId,
@@ -191,7 +203,7 @@ export async function createPickupTour(
     abholzyklus_wochen: defaults?.abholzyklus_wochen || null,
     abholservice: defaults?.abholservice || false,
     titel: values.titel || null,
-    erstellt_von: user.id,
+    erstellt_von: zugriff.profile.id,
   };
 
   const { error } = await serviceClient
@@ -201,6 +213,15 @@ export async function createPickupTour(
   if (error) {
     console.error("[createPickupTour]", error);
     return { ok: false, error: "Erstellen der Abholung fehlgeschlagen." };
+  }
+
+  // PROJ-42: eine neu angelegte Abholung braucht eine erste Berechnung ihrer
+  // Tourengruppe (kein "alte Gruppe" nötig, da frische Zeile). Blockiert das
+  // Anlegen selbst unter keinen Umständen (siehe loeseNeuberechnungAus).
+  if (payload.fahrer_id && payload.geplantes_abholdatum) {
+    await loeseNeuberechnungAus(serviceClient, [
+      { fahrerId: payload.fahrer_id, datum: payload.geplantes_abholdatum },
+    ]);
   }
 
   revalidatePath(`/kunden/${partnerId}`);
@@ -269,7 +290,7 @@ export async function autoCreateNextPickup(
 
 /**
  * Bearbeitet eine bestehende Tour (Fahrer + Datum)
- * Jeder eingeloggte Nutzer darf bearbeiten
+ * QA-Fund BUG-1 (PROJ-42): nur Admin darf bearbeiten (vorher jeder eingeloggte Nutzer)
  */
 export async function updatePickupTour(
   tourId: string,
@@ -279,7 +300,24 @@ export async function updatePickupTour(
     titel?: string | null;
   }
 ): Promise<UpsertResult> {
+  const zugriff = await pruefeAdminZugriff();
+  if (!zugriff.ok) return zugriff;
+
   const serviceClient = createAdminClient({ schema: "tms" });
+
+  // PROJ-42: alte Fahrer/Datum-Werte vorher lesen, um zu erkennen, ob sich
+  // die Tourengruppe tatsächlich ändert (nötig für die Neuberechnung unten).
+  // Ein Fehlschlag hier blockiert das eigentliche Update nicht — es entfällt
+  // dann nur die Neuberechnung, wie bei jedem anderen Geoapify-Fehlschlag.
+  const { data: alteTour, error: leseFehler } = await serviceClient
+    .from("tours")
+    .select("fahrer_id, geplantes_abholdatum")
+    .eq("id", tourId)
+    .maybeSingle();
+
+  if (leseFehler) {
+    console.error("[updatePickupTour] (lesen)", leseFehler);
+  }
 
   const { error } = await serviceClient
     .from("tours")
@@ -294,16 +332,41 @@ export async function updatePickupTour(
     return { ok: false, error: "Konnte Abholung nicht aktualisieren." };
   }
 
+  if (alteTour) {
+    const fahrerGeaendert =
+      "fahrer_id" in values && (values.fahrer_id ?? null) !== (alteTour.fahrer_id ?? null);
+    const datumGeaendert =
+      "geplantes_abholdatum" in values &&
+      values.geplantes_abholdatum !== alteTour.geplantes_abholdatum;
+
+    if (fahrerGeaendert || datumGeaendert) {
+      await loeseNeuberechnungAus(serviceClient, [
+        { fahrerId: alteTour.fahrer_id, datum: alteTour.geplantes_abholdatum },
+        {
+          fahrerId: "fahrer_id" in values ? values.fahrer_id ?? null : alteTour.fahrer_id,
+          datum:
+            "geplantes_abholdatum" in values
+              ? values.geplantes_abholdatum ?? null
+              : alteTour.geplantes_abholdatum,
+        },
+      ]);
+    }
+  }
+
   revalidatePath("/kunden/[id]", "page");
   return { ok: true };
 }
 
 /**
  * Löscht eine geplante Tour
+ * QA-Fund BUG-1 (PROJ-42): nur Admin darf löschen (vorher jeder eingeloggte Nutzer)
  */
 export async function deletePickupTour(
   tourId: string,
 ): Promise<UpsertResult> {
+  const zugriff = await pruefeAdminZugriff();
+  if (!zugriff.ok) return zugriff;
+
   const serviceClient = createAdminClient({ schema: "tms" });
 
   const { error } = await serviceClient
