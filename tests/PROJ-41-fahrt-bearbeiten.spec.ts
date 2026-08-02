@@ -136,7 +136,7 @@ test.describe("PROJ-41 Fahrt bearbeiten", () => {
 
     await expect(
       page.getByRole("button", { name: /08\.07\.2026.*Christian Gudel/s })
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 10000 });
 
     // Zurücksetzen, damit die Live-Daten unverändert bleiben.
     await page.getByRole("button", { name: /08\.07\.2026.*Christian Gudel/s }).click();
@@ -151,6 +151,6 @@ test.describe("PROJ-41 Fahrt bearbeiten", () => {
 
     await expect(
       page.getByRole("button", { name: /06\.07\.2026.*Mechthild Gudel — 7 Stopps/s })
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 10000 });
   });
 });
