@@ -42,6 +42,7 @@
 | PROJ-39 | Externe Fremdbearbeitung — Tracking & Workflow | 🔵 Roadmap — Teil 7/7, nach den Kern-Stationen. Versand per Spedition/Post (nicht eigene Fahrer), Rückkehr über normalen Wareneingang-Scan, eigene "aktuell extern"-Tracking-Tabelle. Baut auf PROJ-35/40 auf | 2026-07-28 |
 | PROJ-40 | Arbeitsvorbereitung — AV-Workflow (Fahrt festlegen) | 🔵 Roadmap — Teil 2b/7. Der eigentliche AV-Tagesablauf: Werkzeug scannen, 3-Stufen-Formular (Oberkategorie→Unterkategorie→Geometrie-Daten), automatische Serviceartikel-Zuordnung anhand der PROJ-35-Preisstaffel, Standard-Pfad aus PROJ-35 bestätigen/anpassen (Fahrt), konkreten externen Dienstleister pro Werkzeug zuweisen/überschreiben. Baut auf PROJ-35 auf | 2026-07-28 |
 | PROJ-41 | Fahrer — Fahrt bearbeiten (Fahrer/Datum/Notiz + Änderungsverlauf) | ✅ Deployed — Live seit 2026-08-02 unter https://tms.gudel-werkzeuge.de/fahrer (`./scripts/deploy.sh PROJ-41`, Post-Deploy-Smoke grün im 2. Anlauf — 1. Anlauf hatte zwei Mobile-Safari-Timeouts durch Container-Warmlauf, danach 8/8 grün; zusätzlich manuell live verifiziert: Bearbeiten-Dialog öffnet korrekt, keine Fehler in Container-Logs). QA zuvor bestanden: 9/9 Acceptance-Criteria-Gruppen (1 teilweise per Code-Review, da noch keine Live-Fahrten mit Status unterwegs/angekommen/problem existieren), BUG-1 (Low, fahrerId ohne Rollen-Prüfung) noch vor Deploy gefixt und re-verifiziert. Alle Live-Test-Änderungen an echten Stopps zurückgesetzt. Empfehlung offen: dediziertes `tests/deploy/PROJ-41-*.spec.ts` als Folge-Polish. Git-Tag `v1.41.0-PROJ-41`. Details in `features/PROJ-41-fahrt-bearbeiten.md` | 2026-08-02 |
+| PROJ-42 | Routenberechnung für Touren (Geoapify) | 🔵 Planned — Spec fertig und approved: optimale Stopp-Reihenfolge + Fahrzeit + Ankunftszeit je Stopp berechnen (fester Depot-Ort Zur Reithalle 86, Dorsten, Start 09:00 Uhr, Anbieter Geoapify, Ziel kürzeste Fahrzeit, keine Rückfahrt eingerechnet). Einmaliges Backfill-Skript für alle offenen Touren (pro Tour isolierte Fehlerbehandlung, kein Alles-oder-Nichts), danach automatische Neuberechnung bei jeder Fahrer/Datum-Änderung — sowohl über PROJ-41-Dialog als auch Kundendetailseite (`pickup-tours.ts`). Manuelles Überschreiben + Cronjob-Zeitplan bewusst spätere Bausteine. Details in `features/PROJ-42-routenberechnung.md`. Baut auf PROJ-21/PROJ-41 auf. Nächster Schritt: `/architecture PROJ-42` | 2026-08-02 |
 
 ## Architektur-Dokumente
 
@@ -69,4 +70,4 @@
 - Vor jeder Code-Änderung: CLAUDE.md, docs/PRD.md und relevante Feature-Datei lesen.
 - Status in INDEX.md und Feature-Header immer synchron halten.
 
-## Next Available ID: PROJ-42
+## Next Available ID: PROJ-43
