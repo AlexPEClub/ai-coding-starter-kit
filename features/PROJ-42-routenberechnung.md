@@ -1,6 +1,6 @@
 # PROJ-42: Routenberechnung für Touren (Geoapify)
 
-## Status: Approved
+## Status: ✅ Deployed
 **Created:** 2026-08-02
 **Last Updated:** 2026-08-02
 
@@ -472,4 +472,24 @@ hinterlegt (für jede Umgebung, in der das Feature läuft).
 - **Empfehlung:** GEOAPIFY_API_KEY setzen + einmaligen Backfill-Testlauf gegen eine einzelne echte Tour vor dem produktiven Vollbackfill, um die 4 offenen Unit-Test-only-Kriterien und die Geoapify-Feldnamen-Annahme final live zu bestätigen
 
 ## Deployment
-_To be added by /deploy_
+**Deployed:** 2026-08-02 zu https://tms.gudel-werkzeuge.de (`./scripts/deploy.sh PROJ-42`,
+Post-Deploy-Smoke grün im 1. Anlauf, keine Fehler in Container-Logs). Git-Tag `v1.42.0-PROJ-42`.
+
+- Migration `20260802090000_PROJ-42_routenberechnung_spalten.sql` gegen die
+  Produktions-Supabase-Instanz angewendet (`node scripts/apply-migration.mjs`) —
+  sicherer No-Op, da die fünf Spalten bereits live existierten.
+- `.env.production` auf dem Server bewusst **ohne** `GEOAPIFY_API_KEY`/
+  `GEOAPIFY_DEPOT_LAT`/`GEOAPIFY_DEPOT_LON` deployed (User-Entscheidung: „ohne
+  Key deployen, später nachtragen") — die Routenberechnung bleibt bis dahin
+  inaktiv (Trigger feuern, schlagen sicher/geloggt fehl, Touren-Liste zeigt
+  weiter den bisherigen Datums-Fallback). Kein zweiter Deploy nötig, sobald
+  die drei Variablen nachgetragen werden — die Funktionalität aktiviert sich
+  von selbst beim nächsten Fahrer/Datum-Trigger bzw. manuellen Backfill-Lauf
+  (`npm run backfill:routen`).
+- Kein dediziertes `tests/deploy/PROJ-42-*.spec.ts` erstellt (bestehende
+  generische Smoke-Tests liefen grün) — als Folge-Polish empfohlen, analog zur
+  offenen Empfehlung bei PROJ-21/PROJ-41.
+- Offene Nachfolge-Schritte für den User: (1) drei Geoapify-Env-Variablen in
+  `.env.production` ergänzen, (2) `npm run backfill:routen` einmalig gegen
+  die aktuell offenen Touren laufen lassen, (3) Ergebnis in der `/fahrer`-
+  Touren-Liste stichprobenartig prüfen.
