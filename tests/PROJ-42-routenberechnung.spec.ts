@@ -80,20 +80,22 @@ test.describe("PROJ-42 Routenberechnung — Neuberechnungs-Trigger blockiert nie
     ).toBeVisible({ timeout: 10000 });
   });
 
-  test("Touren-Liste zeigt weiterhin den Datums-Fallback (keine Distanz/Fahrzeit-Anzeige), solange keine Route berechnet ist", async ({
+  test("Touren-Liste zeigt Gesamtstrecke/-fahrzeit und Ankunftszeit je Stopp für eine erfolgreich berechnete Tour", async ({
     page,
   }) => {
+    // Seit dem initialen Backfill (2026-08-03, nach Fix der Geoapify-Feldnamen
+    // — siehe tour-route.ts) hat die Mechthild-Gudel-Tour vom 06.07.2026 eine
+    // vollständig berechnete Route. Deckt damit live ab, was zuvor (vor dem
+    // Backfill) nur per Unit-Test verifizierbar war.
     await login(page);
     await oeffneMechthild0607(page);
 
-    // PROJ-42 AC "Anzeige in der Touren-Liste": ohne (oder mit fehlgeschlagener)
-    // Routenberechnung bleibt die bisherige Datums-/Anlage-Reihenfolge ohne
-    // Distanz-/Fahrzeit-Anzeige — aktueller Live-Zustand, da noch kein
-    // Backfill/GEOAPIFY_API_KEY konfiguriert ist.
     const tourKopf = page.getByRole("button", { name: /06\.07\.2026.*Mechthild Gudel/ });
     await expect(tourKopf).toBeVisible();
-    await expect(tourKopf).not.toContainText("km");
-    await expect(tourKopf).not.toContainText("Std.");
+    await expect(tourKopf).toContainText("km");
+    await expect(tourKopf).toContainText("Min.");
+
+    await expect(page.getByText(/Uhr$/).first()).toBeVisible();
   });
 });
 

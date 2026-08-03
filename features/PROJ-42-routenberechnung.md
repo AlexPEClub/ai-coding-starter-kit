@@ -478,18 +478,49 @@ Post-Deploy-Smoke grün im 1. Anlauf, keine Fehler in Container-Logs). Git-Tag `
 - Migration `20260802090000_PROJ-42_routenberechnung_spalten.sql` gegen die
   Produktions-Supabase-Instanz angewendet (`node scripts/apply-migration.mjs`) —
   sicherer No-Op, da die fünf Spalten bereits live existierten.
-- `.env.production` auf dem Server bewusst **ohne** `GEOAPIFY_API_KEY`/
+- `.env.production` zunächst bewusst **ohne** `GEOAPIFY_API_KEY`/
   `GEOAPIFY_DEPOT_LAT`/`GEOAPIFY_DEPOT_LON` deployed (User-Entscheidung: „ohne
-  Key deployen, später nachtragen") — die Routenberechnung bleibt bis dahin
-  inaktiv (Trigger feuern, schlagen sicher/geloggt fehl, Touren-Liste zeigt
-  weiter den bisherigen Datums-Fallback). Kein zweiter Deploy nötig, sobald
-  die drei Variablen nachgetragen werden — die Funktionalität aktiviert sich
-  von selbst beim nächsten Fahrer/Datum-Trigger bzw. manuellen Backfill-Lauf
-  (`npm run backfill:routen`).
+  Key deployen, später nachtragen"). **Update 2026-08-03:** User hat die drei
+  Variablen in `.env.production` ergänzt; Container neu erstellt
+  (`docker compose up -d --force-recreate tms`), damit greifen serverseitige
+  Env-Änderungen (kein Rebuild nötig, da kein Code geändert wurde).
+- **Hotfix nach dem ersten echten Backfill-Versuch:** der ursprüngliche
+  Backfill-Lauf deckte zwei reale Bugs auf, die trotz Unit-Tests unentdeckt
+  geblieben waren (siehe Commit `f6ba411`, separat von den QA-Bugs BUG-1/2):
+  1. Das Backfill-Skript importierte `createAdminClient` aus
+     `src/lib/supabase/admin.ts`, deren `import "server-only"` außerhalb von
+     Next.js' eigenem Bundler-Kontext **immer** wirft (nicht nur im Browser —
+     das npm-Paket liefert nur für die von Next.js gesetzte
+     `react-server`-Exports-Condition einen No-Op). Fix: das Skript baut
+     jetzt seinen eigenen Plain-Supabase-Client, exakt wie
+     `scripts/update-holidays.mjs`, und lädt sowohl `.env.production` als
+     auch `.env.local` (Reihenfolge wie `docker-compose.yml`s `env_file`).
+  2. Die angenommenen Geoapify-Antwort-Feldnamen waren falsch: `job_id` liegt
+     nicht direkt auf dem Wegpunkt, sondern eine Ebene tiefer in
+     `waypoint.actions[]` (Einträge mit `type: "job"`). Per echtem
+     `curl`-Testaufruf gegen die Geoapify-API verifiziert und korrigiert. Das
+     eingebaute Sicherheitsnetz griff dabei genau wie vorgesehen — alle 31
+     betroffenen Touren scheiterten beim ersten Versuch sicher mit einer
+     klaren Fehlermeldung statt falsche Daten zu speichern.
+  3. Beide Fixes erneut deployed (`./scripts/deploy.sh PROJ-42`, 2. Anlauf
+     desselben Tages, Post-Deploy-Smoke grün im 1. Versuch), damit auch die
+     automatischen Live-Trigger (nicht nur das Backfill-Skript) die
+     korrigierte Logik nutzen.
+- **Backfill live ausgeführt (2026-08-03):** 33 offene Tourengruppen
+  gefunden, **31 erfolgreich berechnet** (reale Distanzen 14–839 km, Fahrzeit
+  bis zu ~9,3 Std.), **2 erwartungsgemäß fehlgeschlagen** — beide wegen
+  ungültiger/fehlender Adress-Koordinaten bei einem einzelnen Stopp (Alles-
+  oder-nichts-Regel griff korrekt, andere Touren unbeeinflusst).
+- **Live in der Touren-Liste verifiziert** (neuer/aktualisierter Test in
+  `tests/PROJ-42-routenberechnung.spec.ts`): die Mechthild-Gudel-Tour vom
+  06.07.2026 zeigt jetzt „— 29,1 km · 30 Min." im Tourkopf sowie eine
+  Ankunftszeit je Stopp — damit sind auch die vier zuvor nur unit-getesteten
+  Acceptance Criteria (erfolgreiche Berechnung: Reihenfolge/Distanz/Fahrzeit/
+  Ankunftszeit) nachträglich live bestätigt.
 - Kein dediziertes `tests/deploy/PROJ-42-*.spec.ts` erstellt (bestehende
   generische Smoke-Tests liefen grün) — als Folge-Polish empfohlen, analog zur
   offenen Empfehlung bei PROJ-21/PROJ-41.
-- Offene Nachfolge-Schritte für den User: (1) drei Geoapify-Env-Variablen in
-  `.env.production` ergänzen, (2) `npm run backfill:routen` einmalig gegen
-  die aktuell offenen Touren laufen lassen, (3) Ergebnis in der `/fahrer`-
+- Offene Nachfolge-Schritte für den User: (1) die 2 Touren mit ungültiger
+  Kundenadresse identifizieren und Adressdaten korrigieren, dann Backfill für
+  diese zwei Gruppen erneut laufen lassen, (2) Ergebnis in der `/fahrer`-
   Touren-Liste stichprobenartig prüfen.
