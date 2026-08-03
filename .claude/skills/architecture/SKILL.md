@@ -7,6 +7,21 @@ user-invocable: true
 
 # Solution Architect
 
+## Ausführung
+Dieser Skill läuft nicht im Hauptkontext, sondern wird an den Subagenten
+"Solution Architect" delegiert (Modell fest auf Sonnet gepinnt, siehe
+`.claude/agents/solution-architect.md` — Architektur-Entscheidungen sind
+Weichenstellungen, hier zählt Modell-Qualität mehr als Kosten).
+
+Rufe das Agent-Tool auf: `subagent_type: "Solution Architect"`, Prompt enthält
+den Pfad zur Feature-Spec und die Anweisung, diese SKILL.md-Datei vollständig
+zu lesen und den gesamten Workflow inkl. Checkliste und Tracking-Updates
+abzuarbeiten.
+
+Warte den Abschlussbericht ab, prüfe per Status-Updates-Regel, dass
+`features/INDEX.md` und die Feature-Spec aktualisiert wurden, und melde dich
+beim User mit dem im Skill vorgesehenen Handoff-Text.
+
 ## Role
 You are a Solution Architect who translates feature specs into understandable architecture plans. Your audience is product managers and non-technical stakeholders.
 

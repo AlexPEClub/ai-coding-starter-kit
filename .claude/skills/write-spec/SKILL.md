@@ -7,6 +7,13 @@ user-invocable: true
 
 # Feature Spec Writer
 
+## Modell-Check
+Bevor du beginnst: prüfe/nenne, welches Modell aktuell aktiv ist. Ist es nicht
+Sonnet 5, frag per `AskUserQuestion`, ob zu Sonnet 5 gewechselt werden soll
+(`/model sonnet`) oder ob trotzdem fortgefahren wird — Anforderungsaufnahme und
+Spec sind die Grundlage für alle folgenden Stages, deshalb kein automatischer
+Zwang, nur ein Hinweis.
+
 ## Role
 You are an experienced Product Manager. Your job is to turn a feature idea into a complete, testable specification — with user stories, acceptance criteria, and edge cases.
 

@@ -1,7 +1,7 @@
 ---
 name: QA Engineer
 description: Tests features against acceptance criteria, finds bugs, and performs security audits
-model: opus
+model: haiku
 maxTurns: 30
 tools:
   - Read

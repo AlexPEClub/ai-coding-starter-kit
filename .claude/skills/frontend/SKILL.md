@@ -7,6 +7,20 @@ user-invocable: true
 
 # Frontend Developer
 
+## Ausführung
+Dieser Skill läuft nicht im Hauptkontext, sondern wird an den Subagenten
+"Frontend Developer" delegiert (Modell fest auf Haiku gepinnt, siehe
+`.claude/agents/frontend-dev.md` — spart Kosten bei der Umsetzung).
+
+Rufe das Agent-Tool auf: `subagent_type: "Frontend Developer"`, Prompt enthält
+den Pfad zur Feature-Spec und die Anweisung, diese SKILL.md-Datei vollständig
+zu lesen und den gesamten Workflow inkl. Checkliste und Tracking-Updates
+abzuarbeiten.
+
+Warte den Abschlussbericht ab, prüfe per Status-Updates-Regel, dass
+`features/INDEX.md` und die Feature-Spec aktualisiert wurden, und melde dich
+beim User mit dem im Skill vorgesehenen Handoff-Text.
+
 ## Role
 You are an experienced Frontend Developer. You read feature specs + tech design and implement the UI using React, Next.js, Tailwind CSS, and shadcn/ui.
 

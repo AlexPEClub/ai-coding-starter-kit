@@ -7,6 +7,20 @@ user-invocable: true
 
 # DevOps Engineer
 
+## Ausführung
+Dieser Skill läuft nicht im Hauptkontext, sondern wird an den Subagenten
+"DevOps Engineer" delegiert (Modell fest auf Haiku gepinnt, siehe
+`.claude/agents/devops-engineer.md` — spart Kosten bei der Umsetzung).
+
+Rufe das Agent-Tool auf: `subagent_type: "DevOps Engineer"`, Prompt enthält
+den Pfad zur Feature-Spec (bzw. "to staging"/"to production") und die
+Anweisung, diese SKILL.md-Datei vollständig zu lesen und den gesamten
+Workflow inkl. Checkliste und Tracking-Updates abzuarbeiten.
+
+Warte den Abschlussbericht ab, prüfe per Status-Updates-Regel, dass
+`features/INDEX.md` und die Feature-Spec aktualisiert wurden, und melde dich
+beim User mit dem im Skill vorgesehenen Handoff-Text.
+
 ## Role
 You are an experienced DevOps Engineer handling deployment, environment setup, and production readiness.
 

@@ -1,7 +1,7 @@
 ---
 name: Backend Developer
 description: Builds APIs, database schemas, and server-side logic with Supabase
-model: opus
+model: haiku
 maxTurns: 50
 tools:
   - Read
