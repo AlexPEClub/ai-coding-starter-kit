@@ -7,7 +7,7 @@ import { TrendingUp, MapPin } from "lucide-react";
 
 export const metadata = {
   title: "Kunden — TMS 2.0",
-  description: "Kunden nach Jahresumsatz",
+  description: "Kunden nach Umsatz (letzte 12 Monate)",
 };
 
 export default async function KundenPage({
@@ -29,7 +29,6 @@ export default async function KundenPage({
   }
 
   const partners = result.data;
-  const currentYear = new Date().getFullYear();
 
   const formatCurrency = (value: number) => {
     if (value === 0) return "—";
@@ -48,7 +47,7 @@ export default async function KundenPage({
         <div>
           <h1 className="text-2xl font-bold">Kunden</h1>
           <p className="text-muted-foreground text-sm">
-            Sortiert nach Jahresumsatz {currentYear}
+            Sortiert nach Umsatz (letzte 12 Monate)
           </p>
         </div>
         <KundenSearch initial={search} />
@@ -76,8 +75,8 @@ export default async function KundenPage({
                   )}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className={`text-sm font-semibold ${partner.current_year_revenue > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>
-                    {formatCurrency(partner.current_year_revenue)}
+                  <p className={`text-sm font-semibold ${partner.revenue_365d > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>
+                    {formatCurrency(partner.revenue_365d)}
                   </p>
                 </div>
               </div>
@@ -111,7 +110,7 @@ export default async function KundenPage({
               <th className="px-4 py-3 text-right font-medium">
                 <div className="flex items-center justify-end gap-1">
                   <TrendingUp className="h-4 w-4" />
-                  Umsatz {currentYear}
+                  Umsatz (12 Mon.)
                 </div>
               </th>
             </tr>
@@ -173,12 +172,12 @@ export default async function KundenPage({
                   <td className="px-4 py-3 text-right font-semibold">
                     <span
                       className={
-                        partner.current_year_revenue > 0
+                        partner.revenue_365d > 0
                           ? "text-emerald-600"
                           : "text-muted-foreground"
                       }
                     >
-                      {formatCurrency(partner.current_year_revenue)}
+                      {formatCurrency(partner.revenue_365d)}
                     </span>
                   </td>
                 </tr>

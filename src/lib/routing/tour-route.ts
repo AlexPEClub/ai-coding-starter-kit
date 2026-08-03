@@ -10,6 +10,7 @@ export type AdminClient = ReturnType<typeof createAdminClient>;
 
 const OFFENE_STATUS = ["geplant", "unterwegs", "angekommen", "problem"] as const;
 const TAGESSTART_STUNDE = 9; // Feste Start-Uhrzeit 09:00 Uhr (MVP-Annahme, siehe Spec)
+const VERWEILZEIT_PRO_STOPP_SEKUNDEN = 15 * 60; // Feste Verweilzeit beim Kunden (MVP-Annahme, siehe Spec)
 const GEOAPIFY_ROUTEPLANNER_URL = "https://api.geoapify.com/v1/routeplanner";
 
 export type RouteBerechnungErgebnis =
@@ -170,9 +171,65 @@ interface GeoapifyRoutePlannerAntwort {
 }
 
 /**
+ * Bestimmt den UTC-Offset (in Minuten) einer Zeitzone für einen gegebenen
+ * Zeitpunkt. DST-sicher (liefert im Sommer +120, im Winter +60 für
+ * Europe/Berlin), im Gegensatz zu einem hartkodierten Offset.
+ */
+function ermittleZeitzonenOffsetMinuten(zeitpunkt: Date, zeitzone: string): number {
+  const teile = new Intl.DateTimeFormat("en-US", {
+    timeZone: zeitzone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+    .formatToParts(zeitpunkt)
+    .reduce((akkumulator, teil) => {
+      akkumulator[teil.type] = teil.value;
+      return akkumulator;
+    }, {} as Record<string, string>);
+
+  const alsUtcInterpretiert = Date.UTC(
+    Number(teile.year),
+    Number(teile.month) - 1,
+    Number(teile.day),
+    Number(teile.hour),
+    Number(teile.minute),
+    Number(teile.second)
+  );
+
+  return (alsUtcInterpretiert - zeitpunkt.getTime()) / 60_000;
+}
+
+/**
+ * Liefert den heutigen Tagesstart (TAGESSTART_STUNDE Uhr Europe/Berlin) als
+ * korrekten UTC-Zeitpunkt. Vermeidet den Bug von `new Date().setHours(...)`,
+ * das in der lokalen Zeitzone des Node-Prozesses rechnet — der Server läuft
+ * in Etc/UTC, wodurch 09:00 Uhr sonst faktisch 09:00 UTC (= 11:00 Uhr
+ * Europe/Berlin im Sommer) statt der gewünschten 09:00 Uhr Berlin ergäbe.
+ */
+function ermittleTagesstartUtc(): Date {
+  const jetzt = new Date();
+  const heuteBerlin = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" }).format(
+    jetzt
+  );
+  const [jahr, monat, tag] = heuteBerlin.split("-").map(Number);
+
+  const naiverUtcZeitpunkt = new Date(Date.UTC(jahr, monat - 1, tag, TAGESSTART_STUNDE, 0, 0));
+  const offsetMinuten = ermittleZeitzonenOffsetMinuten(naiverUtcZeitpunkt, "Europe/Berlin");
+
+  return new Date(naiverUtcZeitpunkt.getTime() - offsetMinuten * 60_000);
+}
+
+/**
  * Ruft Geoapifys Route-Planner-API mit dem festen Depot als Start und den
  * validierten Stopp-Koordinaten als Wegpunkten auf. Ein Fahrzeug, kein
- * Rückweg zum Depot (kein `end_location` gesetzt), Modus "drive".
+ * Rückweg zum Depot (kein `end_location` gesetzt), Modus "drive". Jeder Job
+ * trägt eine feste Verweilzeit (`duration`), die Geoapify automatisch in
+ * `waypoint.start_time` der nachfolgenden Stopps einrechnet.
  *
  * Feldnamen anhand eines echten Testaufrufs verifiziert (2026-08-03): jeder
  * Wegpunkt (`properties.waypoints[]`) trägt `start_time` direkt, aber die
@@ -197,6 +254,7 @@ async function rufeGeoapifyRoutePlanner(
     jobs: stopps.map((stopp) => ({
       id: stopp.id,
       location: [stopp.koordinate.lon, stopp.koordinate.lat],
+      duration: VERWEILZEIT_PRO_STOPP_SEKUNDEN,
     })),
   };
 
@@ -218,8 +276,7 @@ async function rufeGeoapifyRoutePlanner(
     throw new Error("Geoapify lieferte keine gültige Wegpunkt-Reihenfolge.");
   }
 
-  const start = new Date();
-  start.setHours(TAGESSTART_STUNDE, 0, 0, 0);
+  const start = ermittleTagesstartUtc();
 
   const reihenfolge = new Map<string, number>();
   const ankunftszeiten = new Map<string, string>();

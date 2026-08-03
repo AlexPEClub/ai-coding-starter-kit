@@ -1,8 +1,8 @@
 # PROJ-31: Content-Studio (Generierung + Redaktion + Lern-Loop)
 
-## Status: Planned
+## Status: Architected
 **Created:** 2026-07-20
-**Last Updated:** 2026-07-24
+**Last Updated:** 2026-08-03
 
 > Dritter Baustein des **Content-Epics** (PROJ-29 → PROJ-30 → **PROJ-31** → PROJ-32) und dessen
 > Herzstück. Hier wird zu einem **freigegebenen Thema** (aus PROJ-30) mit KI ein Artikel (Text +
@@ -198,13 +198,66 @@
 <!-- Added by /architecture -->
 | Decision | Rationale | Date |
 |----------|-----------|------|
-| _wird in /architecture ergänzt_ | | |
+| KI-Textgenerierung über Anthropic Claude API, Modell Claude Opus 4.8 | Niedriges Aufrufvolumen (internes Tool, wenige Artikel/Woche) — Tonalitäts-/Fachtreue wichtiger als Kosten pro Aufruf; im Prototyp bereits mit starkem Modell validiert; passt zur Projekt-Grundhaltung „Security/Robustheit vor Geschwindigkeit" | 2026-08-03 |
+| Faktengrundlage über die bestehende Postgres-Volltextsuche aus PROJ-29, keine neue Vektordatenbank | Vermeidet zusätzlichen Infrastruktur-Baustein; Stichwort-Suche über den vorhandenen tsvector/GIN-Index reicht für den aktuellen Bedarf | 2026-08-03 |
+| Neue Tabellen im bestehenden `tms`-Schema, RLS analog PROJ-29 (nur Redaktion + Admin) | Konsistentes Sicherheitsmuster wiederverwenden statt neu erfinden | 2026-08-03 |
+| Bilder in Supabase Storage, analog zum PROJ-29-Wissensbasis-Bucket | Wiederverwendung der bestehenden Storage-Policies statt neuem Bucket-Typ | 2026-08-03 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Komponenten-Struktur (UI)
+
+```
+Content-Studio (nur Rollen Redaktion/Admin)
+├── Themen-Auswahl
+│   └── Liste freigegebener Themen (aus PROJ-30) — nicht freigegebene Themen erscheinen nicht
+├── Entwurf-Arbeitsbereich (pro ausgewähltem Thema)
+│   ├── Artikel-Text (aktuelle Version, Sie-Form, ohne Hersteller-/Markennamen)
+│   ├── Quellen-Liste (Wissensbasis-Dokument + Fundstelle, klickbar zum Nachprüfen)
+│   ├── Tonalitäts-Regler: Länge/Ausführlichkeit · Fachtiefe
+│   ├── Freitextfeld „Fachliche Korrektur" (nur fachliche Richtigstellung, kein Stil-Feedback)
+│   ├── Button „Entwurf erzeugen" / „Neu erzeugen"
+│   └── Hinweis-Zustand: „Zu wenig Wissensbasis-Material zu diesem Thema" (statt erfundenem Text)
+├── Versions-Historie (Timeline, jede Iteration einsehbar, nummeriert)
+├── Bild-Upload-Bereich (manueller Upload, kein KI-Bild)
+├── Freigabe-Bereich: „Freigeben" → Status „Freigegeben"; „Zurück in Bearbeitung" (nachvollziehbar)
+└── Tonalitäts-Anker-Verwaltung (Admin-only, ein globaler Beispieltext für alle Content-Typen)
+```
+
+### Datenmodell (fachlich, ohne Code)
+
+- **Content-Artikel** — ein Artikel pro freigegebenem Thema: Status (Entwurf / Freigegeben / Zurück in Bearbeitung), Verweis auf das Thema (PROJ-30), Verweis auf die aktuell gültige Version.
+- **Artikel-Version** — jede Iteration wird als eigene, nummerierte Version gespeichert: Text, die zwei Regler-Werte (Länge, Fachtiefe), wer sie erzeugt hat, wann, und die Liste der verwendeten Wissensbasis-Quellen (Dokument + Fundstelle-Textausschnitt).
+- **Fachliche Korrektur (Lern-Speicher)** — jede eingetragene Richtigstellung wird dauerhaft gespeichert (Text der Korrektur, zugehöriges Thema/Kontext) und als Few-Shot-Beispiel in künftige Generierungs-Prompts eingespeist. Bei widersprüchlichen Korrekturen zum selben Punkt gilt die neuere, ältere bleiben in der Historie sichtbar.
+- **Tonalitäts-Anker** — genau ein globaler Eintrag (Beispieltext), von Admin gepflegt, gilt für alle Content-Typen.
+- **Artikel-Bild** — manuell hochgeladene Bilder pro Artikel (Supabase Storage), unabhängig vom Text-Iterationszyklus.
+
+Berechtigung: nur Rollen Redaktion + Admin dürfen lesen/schreiben (RLS), analog zum bestehenden Muster aus PROJ-29 Wissensbasis.
+
+### Technische Entscheidungen (Begründung)
+
+1. **KI-Textgenerierung: Anthropic Claude API, Modell Claude Opus 4.8.** Das Content-Studio ist ein internes Tool mit niedrigem Volumen (einzelne Artikel pro Woche, gesteuert durch den wöchentlichen PROJ-30-Themenscan) — hier zählt die Tonalitäts- und Fachtreue mehr als der Cent-Betrag pro Generierung, und genau das wurde im Prototyp (2026-07-20) mit einem starken Modell bereits erfolgreich validiert. Passt zur Projekt-Grundhaltung „Security/Robustheit vor Geschwindigkeit" — das robusteste verfügbare Modell für ein Tool mit wenigen, aber qualitativ wichtigen Aufrufen. Sollte sich das Aufrufvolumen später deutlich erhöhen, ist ein Wechsel auf das güns­tigere Sonnet-Modell (spürbar niedrigerer Preis bei weiterhin naher Opus-Qualität) eine unkomplizierte Folge-Optimierung, keine Architektur-Änderung.
+2. **Faktengrundlage: bestehende Postgres-Volltextsuche aus PROJ-29 wiederverwenden, keine neue Vektordatenbank.** Die Wissensbasis-Dokumente haben bereits eine Volltextsuche-Spalte mit Index (aus PROJ-29). Eine themenbezogene Stichwort-Suche darüber liefert die relevanten Textstellen, die der KI als Faktenbasis mitgegeben werden — ohne zusätzlichen Infrastruktur-Baustein (Vektor-DB, Embedding-Pipeline) einzuführen. Das hält die Lösung einfacher und robuster, bei ausreichender Treffergüte für den aktuellen Bedarf.
+3. **Lern-Mechanik: Few-Shot statt Fine-Tuning** (bereits in der Spec festgelegt) — gespeicherte Korrekturen werden dem Generierungs-Prompt als Beispiele beigefügt, kein separates Modell-Training nötig.
+4. **Speicherung:** neue Tabellen im bestehenden `tms`-Schema, RLS-Policies analog zum PROJ-29-Muster (nur Redaktion + Admin). Bilder in Supabase Storage, analog zum bestehenden Wissensbasis-Bucket.
+5. **Neutralitäts- und Sie-Form-Durchsetzung** ausschließlich über die Prompt-Vorgabe an die KI, keine zusätzliche automatische Nachkontrolle (bereits im Decision Log der Spec festgehalten, 2026-07-24).
+
+### Abhängigkeiten (neue Pakete)
+
+- `@anthropic-ai/sdk` — offizielles SDK für die Claude-API-Anbindung (noch nicht im Projekt installiert).
+- Keine weiteren neuen Abhängigkeiten — Volltextsuche, Storage und RLS nutzen vorhandene Supabase-Bausteine aus PROJ-29.
+
+Neue Umgebungsvariable: `ANTHROPIC_API_KEY` (analog zum bisherigen Muster bei PROJ-42/Geoapify: Feature kann sicher ohne den Key deployed werden, bleibt dann inaktiv, bis der Key nachgetragen wird).
+
+## Frontend-Implementierung
+**Pausiert (2026-08-03):** Beim Start von `/frontend` fiel auf, dass die „Themen-Auswahl" auf
+freigegebenen Themen aus PROJ-30 aufbaut — PROJ-30 hat aber noch keine Spec, kein Datenmodell und
+keinen Freigabe-Workflow. Mit dem User abgestimmt: **erst PROJ-30 vollständig bauen**
+(`/write-spec` → `/architecture` → `/frontend` → `/backend`), bevor die PROJ-31-Implementierung
+fortgesetzt wird. Kein Code für PROJ-31 wurde in diesem Anlauf geschrieben.
 
 ## QA Test Results
 _To be added by /qa_

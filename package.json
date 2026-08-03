@@ -14,7 +14,8 @@
     "test:e2e:ui": "playwright test --ui",
     "test:deploy": "playwright test --config=playwright.deploy.config.ts",
     "test:all": "vitest run && playwright test",
-    "backfill:routen": "tsx scripts/PROJ-42_backfill_routen.ts"
+    "backfill:routen": "tsx scripts/PROJ-42_backfill_routen.ts",
+    "cache:umsatz": "node scripts/PROJ-43_cache_umsatz.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -2,7 +2,7 @@
 
 ## Status: ✅ Deployed
 **Created:** 2026-08-02
-**Last Updated:** 2026-08-02
+**Last Updated:** 2026-08-03
 
 > Folge-Baustein zu PROJ-21 (Fahrer — Tourenliste) und PROJ-41 (Fahrt
 > bearbeiten). Echte Routenberechnung war von Anfang an bewusst als
@@ -110,7 +110,10 @@
   am Tourkopf angezeigt.
 - [ ] Angenommen eine Tour hat eine erfolgreich berechnete Route, wenn ein
   Stopp angezeigt wird, dann erscheint zusätzlich die berechnete Ankunftszeit
-  für diesen Stopp (ausgehend von 09:00 Uhr Start am Depot).
+  für diesen Stopp (ausgehend von 09:00 Uhr Europe/Berlin Start am Depot,
+  DST-sicher berechnet — nicht mit der lokalen Server-Zeitzone verwechseln,
+  siehe Bugfix 2026-08-03) — jeder Zwischenstopp beinhaltet zusätzlich zur
+  reinen Fahrzeit eine feste Verweilzeit von 15 Minuten beim Kunden.
 - [ ] Angenommen eine Tour hat noch keine (oder eine zuletzt fehlgeschlagene)
   Routenberechnung, wenn sie angezeigt wird, dann werden die Stopps wie
   bisher nach Datum/Anlage-Reihenfolge angezeigt, ohne Gesamtstrecke-/
@@ -170,6 +173,7 @@ _Keine offenen Fragen mehr — alle im Spec-Review geklärt._
 | Fehlerbehandlung pro Tour isoliert, kein globales Alles-oder-Nichts über alle Touren | Bei ~7 % ungültigen Adressen und 108 offenen Touren hätte ein globales Alles-oder-Nichts die Erst-Berechnung höchstwahrscheinlich komplett blockiert; User hat das nach Rückfrage mit den konkreten Zahlen bestätigt | 2026-08-02 |
 | Fehlschlagende Routenberechnung blockiert NICHT das eigentliche Speichern von Fahrer/Datum/Notiz | Die Fahrt-Bearbeitung (PROJ-41) soll unabhängig von einem externen Dienst zuverlässig funktionieren — Routenberechnung ist ein nachgelagerter, optionaler Zusatzschritt | 2026-08-02 |
 | Berechnete Ankunftszeit wird zusätzlich zur Gesamtstrecke/-fahrzeit auch je Stopp angezeigt | Ohne sichtbare Anzeige hätte die eigens für diesen Zweck festgelegte Start-Uhrzeit (09:00) keinen praktischen Nutzen | 2026-08-02 |
+| Feste Verweilzeit von 15 Minuten pro Kundenstopp, fix und nicht pro Kunde/Fahrer konfigurierbar (MVP) | User-Feedback nach dem ersten Live-Test: ohne Verweilzeit wirkten die angezeigten Ankunftszeiten unrealistisch gestaucht (nur reine Fahrzeit zwischen Stopps) | 2026-08-03 |
 
 ### Technical Decisions
 <!-- Added by /architecture -->
@@ -183,6 +187,8 @@ _Keine offenen Fragen mehr — alle im Spec-Review geklärt._
 | `route_manual_override` wird von Migration und Modul bewusst nicht angefasst | Gehört zu einem späteren, separaten Feature (manuelles Überschreiben) | 2026-08-02 |
 | Backfill-Skript (`scripts/PROJ-42_backfill_routen.ts`) läuft über `tsx` und importiert direkt `createAdminClient` + das gemeinsame Modul, statt dem bisherigen Plain-JS-Skript-Muster (`update-holidays.mjs`) zu folgen | Sonst müsste die Routing-Kernlogik ein zweites Mal in JS nachgebaut werden — ein Modul als einzige Quelle der Wahrheit ist wichtiger als Konsistenz mit dem älteren Skript-Muster | 2026-08-02 |
 | Neue Env-Variablen `GEOAPIFY_API_KEY`, `GEOAPIFY_DEPOT_LAT`, `GEOAPIFY_DEPOT_LON`; kein neues HTTP-Client-Paket | Kein Geoapify-Client existiert bisher im App-Code; Route-Planner ist eine einfache JSON-API, mit eingebautem `fetch` aufrufbar | 2026-08-02 |
+| **Bugfix:** Tagesstart wird jetzt über eine DST-sichere Europe/Berlin→UTC-Umrechnung (`ermittleTagesstartUtc()`, `Intl.DateTimeFormat`) statt über `new Date().setHours(9,...)` bestimmt | `setHours()` rechnet in der lokalen Zeitzone des Node-Prozesses; der App-Container läuft in `Etc/UTC` ohne `TZ`-Override, wodurch 09:00 faktisch als 09:00 UTC gesetzt wurde — im Sommer (CEST, UTC+2) als 11:00 Uhr Europe/Berlin angezeigt. Live entdeckt durch den User (Screenshot 2026-08-03, erster Stopp zeigte 11:00 statt 09:00) | 2026-08-03 |
+| Verweilzeit (15 Min./Stopp) wird als natives Geoapify-Job-Feld `duration` (Sekunden) übergeben, nicht in der lokalen Ankunftszeit-Berechnung nachträglich addiert | Geoapifys Route Planner rechnet `duration` automatisch kumulativ in `waypoint.start_time` der nachfolgenden Stopps ein — dadurch bleibt die bestehende Auswertungslogik unverändert korrekt, und auch die angezeigte Gesamtfahrzeit (`agentFeature.properties.time`) enthält automatisch alle Verweilzeiten statt nur der reinen Fahrzeit; ändert die Optimierungs-Reihenfolge nicht (alle Jobs erhalten dieselbe zusätzliche Dauer, keine engen Zeitfenster pro Job) | 2026-08-03 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
@@ -203,7 +209,8 @@ Stopp), `route_calculated_at` (Zeitpunkt der letzten erfolgreichen
 Berechnung, pro Tourengruppe identisch), `route_distance_meters` und
 `route_duration_seconds` (Gesamtstrecke/-fahrzeit der Tour, pro
 Tourengruppe identisch), `berechnete_ankunftszeit` (Ankunftszeit je Stopp,
-ausgehend von 09:00 Uhr Depot-Start). Eine neue Migration fügt diese
+ausgehend von 09:00 Uhr Europe/Berlin Depot-Start plus 15 Min. Verweilzeit
+pro Zwischenstopp). Eine neue Migration fügt diese
 Spalten "falls noch nicht vorhanden" hinzu — sicher gegenüber der
 Produktions-DB, wo sie bereits existieren. Die ebenfalls vorbereitete
 Spalte `route_manual_override` bleibt für dieses Feature unangetastet

@@ -1,8 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { centsToEuro } from "./orders-helpers";
+import { centsToEuro, escapeOrFilterValue } from "./orders-helpers";
 
 // Types für tms.partners (easybill Kunden)
 export type Partner = {
@@ -59,22 +58,26 @@ export type PartnerActionResult =
   | { ok: false; error: string };
 
 export type PartnerWithRevenue = Partner & {
-  current_year_revenue: number;
+  /** Umsatz der letzten rollierenden 365 Tage in Euro (PROJ-43-Cache-Spalte). */
+  revenue_365d: number;
   shipping_address?: PartnerAddress | null;
 };
 
+const LIST_LIMIT = 20;
+
 /**
- * Kunden laden, sortiert nach aktuellem Jahresumsatz (höchster zuerst).
- * Lädt ALLE aktiven Kunden (mit Paginierung, da >1000) -> Umsatz
- * in der Datenbank aufsummieren -> Top 20 zurückgeben.
+ * Kunden laden, sortiert nach Umsatz der letzten 365 Tage (höchster zuerst).
+ * Liest den nächtlich vorausberechneten Cache (PROJ-43) statt wie zuvor bei
+ * jeder Anfrage alle Kunden zu laden und `invoice_items` live aufzusummieren
+ * (siehe features/PROJ-43-globale-kundensuche-umsatz-caching.md, Tech
+ * Design) — Datenbank sortiert/begrenzt direkt, kein Vollzugriff auf alle
+ * Kunden mehr nötig.
  */
 export async function getPartnersWithRevenue(
   search?: string,
 ): Promise<{ ok: true; data: PartnerWithRevenue[] } | { ok: false; error: string }> {
   const supabase = await createClient();
-  const currentYear = new Date().getFullYear();
 
-  // 1. Alle aktiven Kunden laden (mit Paginierung, da Supabase nur 1000/Zeile liefert)
   let query = supabase
     .schema("tms")
     .from("partners")
@@ -84,125 +87,55 @@ export async function getPartnersWithRevenue(
 
   if (search) {
     const isNumeric = /^\d+$/.test(search);
-    if (isNumeric) {
-      query = query.or(
-        `company_name.ilike.%${search}%,display_name.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,easybill_customer_number.eq.${search}`
-      );
-    } else {
-      query = query.or(
-        `company_name.ilike.%${search}%,display_name.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`
-      );
-    }
+    const escaped = escapeOrFilterValue(search);
+    query = isNumeric
+      ? query.or(
+          `company_name.ilike."%${escaped}%",display_name.ilike."%${escaped}%",first_name.ilike."%${escaped}%",last_name.ilike."%${escaped}%",email.ilike."%${escaped}%",easybill_customer_number.eq."${escaped}"`
+        )
+      : query.or(
+          `company_name.ilike."%${escaped}%",display_name.ilike."%${escaped}%",first_name.ilike."%${escaped}%",last_name.ilike."%${escaped}%",email.ilike."%${escaped}%"`
+        );
   }
 
-  const PAGE = 1000;
-  let partners: any[] = [];
-  let from = 0;
-  while (true) {
-    const { data: chunk, error } = await query.range(from, from + PAGE - 1);
-    if (error) {
-      console.error("[getPartnersWithRevenue]", error);
-      return { ok: false, error: "Konnte Kunden nicht laden." };
-    }
-    if (!chunk || chunk.length === 0) break;
-    partners = partners.concat(chunk);
-    if (chunk.length < PAGE) break;
-    from += PAGE;
+  // Absteigend nach Umsatz sortiert reiht sich Umsatz=0 automatisch ans Ende
+  // ein, dort alphabetisch — reproduziert exakt das bisherige zweistufige
+  // Sortierverhalten, jetzt aber vollständig in der Datenbank.
+  const { data, error } = await query
+    .order("cached_revenue_365d", { ascending: false })
+    .order("display_name", { ascending: true })
+    .limit(LIST_LIMIT);
+
+  if (error) {
+    console.error("[getPartnersWithRevenue]", error);
+    return { ok: false, error: "Konnte Kunden nicht laden." };
   }
 
+  const partners = data ?? [];
   if (partners.length === 0) {
     return { ok: true, data: [] };
   }
 
-  // 2. Umsatz-Daten für ALLE Partner laden (in Batches) — live aus
-  // `tms.invoice_items` statt der nie in Produktion existierenden
-  // `mv_partner_monthly_revenue` (siehe features/PROJ-11-kundendetailseite.md,
-  // Deploy-Verlauf 2026-07-18 + Umsatz-Tab-Neubau). Läuft über den Admin-Client,
-  // da `invoice_items`/`invoices`-GRANTs bisher nur für `service_role` verifiziert
-  // sind (siehe revenue.ts).
+  // Lieferadressen nur für die begrenzte Treffermenge laden
   const partnerIds = partners.map((p) => p.id);
-  const revenueByPartner = new Map<string, number>();
-  const BATCH_SIZE = 100;
-  const PAGE_REVENUE = 1000;
-  const yearFrom = `${currentYear}-01-01`;
-  const yearTo = `${currentYear}-12-31`;
-  const adminClient = createAdminClient({ schema: "tms" });
-
-  for (let i = 0; i < partnerIds.length; i += BATCH_SIZE) {
-    const batchIds = partnerIds.slice(i, i + BATCH_SIZE);
-
-    for (let from = 0; ; from += PAGE_REVENUE) {
-      const { data: revenueData, error: revenueError } = await adminClient
-        .from("invoice_items")
-        .select("total_price_net, invoices!inner(document_date, partner_id)")
-        .in("invoices.partner_id", batchIds)
-        .gte("invoices.document_date", yearFrom)
-        .lte("invoices.document_date", yearTo)
-        .order("id", { ascending: true })
-        .range(from, from + PAGE_REVENUE - 1);
-
-      if (revenueError) {
-        console.error("[getPartnersWithRevenue] Revenue:", revenueError);
-        break;
-      }
-
-      const batch = (revenueData || []) as any[];
-      for (const row of batch) {
-        const partnerId = row.invoices?.partner_id;
-        if (!partnerId) continue;
-        const current = revenueByPartner.get(partnerId) || 0;
-        revenueByPartner.set(partnerId, current + centsToEuro(row.total_price_net));
-      }
-      if (batch.length < PAGE_REVENUE) break;
-    }
-  }
-
-  // 3. Partner mit Umsatz verknüpfen
-  const partnersWithRevenue: PartnerWithRevenue[] = partners.map((p) => ({
-    ...p,
-    current_year_revenue: revenueByPartner.get(p.id) || 0,
-    shipping_address: null,
-  }));
-
-  // 4. Sortieren: Mit Umsatz zuerst (absteigend), dann alphabetisch
-  partnersWithRevenue.sort((a, b) => {
-    const aHasRevenue = a.current_year_revenue > 0;
-    const bHasRevenue = b.current_year_revenue > 0;
-    if (aHasRevenue && !bHasRevenue) return -1;
-    if (!aHasRevenue && bHasRevenue) return 1;
-    if (aHasRevenue && bHasRevenue) {
-      return b.current_year_revenue - a.current_year_revenue;
-    }
-    return (a.display_name || "").localeCompare(b.display_name || "");
-  });
-
-  // 5. Top 20 auswählen
-  const sortedPartners = partnersWithRevenue.slice(0, 20);
-
-  // 6. Lieferadressen nur für die Top 20 laden
-  const top20Ids = sortedPartners.map((p) => p.id);
   const { data: addressesData, error: addressesError } = await supabase
     .schema("tms")
     .from("partner_addresses")
     .select("*")
-    .in("partner_id", top20Ids)
+    .in("partner_id", partnerIds)
     .eq("address_type", "shipping");
 
   if (addressesError) {
     console.error("[getPartnersWithRevenue] Addresses:", addressesError);
   }
 
-  // 7. Adressen zuordnen
   const shippingAddressByPartner = new Map<string, PartnerAddress>();
-  if (addressesData) {
-    for (const addr of addressesData) {
-      shippingAddressByPartner.set(addr.partner_id, addr);
-    }
+  for (const addr of addressesData ?? []) {
+    shippingAddressByPartner.set(addr.partner_id, addr);
   }
 
-  // 8. Adressen einfügen
-  const result: PartnerWithRevenue[] = sortedPartners.map((p) => ({
+  const result: PartnerWithRevenue[] = partners.map((p) => ({
     ...p,
+    revenue_365d: centsToEuro(p.cached_revenue_365d),
     shipping_address: shippingAddressByPartner.get(p.id) || null,
   }));
 
@@ -233,8 +166,9 @@ export async function getPartners(
 
   // Suche
   if (search) {
+    const escaped = escapeOrFilterValue(search);
     query = query.or(
-      `company_name.ilike.%${search}%,display_name.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`
+      `company_name.ilike."%${escaped}%",display_name.ilike."%${escaped}%",first_name.ilike."%${escaped}%",last_name.ilike."%${escaped}%",email.ilike."%${escaped}%"`
     );
   }
 
@@ -246,6 +180,95 @@ export async function getPartners(
   }
 
   return { ok: true, data: data ?? [] };
+}
+
+export type PartnerSearchResult = {
+  id: string;
+  displayName: string;
+  companyName: string | null;
+  city: string | null;
+  /** Umsatz der letzten rollierenden 365 Tage in Euro (PROJ-43-Cache-Spalte). */
+  revenue365d: number;
+};
+
+const HEADER_SEARCH_LIMIT = 8;
+
+/**
+ * Schlanke globale Kundensuche für das Header-Suchfeld (PROJ-43). Liefert nur
+ * die für das Ergebnis-Dropdown nötigen Felder, begrenzt auf HEADER_SEARCH_LIMIT
+ * Treffer. Suchfelder/Kundennummer-Erkennung identisch zu getPartners/
+ * getPartnersWithRevenue (Konsistenz laut Spec).
+ */
+export async function searchPartnersGlobal(
+  query: string,
+): Promise<{ ok: true; data: PartnerSearchResult[] } | { ok: false; error: string }> {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) {
+    return { ok: true, data: [] };
+  }
+
+  const supabase = await createClient();
+  const isNumeric = /^\d+$/.test(trimmed);
+
+  let dbQuery = supabase
+    .schema("tms")
+    .from("partners")
+    .select("id, display_name, company_name, cached_revenue_365d")
+    .eq("is_active", true)
+    .eq("is_archived", false);
+
+  const escaped = escapeOrFilterValue(trimmed);
+  dbQuery = isNumeric
+    ? dbQuery.or(
+        `company_name.ilike."%${escaped}%",display_name.ilike."%${escaped}%",first_name.ilike."%${escaped}%",last_name.ilike."%${escaped}%",email.ilike."%${escaped}%",easybill_customer_number.eq."${escaped}"`
+      )
+    : dbQuery.or(
+        `company_name.ilike."%${escaped}%",display_name.ilike."%${escaped}%",first_name.ilike."%${escaped}%",last_name.ilike."%${escaped}%",email.ilike."%${escaped}%"`
+      );
+
+  const { data, error } = await dbQuery
+    .order("cached_revenue_365d", { ascending: false })
+    .order("display_name", { ascending: true })
+    .limit(HEADER_SEARCH_LIMIT);
+
+  if (error) {
+    console.error("[searchPartnersGlobal]", error);
+    return { ok: false, error: "Suche fehlgeschlagen." };
+  }
+
+  const partners = data ?? [];
+  if (partners.length === 0) {
+    return { ok: true, data: [] };
+  }
+
+  // Städte nur für die begrenzte Treffermenge nachladen (analog
+  // getPartnersWithRevenue, das dasselbe für die Top 20 tut).
+  const partnerIds = partners.map((p) => p.id);
+  const { data: addresses, error: addressError } = await supabase
+    .schema("tms")
+    .from("partner_addresses")
+    .select("partner_id, city")
+    .in("partner_id", partnerIds)
+    .eq("address_type", "shipping");
+
+  if (addressError) {
+    console.error("[searchPartnersGlobal] Adressen:", addressError);
+  }
+
+  const cityByPartner = new Map<string, string | null>();
+  for (const addr of addresses ?? []) {
+    cityByPartner.set(addr.partner_id, addr.city);
+  }
+
+  const result: PartnerSearchResult[] = partners.map((p) => ({
+    id: p.id,
+    displayName: p.display_name,
+    companyName: p.company_name,
+    city: cityByPartner.get(p.id) ?? null,
+    revenue365d: centsToEuro(p.cached_revenue_365d),
+  }));
+
+  return { ok: true, data: result };
 }
 
 /**

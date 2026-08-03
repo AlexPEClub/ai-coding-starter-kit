@@ -25,6 +25,7 @@ import {
 
 import { type UserRole } from "@/lib/roles";
 import { signOutAction } from "@/lib/actions/auth";
+import { KundenSuche } from "@/components/kunden-suche";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -213,30 +214,33 @@ export function AppHeader({ user }: { user: CurrentUser }) {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-card">
-      <div className="mx-auto flex h-16 max-w-6xl items-center px-4">
-        {/* Links: Burger-Menü */}
-        <div className="flex w-14 items-center justify-start">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:gap-4">
+        {/* Burger-Menü */}
+        <div className="flex shrink-0 items-center">
           <NavigationSheet isAdmin={isAdmin} isRedaktion={isRedaktion} />
         </div>
 
-        {/* Mitte: Logo (echt zentriert) */}
-        <div className="flex flex-1 items-center justify-center">
-          <Link href="/home" className="flex items-center gap-2">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-              <Image
-                src="/logo.svg"
-                alt=""
-                width={28}
-                height={28}
-                className="h-7 w-7 brightness-0 invert"
-              />
-            </span>
-            <span className="text-lg font-bold text-foreground">TMS 2.0</span>
-          </Link>
+        {/* Logo */}
+        <Link href="/home" className="flex shrink-0 items-center gap-2">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
+            <Image
+              src="/logo.svg"
+              alt=""
+              width={28}
+              height={28}
+              className="h-7 w-7 brightness-0 invert"
+            />
+          </span>
+          <span className="hidden text-lg font-bold text-foreground sm:inline">TMS 2.0</span>
+        </Link>
+
+        {/* Kundensuche — immer sichtbar (PROJ-43) */}
+        <div className="min-w-0 flex-1">
+          <KundenSuche />
         </div>
 
-        {/* Rechts: User-Menü */}
-        <div className="flex w-14 items-center justify-end">
+        {/* User-Menü */}
+        <div className="flex shrink-0 items-center justify-end">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
