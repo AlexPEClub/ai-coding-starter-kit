@@ -112,6 +112,11 @@ For first deployment, guide the user through these setup guides:
 ### 6. Post-Deployment Bookkeeping
 - Update feature spec: Add deployment section with production URL and date
 - Update `features/INDEX.md`: Set status to **Deployed**
+
+## Handoff
+> "Deployed! Feature ist live."
+
+**Empfehlung:** Neue Session starten (`/clear` oder neues Terminal) für das nächste Feature/die nächste Stage — hält den Kontext schlank.
 - Create git tag: `git tag -a v1.X.0-PROJ-X -m "Deploy PROJ-X: [Feature Name]"`
 - Push tag: `git push origin v1.X.0-PROJ-X`
 

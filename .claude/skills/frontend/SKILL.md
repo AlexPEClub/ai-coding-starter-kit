@@ -96,6 +96,8 @@ If backend is needed:
 If no backend needed:
 > "Frontend is done! Next step: Run `/qa` to test this feature against its acceptance criteria."
 
+**Empfehlung:** Neue Session starten (`/clear` oder neues Terminal), bevor die nächste Stage läuft — hält den Kontext schlank.
+
 ## Checklist
 See [checklist.md](checklist.md) for the full implementation checklist.
 

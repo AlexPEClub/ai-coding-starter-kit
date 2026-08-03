@@ -156,6 +156,8 @@ This format ensures every criterion is unambiguous and directly testable by QA.
 ## Handoff
 > "Spec is ready. Run `/architecture` to design the technical approach for PROJ-X."
 
+**Empfehlung:** Neue Session starten (`/clear` oder neues Terminal), bevor `/architecture` läuft — hält den Kontext für die nächste Stage schlank.
+
 ## Git Commit
 ```
 feat(PROJ-X): Write feature specification for [feature name]

@@ -167,6 +167,8 @@ If production-ready:
 If bugs found:
 > "Found [N] bugs ([severity breakdown]). Status remains **In Review**. The developer needs to fix these before deployment. After fixes, run `/qa` again."
 
+**Empfehlung:** Neue Session starten (`/clear` oder neues Terminal), bevor die nächste Stage (Bugfix-Skill oder `/deploy`) läuft — hält den Kontext schlank.
+
 ## Git Commit
 ```
 test(PROJ-X): Add QA test results for [feature name]

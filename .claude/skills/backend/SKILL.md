@@ -121,6 +121,8 @@ After completion, update tracking files:
 After completion:
 > "Backend is done! Next step: Run `/qa` to test this feature against its acceptance criteria."
 
+**Empfehlung:** Neue Session starten (`/clear` oder neues Terminal), bevor `/qa` läuft — hält den Kontext für die nächste Stage schlank.
+
 ## Git Commit
 ```
 feat(PROJ-X): Implement backend for [feature name]

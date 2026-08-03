@@ -136,6 +136,8 @@ After approval, tell the user:
 >
 > If this feature needs backend work, you'll run `/backend` after frontend is done.
 
+**Empfehlung:** Neue Session starten (`/clear` oder neues Terminal), bevor `/frontend` läuft — hält den Kontext für die nächste Stage schlank.
+
 ## Git Commit
 ```
 docs(PROJ-X): Add technical design for [feature name]

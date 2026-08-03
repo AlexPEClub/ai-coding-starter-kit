@@ -16,3 +16,5 @@ Stelle die Fragen einzeln und warte auf meine Antwort, bevor du weitermachst. Me
 Wenn sich ein Fakt durch Erkunden der Umgebung (Dateien, Tools usw.) herausfinden lässt, schlag ihn selbst nach, statt mich zu fragen. Die Entscheidungen aber gehören mir: Leg mir jede einzeln vor und warte auf meine Antwort.
 
 Fang nicht mit der Umsetzung an, bevor ich bestätigt habe, dass wir ein gemeinsames Verständnis erreicht haben.
+
+**Empfehlung:** Sobald das gemeinsame Verständnis steht und es weitergeht (z. B. mit `/write-spec`), eine neue Session starten (`/clear` oder neues Terminal) — hält den Kontext für die nächste Stage schlank.
