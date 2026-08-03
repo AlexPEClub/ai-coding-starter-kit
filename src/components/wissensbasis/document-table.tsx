@@ -403,7 +403,6 @@ export function UploadDialog({
     const formData = new FormData(e.currentTarget);
     categoryIds.forEach((id) => formData.append("categoryIds", id));
     await onSubmit(formData);
-    reset();
   };
 
   return (

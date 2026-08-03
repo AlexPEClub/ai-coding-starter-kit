@@ -2,7 +2,7 @@
 
 ## Status: Deployed
 **Created:** 2026-07-20
-**Last Updated:** 2026-07-29
+**Last Updated:** 2026-08-03
 
 > Erstes Feature des **Content-Epics** (PROJ-29 → PROJ-30 → PROJ-31 → PROJ-32).
 > Ziel des Epics: eine große, durchsuchbare Text-Basis zu Themen der
@@ -599,6 +599,30 @@ eine konkrete Fehlermeldung, die den nächsten Diagnose-Schritt liefert.
 **Nicht geprüft (Hinweis für später):** ob dasselbe fehlende
 try/catch-Muster auch in anderen Server-Action-Aufrufen im Projekt vorkommt
 — eigener, separater Rundgang bei Bedarf.
+
+## Refine (2026-08-03) — Hotfix Nr. 3: Formular wird bei fehlgeschlagenem Upload geleert
+
+**Auslöser:** User meldete, dass der Datei-Upload "kaputt" sei.
+
+**Root Cause:** In `UploadDialog` (`src/components/wissensbasis/document-table.tsx`)
+rief `handleSubmit` nach `await onSubmit(formData)` **unbedingt** `reset()` auf —
+auch wenn der Upload fehlschlägt. Der Dialog bleibt bei einem Fehler bewusst offen
+(`wissensbasis-admin-page.tsx:handleUpload` schließt ihn nur im `result.ok`-Zweig via
+`setUploadOpen(false)`, was den bereits vorhandenen `onOpenChange`-Reset auslöst).
+Durch den zusätzlichen `reset()`-Aufruf in `handleSubmit` wurden Quelle,
+Kategorie-Auswahl und Datei-Name-Anzeige **auch bei einem fehlgeschlagenen Versuch**
+gelöscht — der User musste nach jedem Fehler alles neu eingeben, obwohl die
+Fehlermeldung im Dialog sichtbar blieb.
+
+**Fix (Hotfix, mit dem User abgestimmt):** Den fälschlichen `reset()`-Aufruf in
+`handleSubmit` entfernt. Reset passiert weiterhin korrekt und ausschließlich über
+`onOpenChange`, wenn der Dialog tatsächlich geschlossen wird (nur bei Erfolg).
+
+**Bewusst nicht mit erledigt (separates, nicht gemeldetes Thema):** ein
+Client-seitiger Dateigrößen-Check gegen das 25MB-Limit (`bodySizeLimit` in
+`next.config.ts`) fehlt weiterhin — große Dateien scheitern aktuell erst nach
+einem vollständigen (ggf. langsamen mobilen) Upload-Versuch mit einer generischen
+Fehlermeldung statt einem frühen "Datei zu groß"-Hinweis.
 
 ## Deployment
 _To be added by /deploy_
