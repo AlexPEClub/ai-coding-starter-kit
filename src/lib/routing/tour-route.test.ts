@@ -70,6 +70,8 @@ function createFakeAdminClient(options: {
   };
 }
 
+// Struktur verifiziert gegen einen echten Geoapify-Testaufruf (2026-08-03):
+// job_id liegt in waypoint.actions[], nicht direkt auf dem Wegpunkt.
 function geoapifyAntwort(stoppIds: string[]) {
   return {
     features: [
@@ -78,8 +80,8 @@ function geoapifyAntwort(stoppIds: string[]) {
           distance: 12345,
           time: 2400,
           waypoints: stoppIds.map((id, index) => ({
-            job_id: id,
             start_time: index * 1200,
+            actions: [{ type: "job", job_id: id }],
           })),
         },
       },

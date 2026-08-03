@@ -6,6 +6,13 @@
  * Läuft über `tsx` (statt kompiliertem Plain-JS wie scripts/update-holidays.mjs),
  * damit hier dieselbe Routing-Kernlogik wiederverwendet wird, die auch die
  * automatische Neuberechnung nutzt — kein zweites, driftendes Regelwerk.
+ * Der Admin-Client wird hier bewusst NICHT über src/lib/supabase/admin.ts
+ * bezogen (dessen `import "server-only"` wirft außerhalb von Next.js'
+ * eigenem Bundler-Kontext IMMER — auch unter Node/tsx, nicht nur im Browser
+ * —, da das npm-Paket `server-only` nur für die von Next.js gesetzte
+ * "react-server"-Exports-Condition einen No-Op liefert; jede andere
+ * Node-Ausführung landet im werfenden `default`-Zweig). Deshalb baut dieses
+ * Skript seinen eigenen Plain-Client, exakt wie scripts/update-holidays.mjs.
  *
  * Pro Tourengruppe isolierte Fehlerbehandlung: eine einzelne fehlerhafte
  * Gruppe (ungültige Adresse, Geoapify kurzzeitig down) bricht den Lauf nicht
@@ -19,13 +26,13 @@
  */
 
 import { readFileSync } from "node:fs";
-import { createAdminClient } from "../src/lib/supabase/admin";
+import { createClient } from "@supabase/supabase-js";
 import { berechneUndSpeichereRoute } from "../src/lib/routing/tour-route";
 
-function loadEnvLocal() {
+function loadEnvDatei(pfad: string) {
   let content: string;
   try {
-    content = readFileSync(".env.local", "utf8");
+    content = readFileSync(pfad, "utf8");
   } catch {
     return;
   }
@@ -42,11 +49,14 @@ function loadEnvLocal() {
     ) {
       value = value.slice(1, -1);
     }
-    if (!(key in process.env)) process.env[key] = value;
+    // Spätere Datei überschreibt frühere — exakt die Reihenfolge/Priorität
+    // von docker-compose.yml env_file: [.env.production, .env.local].
+    process.env[key] = value;
   }
 }
 
-loadEnvLocal();
+loadEnvDatei(".env.production");
+loadEnvDatei(".env.local");
 
 const OFFENE_STATUS = ["geplant", "unterwegs", "angekommen", "problem"];
 
@@ -63,7 +73,18 @@ async function main() {
     process.exit(1);
   }
 
-  const adminClient = createAdminClient({ schema: "tms" });
+  const url = process.env.SUPABASE_INTERNAL_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) {
+    console.error(
+      "Abbruch: SUPABASE_INTERNAL_URL/NEXT_PUBLIC_SUPABASE_URL bzw. SUPABASE_SERVICE_ROLE_KEY fehlen."
+    );
+    process.exit(1);
+  }
+  const adminClient = createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    db: { schema: "tms" },
+  });
 
   const { data: stopps, error } = await adminClient
     .from("tours")

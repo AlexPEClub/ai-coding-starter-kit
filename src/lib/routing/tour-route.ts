@@ -174,11 +174,12 @@ interface GeoapifyRoutePlannerAntwort {
  * validierten Stopp-Koordinaten als Wegpunkten auf. Ein Fahrzeug, kein
  * Rückweg zum Depot (kein `end_location` gesetzt), Modus "drive".
  *
- * Hinweis: die exakten Feldnamen der Geoapify-Antwort (`job_id`/`id`,
- * `start_time`/`arrival_time`) sollten beim ersten echten Testlauf gegen
- * die Live-API verifiziert werden — die Prüfung unten (alle Stopps müssen
- * in der Antwort zugeordnet werden können) fängt ein Namens-Mismatch als
- * klaren Fehlschlag ab, statt still falsche Daten zu speichern.
+ * Feldnamen anhand eines echten Testaufrufs verifiziert (2026-08-03): jeder
+ * Wegpunkt (`properties.waypoints[]`) trägt `start_time` direkt, aber die
+ * Job-Zuordnung liegt NICHT direkt auf dem Wegpunkt, sondern eine Ebene
+ * tiefer in `waypoint.actions[]` (Einträge mit `type: "job"` tragen
+ * `job_id`) — der Depot-Wegpunkt hat stattdessen eine Aktion `type: "start"`
+ * ohne `job_id` und wird dadurch automatisch übersprungen.
  */
 async function rufeGeoapifyRoutePlanner(
   depot: Koordinate,
@@ -225,11 +226,14 @@ async function rufeGeoapifyRoutePlanner(
 
   let position = 1;
   for (const waypoint of waypoints) {
-    const jobId: string | undefined = waypoint.job_id ?? waypoint.id;
-    if (!jobId) continue; // Depot-/Start-Pseudo-Wegpunkt ohne Job-Bezug überspringen
+    const jobAction = Array.isArray(waypoint.actions)
+      ? waypoint.actions.find((a: { type?: string; job_id?: string }) => a.type === "job")
+      : undefined;
+    const jobId: string | undefined = jobAction?.job_id;
+    if (!jobId) continue; // Depot-/Start-Wegpunkt (actions[].type "start") ohne Job-Bezug überspringen
 
     reihenfolge.set(jobId, position);
-    const ankunftSekunden: number = waypoint.start_time ?? waypoint.arrival_time ?? 0;
+    const ankunftSekunden: number = waypoint.start_time ?? 0;
     ankunftszeiten.set(jobId, new Date(start.getTime() + ankunftSekunden * 1000).toISOString());
     position += 1;
   }
