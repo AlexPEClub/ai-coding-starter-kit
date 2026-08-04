@@ -27,7 +27,12 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 function createFakeAdminClient(options: {
-  aktuelleFahrt: { fahrer_id: string | null; geplantes_abholdatum: string | null; notiz: string | null };
+  aktuelleFahrt: {
+    fahrer_id: string | null;
+    geplantes_abholdatum: string | null;
+    notiz: string | null;
+    status?: string;
+  };
   fahrerProfilGefunden?: boolean;
 }) {
   return {
@@ -147,5 +152,49 @@ describe("bearbeiteFahrt — PROJ-42 Neuberechnungs-Trigger", () => {
 
     expect(ergebnis).toEqual({ ok: true });
     expect(loeseNeuberechnungAusMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("bearbeiteFahrt — PROJ-44-Refine: Guard gegen Ändern eines finalen Stopps", () => {
+  it.each(["erledigt", "abgeschlossen", "archiviert"])(
+    "lehnt Änderungen ab, wenn der Stopp bereits Status '%s' hat",
+    async (status) => {
+      fakeAdminClient = createFakeAdminClient({
+        aktuelleFahrt: { fahrer_id: "fahrer-1", geplantes_abholdatum: "2026-08-05", notiz: null, status },
+      });
+
+      const { bearbeiteFahrt } = await import("./fahrten");
+      const ergebnis = await bearbeiteFahrt("fahrt-1", {
+        fahrerId: "fahrer-1",
+        datum: "2026-08-12",
+        notiz: "Versuchte Änderung",
+      });
+
+      expect(ergebnis).toEqual({
+        ok: false,
+        error: "Ein erledigter Stopp kann nicht mehr geändert werden.",
+      });
+      expect(loeseNeuberechnungAusMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it("erlaubt Änderungen, wenn der Stopp einen nicht-finalen Status hat", async () => {
+    fakeAdminClient = createFakeAdminClient({
+      aktuelleFahrt: {
+        fahrer_id: "fahrer-1",
+        geplantes_abholdatum: "2026-08-05",
+        notiz: null,
+        status: "geplant",
+      },
+    });
+
+    const { bearbeiteFahrt } = await import("./fahrten");
+    const ergebnis = await bearbeiteFahrt("fahrt-1", {
+      fahrerId: "fahrer-1",
+      datum: "2026-08-12",
+      notiz: null,
+    });
+
+    expect(ergebnis).toEqual({ ok: true });
   });
 });

@@ -175,7 +175,13 @@ export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptione
         })}
       </Accordion>
 
+      {/*
+        PROJ-44-Refine (Bug): key erzwingt einen Remount bei jedem Stopp-Wechsel,
+        damit lokaler State (z.B. erledeltLaedt) nicht vom vorherigen Stopp
+        hängen bleibt und "Erledigt" beim nächsten Stopp blockiert.
+      */}
       <StoppDetailModal
+        key={detailZiel?.fahrt.id ?? "leer"}
         ziel={detailZiel}
         onClose={() => setDetailZiel(null)}
         onOeffneBearbeiten={handleOeffneBearbeiten}

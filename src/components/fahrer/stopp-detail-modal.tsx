@@ -66,6 +66,16 @@ function formatAnkunftszeit(ankunftszeit: string): string {
   });
 }
 
+/**
+ * PROJ-44-Refine: Abweichung in Minuten zwischen geplanter (berechneter)
+ * Ankunftszeit und tatsächlicher Erledigt-Zeit. Positiv = zu spät, negativ = zu früh.
+ */
+function berechneAbweichungMinuten(berechneteAnkunftszeit: string, erledigtAm: string): number {
+  return Math.round(
+    (new Date(erledigtAm).getTime() - new Date(berechneteAnkunftszeit).getTime()) / 60000
+  );
+}
+
 /** Etappen-Distanz in km, z. B. "2,3 km". */
 function formatDistanz(distanzMeter: number): string {
   return `${(distanzMeter / 1000).toLocaleString("de-DE", { maximumFractionDigits: 1 })} km`;
@@ -155,6 +165,12 @@ export function StoppDetailModal({
 
   // Status ist "erledigt" wenn status === "erledigt" (PROJ-44)
   const istErledigt = ziel.fahrt.status === "erledigt";
+
+  // PROJ-44-Refine: Abweichung geplante vs. tatsächliche Erledigt-Zeit, nur wenn beide vorhanden.
+  const abweichungMinuten =
+    istErledigt && ziel.fahrt.erledigtAm && ziel.fahrt.berechneteAnkunftszeit
+      ? berechneAbweichungMinuten(ziel.fahrt.berechneteAnkunftszeit, ziel.fahrt.erledigtAm)
+      : null;
 
   // Navi-Link zu Google Maps mit der Kundenadresse
   const adresseFuerMaps = formatAdresseForMaps(ziel.fahrt.kunde);
@@ -247,6 +263,31 @@ export function StoppDetailModal({
                   </p>
                 </div>
 
+                {/* Erledigt-Zeit + Abweichung (PROJ-44-Refine) */}
+                {ziel.fahrt.erledigtAm && (
+                  <div>
+                    <p className="text-xs font-medium uppercase text-muted-foreground">
+                      Erledigt um
+                    </p>
+                    <p className="text-sm text-foreground">
+                      {formatAnkunftszeit(ziel.fahrt.erledigtAm)} Uhr
+                      {abweichungMinuten !== null && (
+                        <span
+                          className={
+                            abweichungMinuten > 0
+                              ? "ml-2 font-medium text-destructive"
+                              : abweichungMinuten < 0
+                                ? "ml-2 font-medium text-green-600"
+                                : "ml-2 font-medium text-muted-foreground"
+                          }
+                        >
+                          {abweichungMinuten > 0 ? `+${abweichungMinuten}` : abweichungMinuten} Min.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
+
                 {/* Etappen-Distanz und Fahrzeit (PROJ-44) */}
                 {ziel.legDistanceMeters !== null && ziel.legDistanceMeters !== undefined && (
                   <div className="grid grid-cols-2 gap-4">
@@ -300,15 +341,17 @@ export function StoppDetailModal({
 
           {/* Action-Buttons */}
           <div className="flex gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="min-h-[48px] flex-1"
-              onClick={() => onOeffneBearbeiten(ziel)}
-            >
-              Ändern
-            </Button>
+            {!istErledigt && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-h-[48px] flex-1"
+                onClick={() => onOeffneBearbeiten(ziel)}
+              >
+                Ändern
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"

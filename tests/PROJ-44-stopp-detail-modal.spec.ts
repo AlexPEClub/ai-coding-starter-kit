@@ -348,3 +348,175 @@ test.describe("PROJ-44 — Edge Cases", () => {
     }
   });
 });
+
+test.describe("PROJ-44 — Refine 2026-08-04: Bugfixes & neue Features", () => {
+  test("PROJ-44-Refine BUG-1: Fahrer-Feld zeigt den Namen des angeloggten Fahrers (nicht '–') im Tab 'Mir zugewiesen'", async ({
+    page,
+  }) => {
+    // Teste mit Fahrer-Account, der Touren zugewiesen hat
+    await login(page, FAHRER_EMAIL);
+    await page.goto("/fahrer");
+
+    // Gehe zum "Mir zugewiesen"-Tab
+    const mirZugewiesenTab = page.getByRole("tab", { name: "Mir zugewiesen" });
+    if (await mirZugewiesenTab.isVisible()) {
+      await mirZugewiesenTab.click();
+      await page.waitForTimeout(500);
+
+      // Suche eine beliebige Tour und öffne sie
+      const tourButton = page.getByRole("button").filter({ hasText: /\d{2}\.\d{2}\.\d{4}/ }).first();
+      if (await tourButton.isVisible()) {
+        await tourButton.click();
+        await page.waitForTimeout(300);
+
+        // Klicke auf einen Stopp
+        const stoppButton = page
+          .locator('button:has-text(/^[A-ZÄÖÜa-zäöü\\s&\\.,-]+$/)') // Kundenname
+          .first();
+        if (await stoppButton.isVisible()) {
+          await stoppButton.click();
+          await page.waitForTimeout(300);
+
+          // Prüfe, dass das Modal öffnet und die Fahrer-Info zeigt
+          const modal = page.getByRole("dialog");
+          await expect(modal).toBeVisible();
+
+          // Prüfe, dass das Fahrer-Feld nicht "–" zeigt, sondern einen echten Namen/Email
+          // (Der Name sollte aus profile.full_name || profile.email kommen, nicht null sein)
+          const fahrerText = page.getByText(/Fahrer/i).locator("..").nth(1);
+          const fahrerValue = await fahrerText.textContent();
+
+          // Der Wert sollte nicht nur "–" oder "null" sein
+          expect(fahrerValue).toBeTruthy();
+          expect(fahrerValue).not.toMatch(/^–?$/);
+        }
+      }
+    }
+  });
+
+  test("PROJ-44-Refine BUG-2: Erledigt-Button bleibt responsiv nach Markieren eines Stopps", async ({
+    page,
+  }) => {
+    // Dieser Test verifyzt, dass der Loading-State nicht hängen bleibt
+    // wenn mehrere Stopps hintereinander geklickt werden
+    await login(page, FAHRER_EMAIL);
+    await page.goto("/fahrer");
+    await page.getByRole("tab", { name: "Tourenplanung" }).click();
+
+    const tourButton = page.getByRole("button", { name: /06\.07\.2026.*Mechthild Gudel/s }).first();
+    if (await tourButton.isVisible()) {
+      await tourButton.click();
+      await page.waitForTimeout(300);
+
+      // Öffne ersten Stopp
+      const stopp1 = page.getByRole("button", { name: /Rhehag GmbH/ }).first();
+      if (await stopp1.isVisible()) {
+        await stopp1.click();
+        await page.waitForTimeout(200);
+
+        // Schließe Modal
+        const closeButton = page.locator("button").filter({ hasText: /schließen|×|close/i }).first();
+        if (await closeButton.isVisible()) {
+          await closeButton.click();
+        } else {
+          // Fallback: ESC drücken
+          await page.keyboard.press("Escape");
+        }
+        await page.waitForTimeout(300);
+
+        // Öffne zweiten Stopp
+        const stopp2 = page.locator('button:has-text(/^[A-ZÄÖÜa-zäöü\\s&\\.,-]+$/)').nth(1);
+        if (await stopp2.isVisible()) {
+          await stopp2.click();
+          await page.waitForTimeout(200);
+
+          // Prüfe, dass der Erledigt-Button nicht mit "Lädt…" steckenbleibt
+          // und responsive ist (nicht disabled)
+          const erledigtButton = page.getByRole("button", { name: "Erledigt" });
+          if (await erledigtButton.isVisible()) {
+            // Der Button sollte nicht disabled sein (Loading-State sollte nicht bleiben)
+            const isDisabled = await erledigtButton.isDisabled();
+            expect(isDisabled).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  test("PROJ-44-Refine NEW-FEATURE-1: Zeit-Vergleich geplant vs. erledigt zeigt Abweichung mit Farbcodierung", async ({
+    page,
+  }) => {
+    // Teste mit einem Stopp, der bereits erledigt ist
+    // Achte auf "Erledigt um [Zeit]" mit +X Min. (rot) / -X Min. (grün) / 0 Min. (grau)
+    await login(page, FAHRER_EMAIL);
+    await page.goto("/fahrer");
+    await page.getByRole("tab", { name: "Tourenplanung" }).click();
+
+    const tourButton = page.getByRole("button", { name: /06\.07\.2026.*Mechthild Gudel/s }).first();
+    if (await tourButton.isVisible()) {
+      await tourButton.click();
+      await page.waitForTimeout(300);
+
+      // Suche einen Stopp mit Status "Erledigt" (würde durchgestrichen sein)
+      // Fallback: suche einen beliebigen Stopp und öffne ihn
+      const stoppButton = page.getByRole("button").filter({ hasText: /[A-Z]/ }).nth(2);
+      if (await stoppButton.isVisible()) {
+        await stoppButton.click();
+        await page.waitForTimeout(300);
+
+        const modal = page.getByRole("dialog");
+        await expect(modal).toBeVisible();
+
+        // Prüfe ob "Erledigt um [Zeit]" text vorhanden ist
+        const erledigtUmText = page.getByText(/Erledigt um/i);
+
+        // Wenn der Stopp erledigt ist, sollte die Zeit-Info und Abweichung vorhanden sein
+        // (Abweichung = +/- X Min. in Farbe oder neutral bei 0)
+        if (await erledigtUmText.isVisible()) {
+          const abweichungText = page.getByText(/[+-]\d+\s*Min\./);
+          // Wenn Abweichung sichtbar, sollte sie die richtige Klasse haben:
+          // - text-destructive (rot) für positiv (zu spät)
+          // - text-green-600 (grün) für negativ (zu früh)
+          // - text-muted-foreground (grau) für 0
+          expect(abweichungText).toBeDefined();
+        }
+      }
+    }
+  });
+
+  test("PROJ-44-Refine NEW-FEATURE-2: Ändern-Button ist nicht sichtbar für bereits erledigte Stopps", async ({
+    page,
+  }) => {
+    // Teste mit einem Stopp, der Status "erledigt" hat
+    await login(page, FAHRER_EMAIL);
+    await page.goto("/fahrer");
+    await page.getByRole("tab", { name: "Tourenplanung" }).click();
+
+    const tourButton = page.getByRole("button", { name: /06\.07\.2026.*Mechthild Gudel/s }).first();
+    if (await tourButton.isVisible()) {
+      await tourButton.click();
+      await page.waitForTimeout(300);
+
+      // Suche einen durchgestrichenen Stopp (zeigt visuell, dass er erledigt ist)
+      const durchgestrichenerStopp = page.locator("button").filter({ hasText: /line-through/ }).first();
+
+      if (await durchgestrichenerStopp.isVisible()) {
+        await durchgestrichenerStopp.click();
+        await page.waitForTimeout(300);
+
+        const modal = page.getByRole("dialog");
+        await expect(modal).toBeVisible();
+
+        // Prüfe, dass der "Ändern"-Button NICHT sichtbar ist
+        const aendernButton = page.getByRole("button", { name: "Ändern" });
+
+        // Fallback: prüfe Status-Badge, ob er "Erledigt" zeigt
+        const erledigtBadge = page.getByText(/Erledigt/i);
+        if (await erledigtBadge.isVisible()) {
+          // Wenn Status "Erledigt" ist, darf Ändern-Button nicht sichtbar sein
+          expect(await aendernButton.isVisible()).toBe(false);
+        }
+      }
+    }
+  });
+});

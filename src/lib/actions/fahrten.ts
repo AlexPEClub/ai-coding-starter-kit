@@ -106,6 +106,7 @@ export async function getEigeneOffeneTouren(): Promise<FahrtenResult> {
       berechnete_ankunftszeit,
       leg_distance_meters,
       leg_duration_seconds,
+      geaendert_am,
       partners:partner_id ( display_name, company_name )
     `
     )
@@ -132,7 +133,7 @@ export async function getEigeneOffeneTouren(): Promise<FahrtenResult> {
       geplantesAbholdatum: row.geplantes_abholdatum,
       notiz: row.notiz ?? null,
       fahrerId: profile.id,
-      fahrerName: null,
+      fahrerName: profile.full_name || profile.email,
       routeOrder: row.route_order ?? null,
       routeCalculatedAt: row.route_calculated_at ?? null,
       routeDistanzMeter: row.route_distance_meters ?? null,
@@ -140,6 +141,7 @@ export async function getEigeneOffeneTouren(): Promise<FahrtenResult> {
       berechneteAnkunftszeit: row.berechnete_ankunftszeit ?? null,
       legDistanzMeter: row.leg_distance_meters ?? null,
       legDauerSekunden: row.leg_duration_seconds ?? null,
+      erledigtAm: row.status === "erledigt" ? row.geaendert_am ?? null : null,
       kunde: {
         name: row.partners?.display_name ?? row.partners?.company_name ?? "Unbekannter Kunde",
         ...adresse,
@@ -174,6 +176,7 @@ export async function getAlleOffeneTouren(): Promise<FahrtenResult> {
       berechnete_ankunftszeit,
       leg_distance_meters,
       leg_duration_seconds,
+      geaendert_am,
       partners:partner_id ( display_name, company_name )
     `
     )
@@ -228,6 +231,7 @@ export async function getAlleOffeneTouren(): Promise<FahrtenResult> {
       berechneteAnkunftszeit: row.berechnete_ankunftszeit ?? null,
       legDistanzMeter: row.leg_distance_meters ?? null,
       legDauerSekunden: row.leg_duration_seconds ?? null,
+      erledigtAm: row.status === "erledigt" ? row.geaendert_am ?? null : null,
       kunde: {
         name: row.partners?.display_name ?? row.partners?.company_name ?? "Unbekannter Kunde",
         ...adresse,
@@ -316,13 +320,21 @@ export async function bearbeiteFahrt(
 
   const { data: aktuelleFahrt, error: leseFehler } = await adminClient
     .from("tours")
-    .select("fahrer_id, geplantes_abholdatum, notiz")
+    .select("fahrer_id, geplantes_abholdatum, notiz, status")
     .eq("id", fahrtId)
     .single();
 
   if (leseFehler || !aktuelleFahrt) {
     console.error("bearbeiteFahrt (lesen) error:", leseFehler);
     return { ok: false, error: "Fahrt nicht gefunden." };
+  }
+
+  // PROJ-44-Refine: ein bereits erledigter/finaler Stopp darf nicht mehr
+  // geändert werden — schützt auch bei einem direkt konstruierten Aufruf
+  // am UI vorbei (gleiches Muster wie der Guard in markiereFahrtAlsErledigt).
+  const finaleStatus = ["erledigt", "abgeschlossen", "archiviert"];
+  if (finaleStatus.includes(aktuelleFahrt.status)) {
+    return { ok: false, error: "Ein erledigter Stopp kann nicht mehr geändert werden." };
   }
 
   const neueNotiz = eingabe.notiz || null;

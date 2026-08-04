@@ -22,6 +22,8 @@ export interface Fahrt {
   legDistanzMeter?: number | null;
   /** PROJ-44: Etappen-Fahrzeit vom vorherigen Stopp (in Sekunden), null ohne Berechnung. */
   legDauerSekunden?: number | null;
+  /** PROJ-44-Refine: Zeitpunkt, an dem der Stopp als erledigt markiert wurde (ISO), nur bei Status "erledigt". */
+  erledigtAm?: string | null;
 }
 
 export interface Tour {
@@ -122,8 +124,8 @@ export function gruppiereZuTouren(fahrten: RohFahrt[]): Tour[] {
         fahrerId: gruppe.fahrerId,
         fahrerName: gruppe.fahrerName,
         fahrten: sortierteFahrten.map(
-          ({ fahrerId: _fahrerId, fahrerName: _fahrerName, routeCalculatedAt: _rc, routeDistanzMeter: _rd, routeDauerSekunden: _rs, legDistanzMeter, legDauerSekunden, ...fahrt }) =>
-            ({ ...fahrt, legDistanzMeter, legDauerSekunden })
+          ({ fahrerId: _fahrerId, fahrerName: _fahrerName, routeCalculatedAt: _rc, routeDistanzMeter: _rd, routeDauerSekunden: _rs, legDistanzMeter, legDauerSekunden, erledigtAm, ...fahrt }) =>
+            ({ ...fahrt, legDistanzMeter, legDauerSekunden, erledigtAm })
         ),
         gesamtDistanzMeter: routeVollstaendig ? gruppe.fahrten[0].routeDistanzMeter : null,
         gesamtDauerSekunden: routeVollstaendig ? gruppe.fahrten[0].routeDauerSekunden : null,
