@@ -357,7 +357,7 @@ dem ersten Deploy, analog zur bestehenden Praxis.
 - [x] Treffer zeigt Name/Firma, Ort, Umsatz
 - [x] Kein Treffer → "Keine Kunden gefunden"
 - [x] Klick auf Treffer navigiert zu `/kunden/[id]`
-- [ ] **Siehe BUG-1:** Die Suche selbst funktioniert korrekt für normale Eingaben, aber die zugrunde liegende Query ist nicht gegen PostgREST-Filter-Injection abgesichert (Security-Kriterium, nicht explizit als eigenes AC formuliert, aber Teil der impliziten "Suche muss sicher sein"-Anforderung aus den Technical Requirements: *"Sanitize data before database insertion"* / Secure-by-Design-Grundsatz aus CLAUDE.md)
+- [x] **BUG-1 gefixt & re-verifiziert:** Query jetzt gegen PostgREST-Filter-Injection abgesichert (siehe Bugfix-Verifikation unten)
 
 #### Umsatz-Konsistenz
 - [x] `/kunden`-Liste, Such-Dropdown und Umsatz-Tab-Standardansicht zeigen identischen Wert für denselben Kunden (verifiziert an "Mann & Tellschow Maschinen-Vertriebs-GmbH": €27.812,46 an allen drei Stellen)
@@ -387,7 +387,7 @@ dem ersten Deploy, analog zur bestehenden Praxis.
 - [x] XSS: Payload im Suchfeld wird nicht ausgeführt (React escaped Ausgabe korrekt)
 - [x] Datensparsamkeit: `PartnerSearchResult` liefert laut Code nur `id, displayName, companyName, city, revenue365d` — keine E-Mail/Telefon/Steuer-ID im Antwort-Payload
 - [x] Bewusst keine zusätzliche Rollenprüfung (Produktentscheidung laut Spec, konsistent mit der bereits offenen `/kunden`-Seite) — kein Bug
-- [ ] **BUG-1 (siehe unten): PostgREST-`.or()`-Filter-Injection** — Sucheingabe mit Komma kann eigene Filterbedingungen einschleusen und den Ergebnisfilter faktisch außer Kraft setzen
+- [x] **BUG-1 gefixt & re-verifiziert** (siehe unten): PostgREST-`.or()`-Filter-Injection behoben
 
 ### Bugs Found
 
@@ -411,6 +411,17 @@ dem ersten Deploy, analog zur bestehenden Praxis.
   3. Screenreader-Nutzer können die beiden Felder nicht anhand des zugänglichen Namens unterscheiden; auch automatisiertes Testen (`getByLabel`) trifft standardmäßig zuerst die Header-Suche statt der eigentlich gemeinten Listen-Suche
 - **Priority:** Nice to have — funktional nicht blockierend (beide Felder arbeiten unabhängig korrekt), aber ein A11y-Polish-Punkt, der leicht behebbar wäre (z. B. `aria-label="Kunden durchsuchen"` für die neue Header-Suche)
 
+### Bugfix-Verifikation (2026-08-03, nach User-Freigabe „beide zusammen")
+
+**BUG-1 (High) — behoben:** `escapeOrFilterValue()` (aus `orders-helpers.ts`) wird jetzt in allen drei betroffenen Funktionen (`searchPartnersGlobal`, `getPartnersWithRevenue`, `getPartners` in `src/lib/actions/partners.ts`) auf den Suchbegriff angewendet, die Werte werden zusätzlich in doppelte Anführungszeichen gesetzt (`ilike."%${escaped}%"`), identisch zum bereits etablierten Muster in `orders.ts`/`manufacturers.ts`/`werkzeug-auftraege.ts`.
+- Unit-Tests (`partners.test.ts`): 10/10 grün (vorher 8/10) — die beiden Injection-Tests bestehen jetzt.
+- E2E-Test (`tests/PROJ-43-...spec.ts`, umbenannt zu „REGRESSION BUG-1"): isoliert grün; im Volllauf 14/15 bzw. 15/15 grün (die eine Abweichung war der bereits dokumentierte, unabhängige Login-Hydration-Race, kein PROJ-43-Bug — siehe „Beobachtung" unten).
+- Live nachvollzogen: `zzznomatch99999,display_name.neq.` liefert jetzt korrekt "Keine Kunden gefunden" (vorher 8 falsche Treffer), sowohl in der Header-Suche als auch in `/kunden?search=...`.
+
+**BUG-2 (Low) — behoben:** aria-label der neuen Header-Suche (`kunden-suche.tsx`) auf `"Kunden durchsuchen"` geändert — eindeutig unterscheidbar von der bestehenden Listen-Suche (`kunden-search.tsx`, weiterhin `"Kunde suchen"`). E2E-Testdatei entsprechend angepasst (Helper `suchfeld()` nutzt jetzt das neue Label).
+
+Re-Verifikation gesamt: `npx vitest run src/lib/actions/partners.test.ts` (10/10), `npx playwright test tests/PROJ-43-globale-kundensuche-umsatz-caching.spec.ts --project=chromium` (15/15, isoliert bestätigt), `npm run lint` (0 Fehler, 1 vorbestehende unabhängige Warnung in `revenue-chart.tsx`), `npx tsc --noEmit` (keine neuen Fehler; die einzigen verbleibenden sind vorbestehende, unabhängige Fehler in `PROJ-21/41/42`-Testdateien).
+
 ### Beobachtung (kein bestätigter Bug)
 Während automatisierter Testläufe trat vereinzelt (nicht reproduzierbar bei gezielten Wiederholungsversuchen) eine React-Hydration-Warnung wegen abweichender Radix-`aria-controls`/`id`-Werte (Burger-Menü/Nutzermenü) in der Browser-Konsole auf. Isolierte Tests mit identischen Navigationsschritten (normale Link-Navigation, Klick auf Suchergebnis) konnten sie nicht reproduzieren — deutet auf einen bekannten Dev-Mode-Effekt (Radix `useId`-Zähler bei React-Strict-Mode-Doppel-Render) statt auf einen PROJ-43-spezifischen Fehler hin. Nicht production-blockierend, aber als Beobachtung festgehalten, falls sie bei zukünftiger QA erneut auffällt.
 
@@ -424,16 +435,16 @@ Während automatisierter Testläufe trat vereinzelt (nicht reproduzierbar bei ge
 - PROJ-18 Header/Navigation: Burger-Menü, Logo, User-Menü funktionieren nach dem Layout-Umbau auf 375px/768px/1440px
 
 ### Automatisierte Tests
-- **Unit (Vitest):** neue Datei `src/lib/actions/partners.test.ts` — 8/10 grün, 2 rot (dokumentieren BUG-1 reproduzierbar, siehe oben). `npm test` gesamt: 414/414 bestehende Tests weiterhin grün (unveränderte Vorbedingung: mehrere `.claude/worktrees/*/tests/deploy/smoke.spec.ts`-Dateien lassen sich nicht als Vitest-Testdateien laden — bereits vor dieser QA-Session bestehend, gehört zu fremden, nicht abgeschlossenen Worktrees, nicht Teil von PROJ-43)
-- **E2E (Playwright):** neue Datei `tests/PROJ-43-globale-kundensuche-umsatz-caching.spec.ts` — 14/15 grün, 1 rot (dokumentiert BUG-1 auch live im Browser, 8 Treffer statt 0 für eine garantiert nicht existierende Suche)
-- Ad-hoc-Skripte aus dem Explorationsanlauf (`qa-proj43*.mjs` im Repo-Root) wieder entfernt, nachdem ihre Fälle in die permanente Test-Suite überführt wurden
+- **Unit (Vitest):** `src/lib/actions/partners.test.ts` — 10/10 grün (nach Bugfix; vorher 8/10)
+- **E2E (Playwright):** `tests/PROJ-43-globale-kundensuche-umsatz-caching.spec.ts` — 15/15 grün (nach Bugfix; vorher 14/15)
+- Ad-hoc-Skripte aus dem Explorationsanlauf (`qa-proj43*.mjs` im Repo-Root) entfernt, nachdem ihre Fälle in die permanente Test-Suite überführt wurden
 
 ### Summary
 - **Acceptance Criteria:** 15/15 funktional bestanden (alle happy-path-Kriterien der Spec erfüllt)
-- **Bugs Found:** 2 total (1 High, 1 Low)
-- **Security:** Issues found — BUG-1 (High) muss vor Deploy behoben werden
-- **Production Ready:** NO
-- **Recommendation:** BUG-1 (PostgREST-Filter-Injection) vor `/deploy` fixen — Lösung liegt bereits als getestetes Pattern im Projekt vor (`escapeOrFilterValue` aus `orders-helpers.ts` auf alle drei `.or()`-Aufrufe in `partners.ts` anwenden, dann die 2 rot markierten Tests in `partners.test.ts` und den 1 rot markierten E2E-Test erneut laufen lassen). BUG-2 kann optional zeitgleich mitgenommen werden.
+- **Bugs Found:** 2 total (1 High, 1 Low) — **beide gefixt & re-verifiziert** (siehe Bugfix-Verifikation oben)
+- **Security:** BUG-1 (PostgREST-Filter-Injection) behoben, re-verifiziert per Unit- und E2E-Test
+- **Production Ready:** YES (Chromium vollständig verifiziert; Mobile Safari in dieser Umgebung nicht testbar, siehe Cross-Browser-Hinweis — kein erhöhtes Risiko erwartet, vor dem nächsten Live-Test nachholen)
+- **Recommendation:** Bereit für `/deploy`. Empfehlung: Mobile-Safari-Smoke-Test nachholen, sobald der Dev-Host wieder Speicherkapazität hat (Post-Deploy-Smoke-Test läuft ohnehin automatisch auch gegen „Mobile Safari").
 
 ## Deployment
 _To be added by /deploy_
