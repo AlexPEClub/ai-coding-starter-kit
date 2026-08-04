@@ -14,6 +14,12 @@ const NOTIZ_MAX_LAENGE = 500;
 
 export type { Fahrt, Tour, FahrerOption } from "./fahrten-helpers";
 
+// PROJ-21/PROJ-42/PROJ-44: Ladefunktionen laden diese Status (offene + neu erledigte Stopps aus PROJ-44).
+// Erledigte Stopps werden geladen, aber am Ende ihrer Tour einsortiert und optional optisch
+// abgeschwächt dargestellt (siehe gruppiereZuTouren in fahrten-helpers.ts).
+const GELAD_STATUS = ["geplant", "unterwegs", "angekommen", "problem", "erledigt"] as const;
+// Der ältere OFFENE_STATUS wird noch in tour-route.ts zum Filtern der Touren für
+// Neuberechnung verwendet (dort dürfen nur nicht-finale Stopps einbezogen werden).
 const OFFENE_STATUS = ["geplant", "unterwegs", "angekommen", "problem"] as const;
 
 export type FahrtenResult =
@@ -98,11 +104,13 @@ export async function getEigeneOffeneTouren(): Promise<FahrtenResult> {
       route_distance_meters,
       route_duration_seconds,
       berechnete_ankunftszeit,
+      leg_distance_meters,
+      leg_duration_seconds,
       partners:partner_id ( display_name, company_name )
     `
     )
     .eq("fahrer_id", profile.id)
-    .in("status", OFFENE_STATUS)
+    .in("status", GELAD_STATUS)
     .order("geplantes_abholdatum", { ascending: true });
 
   if (error) {
@@ -130,6 +138,8 @@ export async function getEigeneOffeneTouren(): Promise<FahrtenResult> {
       routeDistanzMeter: row.route_distance_meters ?? null,
       routeDauerSekunden: row.route_duration_seconds ?? null,
       berechneteAnkunftszeit: row.berechnete_ankunftszeit ?? null,
+      legDistanzMeter: row.leg_distance_meters ?? null,
+      legDauerSekunden: row.leg_duration_seconds ?? null,
       kunde: {
         name: row.partners?.display_name ?? row.partners?.company_name ?? "Unbekannter Kunde",
         ...adresse,
@@ -162,10 +172,12 @@ export async function getAlleOffeneTouren(): Promise<FahrtenResult> {
       route_distance_meters,
       route_duration_seconds,
       berechnete_ankunftszeit,
+      leg_distance_meters,
+      leg_duration_seconds,
       partners:partner_id ( display_name, company_name )
     `
     )
-    .in("status", OFFENE_STATUS)
+    .in("status", GELAD_STATUS)
     .order("geplantes_abholdatum", { ascending: true });
 
   if (error) {
@@ -214,6 +226,8 @@ export async function getAlleOffeneTouren(): Promise<FahrtenResult> {
       routeDistanzMeter: row.route_distance_meters ?? null,
       routeDauerSekunden: row.route_duration_seconds ?? null,
       berechneteAnkunftszeit: row.berechnete_ankunftszeit ?? null,
+      legDistanzMeter: row.leg_distance_meters ?? null,
+      legDauerSekunden: row.leg_duration_seconds ?? null,
       kunde: {
         name: row.partners?.display_name ?? row.partners?.company_name ?? "Unbekannter Kunde",
         ...adresse,
@@ -455,4 +469,74 @@ export async function getFahrtAenderungen(
       geaendertAm: row.geaendert_am,
     })),
   };
+}
+
+// PROJ-44 — Stopp als erledigt markieren
+
+export type MarkiereAlsErlediltResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Markiert einen Stopp als "erledigt" und erstellt einen Chronologie-Eintrag.
+ * Serverseitige Absicherung: Status darf nur von nicht-finalem Zustand nach "erledigt" wechseln.
+ * Rollenprüfung: nur Fahrer/Admin.
+ */
+export async function markiereFahrtAlsErledigt(fahrtId: string): Promise<MarkiereAlsErlediltResult> {
+  const zugriff = await pruefeFahrerZugriff();
+  if (!zugriff.ok) return zugriff;
+  const { profile } = zugriff;
+
+  const adminClient = createAdminClient({ schema: "tms" });
+
+  // Fahrt laden: prüfe aktuellen Status
+  const { data: aktuelleFahrt, error: leseFehler } = await adminClient
+    .from("tours")
+    .select("id, status")
+    .eq("id", fahrtId)
+    .single();
+
+  if (leseFehler || !aktuelleFahrt) {
+    console.error("markiereFahrtAlsErledigt (lesen) error:", leseFehler);
+    return { ok: false, error: "Fahrt nicht gefunden." };
+  }
+
+  // Serverseitige Absicherung: nur von nicht-finalem Status nach "erledigt" übergehen
+  const finaleStatus = ["erledigt", "abgeschlossen", "archiviert"];
+  if (finaleStatus.includes(aktuelleFahrt.status)) {
+    return { ok: false, error: "Stopp ist bereits in einem finalen Status." };
+  }
+
+  // Status setzen auf "erledigt"
+  const { error: updateFehler } = await adminClient
+    .from("tours")
+    .update({
+      status: "erledigt",
+      geaendert_am: new Date().toISOString(),
+    })
+    .eq("id", fahrtId);
+
+  if (updateFehler) {
+    console.error("markiereFahrtAlsErledigt (update) error:", updateFehler);
+    return { ok: false, error: "Status konnte nicht aktualisiert werden." };
+  }
+
+  // Chronologie-Eintrag: Status: [alter Status] → erledigt
+  const { error: verlaufFehler } = await adminClient.from("tour_aenderungen").insert({
+    tour_id: fahrtId,
+    feld: "status",
+    alter_wert: aktuelleFahrt.status,
+    neuer_wert: "erledigt",
+    geaendert_von: profile.id,
+  });
+
+  if (verlaufFehler) {
+    // Die eigentliche Änderung ist bereits gespeichert — ein fehlgeschlagener
+    // Verlaufs-Eintrag soll das nicht rückgängig machen, aber sichtbar sein.
+    console.error("markiereFahrtAlsErledigt (Verlauf) error:", verlaufFehler);
+  }
+
+  // Nicht wie bearbeiteFahrt: Status-Änderung allein löst KEINE Neuberechnung aus
+  // (siehe Decision Log: Statuswechsel ändert weder Fahrer noch Datum noch Adressen)
+
+  revalidatePath("/fahrer");
+  return { ok: true };
 }

@@ -18,6 +18,10 @@ export interface Fahrt {
   routeOrder: number | null;
   /** PROJ-42: berechnete Ankunftszeit an diesem Stopp (ISO), null ohne Berechnung. */
   berechneteAnkunftszeit: string | null;
+  /** PROJ-44: Etappen-Distanz vom vorherigen Stopp (in Metern), null ohne Berechnung. */
+  legDistanzMeter?: number | null;
+  /** PROJ-44: Etappen-Fahrzeit vom vorherigen Stopp (in Sekunden), null ohne Berechnung. */
+  legDauerSekunden?: number | null;
 }
 
 export interface Tour {
@@ -43,6 +47,10 @@ export interface RohFahrt extends Fahrt {
   routeCalculatedAt: string | null;
   routeDistanzMeter: number | null;
   routeDauerSekunden: number | null;
+  /** PROJ-44: Etappen-Distanz vom vorherigen Stopp (in Metern). */
+  legDistanzMeter?: number | null;
+  /** PROJ-44: Etappen-Fahrzeit vom vorherigen Stopp (in Sekunden). */
+  legDauerSekunden?: number | null;
 }
 
 /**
@@ -53,6 +61,11 @@ export interface RohFahrt extends Fahrt {
  * nach `routeOrder` sortiert und Gesamtstrecke/-fahrzeit ausgegeben — sonst
  * bleibt es beim bisherigen Datums-/Anlage-Reihenfolge-Fallback ohne
  * Distanz-/Fahrzeit-Anzeige.
+ *
+ * PROJ-44: erledigte Stopps werden geladen und angezeigt, aber innerhalb ihrer Tour
+ * ans Ende sortiert. Touren, bei denen ALLE Stopps erledigt/abgeschlossen/archiviert
+ * sind, werden komplett aus der Liste entfernt (wie bei vollständig abgeschlossenen
+ * Touren schon vorher).
  */
 export function gruppiereZuTouren(fahrten: RohFahrt[]): Tour[] {
   const gruppen = new Map<
@@ -72,23 +85,45 @@ export function gruppiereZuTouren(fahrten: RohFahrt[]): Tour[] {
   }
 
   return Array.from(gruppen.values())
+    .filter((gruppe) => {
+      // PROJ-44: Filter: entferne Touren, bei denen ALLE Stopps in einem finalen Status sind
+      const finaleStatus = ["erledigt", "abgeschlossen", "archiviert"];
+      const alleStoppsFinal = gruppe.fahrten.every((f) => finaleStatus.includes(f.status));
+      return !alleStoppsFinal;
+    })
     .map((gruppe): Tour => {
       const routeVollstaendig =
         gruppe.fahrten.length > 0 &&
         gruppe.fahrten.every((f) => f.routeOrder !== null && f.routeCalculatedAt !== null) &&
         new Set(gruppe.fahrten.map((f) => f.routeCalculatedAt)).size === 1;
 
-      const sortierteFahrten = routeVollstaendig
-        ? [...gruppe.fahrten].sort((a, b) => (a.routeOrder ?? 0) - (b.routeOrder ?? 0))
-        : gruppe.fahrten;
+      // PROJ-42: Sortiere nach Route-Order, wenn vorhanden.
+      // PROJ-44: Nach Route-Order sortieren, aber erledigte Stopps zusätzlich ans Ende sortieren.
+      const sortierteFahrten = [...gruppe.fahrten];
+      if (routeVollstaendig) {
+        // Sortiere zuerst nach routeOrder (nicht erledigt vor erledigt, da erledigt NULL-Order hat)
+        // dann innerhalb jeder Gruppe nach Erledigt-Status
+        sortierteFahrten.sort((a, b) => {
+          const aErledigt = a.status === "erledigt";
+          const bErledigt = b.status === "erledigt";
+
+          // Nicht erledigt kommen vor erledigt
+          if (aErledigt !== bErledigt) {
+            return aErledigt ? 1 : -1;
+          }
+
+          // Innerhalb der gleichen Erledigt-Kategorie: nach routeOrder sortieren
+          return (a.routeOrder ?? 0) - (b.routeOrder ?? 0);
+        });
+      }
 
       return {
         datum: gruppe.datum,
         fahrerId: gruppe.fahrerId,
         fahrerName: gruppe.fahrerName,
         fahrten: sortierteFahrten.map(
-          ({ fahrerId: _fahrerId, fahrerName: _fahrerName, routeCalculatedAt: _rc, routeDistanzMeter: _rd, routeDauerSekunden: _rs, ...fahrt }) =>
-            fahrt
+          ({ fahrerId: _fahrerId, fahrerName: _fahrerName, routeCalculatedAt: _rc, routeDistanzMeter: _rd, routeDauerSekunden: _rs, legDistanzMeter, legDauerSekunden, ...fahrt }) =>
+            ({ ...fahrt, legDistanzMeter, legDauerSekunden })
         ),
         gesamtDistanzMeter: routeVollstaendig ? gruppe.fahrten[0].routeDistanzMeter : null,
         gesamtDauerSekunden: routeVollstaendig ? gruppe.fahrten[0].routeDauerSekunden : null,
@@ -113,6 +148,7 @@ const STATUS_LABEL: Record<string, string> = {
   unterwegs: "Unterwegs",
   angekommen: "Angekommen",
   problem: "Problem",
+  erledigt: "Erledigt",
 };
 
 const STATUS_VARIANT: Record<string, FahrtBadgeVariant> = {
@@ -120,6 +156,7 @@ const STATUS_VARIANT: Record<string, FahrtBadgeVariant> = {
   unterwegs: "default",
   angekommen: "default",
   problem: "destructive",
+  erledigt: "secondary",
 };
 
 /**

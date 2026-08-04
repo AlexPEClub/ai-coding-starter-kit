@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Accordion,
@@ -14,6 +15,10 @@ import {
   FahrtBearbeitenDialog,
   type BearbeiteFahrtZiel,
 } from "@/components/fahrer/fahrt-bearbeiten-dialog";
+import {
+  StoppDetailModal,
+  type StoppDetailModalZiel,
+} from "@/components/fahrer/stopp-detail-modal";
 
 export function formatDatum(datum: string | null): string {
   if (!datum) return "Ohne Datum";
@@ -65,10 +70,32 @@ interface TourListeProps {
 }
 
 export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptionen }: TourListeProps) {
+  const [detailZiel, setDetailZiel] = useState<StoppDetailModalZiel | null>(null);
   const [bearbeitenZiel, setBearbeitenZiel] = useState<BearbeiteFahrtZiel | null>(null);
 
   if (touren.length === 0) {
     return <p className="text-sm text-muted-foreground">{leerTitel ?? "Keine offenen Touren."}</p>;
+  }
+
+  function handleStoppClick(fahrt: Fahrt, tour: Tour) {
+    setDetailZiel({
+      fahrt,
+      tourFahrerId: tour.fahrerId,
+      tourDatum: tour.datum,
+      fahrerName: tour.fahrerName,
+      legDistanceMeters: fahrt.legDistanzMeter ?? null,
+      legDurationSeconds: fahrt.legDauerSekunden ?? null,
+      heute,
+    });
+  }
+
+  function handleOeffneBearbeiten(ziel: StoppDetailModalZiel) {
+    setDetailZiel(null);
+    setBearbeitenZiel({
+      fahrt: ziel.fahrt,
+      tourFahrerId: ziel.tourFahrerId,
+      tourDatum: ziel.tourDatum,
+    });
   }
 
   return (
@@ -102,22 +129,32 @@ export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptione
                   {tour.fahrten.map((fahrt) => {
                     const adresse = formatAdresse(fahrt.kunde);
                     const badge = berechneFahrtBadge(fahrt.status, tour.datum, heute);
+                    const istErledigt = fahrt.status === "erledigt";
                     return (
                       <li key={fahrt.id}>
                         <button
                           type="button"
-                          onClick={() =>
-                            setBearbeitenZiel({
-                              fahrt,
-                              tourFahrerId: tour.fahrerId,
-                              tourDatum: tour.datum,
-                            })
-                          }
-                          className="flex min-h-[48px] w-full items-start justify-between gap-3 rounded-xl bg-muted/50 px-3 py-2 text-left transition-colors hover:bg-muted"
+                          onClick={() => handleStoppClick(fahrt, tour)}
+                          className={`flex min-h-[48px] w-full items-start justify-between gap-3 rounded-xl bg-muted/50 px-3 py-2 text-left transition-colors hover:bg-muted ${istErledigt ? "opacity-60" : ""}`}
                         >
-                          <div>
-                            <p className="font-medium text-foreground">{fahrt.kunde.name}</p>
-                            {adresse && <p className="text-sm text-muted-foreground">{adresse}</p>}
+                          <div className="flex items-start gap-2">
+                            {istErledigt && (
+                              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                            )}
+                            <div>
+                              <p
+                                className={`font-medium text-foreground ${istErledigt ? "text-muted-foreground line-through" : ""}`}
+                              >
+                                {fahrt.kunde.name}
+                              </p>
+                              {adresse && (
+                                <p
+                                  className={`text-sm text-muted-foreground ${istErledigt ? "line-through" : ""}`}
+                                >
+                                  {adresse}
+                                </p>
+                              )}
+                            </div>
                           </div>
                           <div className="flex flex-col items-end gap-1">
                             {fahrt.berechneteAnkunftszeit && (
@@ -137,6 +174,12 @@ export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptione
           );
         })}
       </Accordion>
+
+      <StoppDetailModal
+        ziel={detailZiel}
+        onClose={() => setDetailZiel(null)}
+        onOeffneBearbeiten={handleOeffneBearbeiten}
+      />
 
       <FahrtBearbeitenDialog
         ziel={bearbeitenZiel}

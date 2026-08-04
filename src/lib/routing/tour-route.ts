@@ -140,6 +140,8 @@ export async function berechneUndSpeichereRoute(
           route_distance_meters: antwort.gesamtDistanzMeter,
           route_duration_seconds: antwort.gesamtDauerSekunden,
           berechnete_ankunftszeit: antwort.ankunftszeiten.get(stopp.id) ?? null,
+          leg_distance_meters: antwort.etappenDistanzMeter.get(stopp.id) ?? null, // PROJ-44
+          leg_duration_seconds: antwort.etappenDauerSekunden.get(stopp.id) ?? null, // PROJ-44
         })
         .eq("id", stopp.id);
 
@@ -168,6 +170,8 @@ interface GeoapifyRoutePlannerAntwort {
   ankunftszeiten: Map<string, string>;
   gesamtDistanzMeter: number;
   gesamtDauerSekunden: number;
+  etappenDistanzMeter: Map<string, number>; // PROJ-44
+  etappenDauerSekunden: Map<string, number>; // PROJ-44
 }
 
 /**
@@ -280,6 +284,8 @@ async function rufeGeoapifyRoutePlanner(
 
   const reihenfolge = new Map<string, number>();
   const ankunftszeiten = new Map<string, string>();
+  const etappenDistanzMeter = new Map<string, number>(); // PROJ-44
+  const etappenDauerSekunden = new Map<string, number>(); // PROJ-44
 
   let position = 1;
   for (const waypoint of waypoints) {
@@ -292,6 +298,13 @@ async function rufeGeoapifyRoutePlanner(
     reihenfolge.set(jobId, position);
     const ankunftSekunden: number = waypoint.start_time ?? 0;
     ankunftszeiten.set(jobId, new Date(start.getTime() + ankunftSekunden * 1000).toISOString());
+
+    // PROJ-44: Etappen-Distanz und Fahrzeit pro Stoppp (vom vorherigen Stoppp)
+    const etappenDistanz: number = Math.round(waypoint.distance ?? 0);
+    const etappenDauer: number = Math.round(waypoint.time ?? 0);
+    etappenDistanzMeter.set(jobId, etappenDistanz);
+    etappenDauerSekunden.set(jobId, etappenDauer);
+
     position += 1;
   }
 
@@ -306,6 +319,8 @@ async function rufeGeoapifyRoutePlanner(
     ankunftszeiten,
     gesamtDistanzMeter: agentFeature?.properties?.distance ?? 0,
     gesamtDauerSekunden: agentFeature?.properties?.time ?? 0,
+    etappenDistanzMeter, // PROJ-44
+    etappenDauerSekunden, // PROJ-44
   };
 }
 
