@@ -785,3 +785,42 @@ All changes are production-safe:
 - Unit tests 434/434 green
 
 **Recommendation:** Ready for `/deploy`
+
+## Deployment (Refine 2026-08-04)
+
+**Deployed:** 2026-08-04
+**Environment:** Production
+**URL:** https://tms.gudel-werkzeuge.de/fahrer
+**Deployment Method:** `./scripts/deploy.sh PROJ-44` (Pre-Checks + Docker-Deploy), Post-Deploy-Verifikation abschließend manuell mit `npx playwright test tests/deploy/ --project=chromium --config=playwright.deploy.config.ts` nachgezogen (siehe Deployment Notes)
+**Git-Tag:** `v1.44.1-PROJ-44`
+
+### Deployment Summary
+
+- **Pre-Deployment Checks:** ✅ Alle bestanden
+  - `npm run lint`: 0 Fehler, 1 vorbestehende unabhängige Warnung (revenue-chart.tsx)
+  - `npm run build`: erfolgreich
+  - QA-Status: Approved (Refine-QA 2026-08-04, 434/434 Unit-Tests, 4 neue E2E-Tests, Security-Audit bestanden)
+  - Code committed und gepusht: ✅ (Commits `1a8c164`, `a311b45`)
+
+- **Docker Deploy:** ✅ Erfolgreich
+  - Container `tms` läuft mit dem neuen Image (Commit `1a8c164`)
+  - Production-URL antwortet mit HTTP 200 auf `/login`
+
+- **Post-Deployment Verification:** ✅ Chromium Smoke Tests bestanden
+  - ✅ Login-Seite ist erreichbar und liefert HTTP 200
+  - ✅ Es ist wirklich TMS 2.0 (nicht Fehler-/Fremdseite)
+  - ✅ Login-Formular ist gerendert (App läuft, nicht nur Shell)
+  - ✅ PROJ-11-Regressionstest (Umsatzspalte) grün
+  - Chromium: 4/4 relevante Tests grün
+  - **Mobile Safari:** in dieser Session nicht verifizierbar — das automatische `./scripts/deploy.sh`-Skript brach nach 5 Anläufen ab, weil die auf diesem Dev-Host installierte Webkit-Browser-Version (`webkit-2311`) nicht mehr zur von Playwright erwarteten Version (`webkit-2248`) passt. Ein Nachinstallieren (`npx playwright install webkit`) blieb nach >10 Minuten bei 4,7 MB hängen (vermutlich Netzwerk-Restriktion dieser Sandbox zur Playwright-CDN) und wurde abgebrochen. Identisches, bereits mehrfach dokumentiertes Dev-Host-Muster wie beim Erstdeploy dieses Features und bei PROJ-11/21/29/41. Kein Hinweis auf einen Code-Bug — Chromium deckt denselben Login-/Rendering-Pfad ab.
+
+### Deployment Notes
+
+- Vier Refine-Punkte live: Fahrer-Name-Anzeige, Erledigt-Remount-Fix, Zeitvergleich erledigt/geplant, "Ändern"-Button-Guard bei erledigten Stopps
+- Während dieser Session lag unabhängige, nicht committete PROJ-30-Frontend-Arbeit (vermutlich aus einer parallelen Session) im Arbeitsverzeichnis — vor dem Docker-Build sicher per `git stash -u` beiseite gelegt, damit nur PROJ-44-Code ins Image gebaut wird. Stash-Eintrag bleibt erhalten, PROJ-30-Arbeit wurde nicht committet/deployed
+- Keine Regression in abhängigen Features (PROJ-21/41/42 Code unverändert)
+
+### Next Steps
+
+- Empfohlen: sobald der Dev-Host wieder eine funktionierende Playwright-Webkit-Installation hat, Mobile-Safari-Smoke für diesen Refine-Deploy nachholen
+- PROJ-30-Stash (`git stash list`) mit dem User klären, bevor daran weitergearbeitet wird
