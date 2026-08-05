@@ -132,6 +132,52 @@ describe("gruppiereZuTouren", () => {
     expect(touren[0].gesamtDistanzMeter).toBeNull();
   });
 
+  it("sortiert weiterhin nach routeOrder, wenn nur ein bereits erledigter Stopp einen veralteten routeCalculatedAt trägt (Bug: erledigte Stopps werden nie neu berechnet)", () => {
+    const touren = gruppiereZuTouren([
+      // Bereits erledigt, VOR der letzten Neuberechnung erledigt worden ->
+      // trägt bewusst einen älteren Zeitstempel, da berechneUndSpeichereRoute
+      // erledigte Stopps nie mit aktualisiert.
+      fahrt({
+        id: "erledigt",
+        status: "erledigt",
+        fahrerId: "fahrer-1",
+        geplantesAbholdatum: "2026-08-05",
+        routeOrder: 1,
+        routeCalculatedAt: "2026-08-01T09:00:00.000Z",
+      }),
+      // Zwei offene Stopps, beide aus der NEUESTEN Berechnung -> gemeinsamer,
+      // aktueller Zeitstempel.
+      fahrt({
+        id: "zweiter-offener-stopp",
+        fahrerId: "fahrer-1",
+        geplantesAbholdatum: "2026-08-05",
+        routeOrder: 2,
+        routeCalculatedAt: "2026-08-02T10:00:00.000Z",
+        routeDistanzMeter: 8000,
+        routeDauerSekunden: 1200,
+      }),
+      fahrt({
+        id: "erster-offener-stopp",
+        fahrerId: "fahrer-1",
+        geplantesAbholdatum: "2026-08-05",
+        routeOrder: 1,
+        routeCalculatedAt: "2026-08-02T10:00:00.000Z",
+        routeDistanzMeter: 8000,
+        routeDauerSekunden: 1200,
+      }),
+    ]);
+
+    expect(touren).toHaveLength(1);
+    // Offene Stopps zuerst (nach routeOrder sortiert), erledigter Stopp ans Ende.
+    expect(touren[0].fahrten.map((f) => f.id)).toEqual([
+      "erster-offener-stopp",
+      "zweiter-offener-stopp",
+      "erledigt",
+    ]);
+    expect(touren[0].gesamtDistanzMeter).toBe(8000);
+    expect(touren[0].gesamtDauerSekunden).toBe(1200);
+  });
+
   it("gibt berechneteAnkunftszeit je Stopp durch, ohne interne Routing-Felder auf Fahrt-Ebene zu leaken", () => {
     const touren = gruppiereZuTouren([
       fahrt({

@@ -369,6 +369,12 @@ export async function deletePickupTour(
 
   const serviceClient = createAdminClient({ schema: "tms" });
 
+  const { data: bestehend } = await serviceClient
+    .from("tours")
+    .select("fahrer_id, geplantes_abholdatum")
+    .eq("id", tourId)
+    .maybeSingle();
+
   const { error } = await serviceClient
     .from("tours")
     .delete()
@@ -377,6 +383,14 @@ export async function deletePickupTour(
   if (error) {
     console.error("[deletePickupTour]", error);
     return { ok: false, error: "Konnte Abholung nicht löschen." };
+  }
+
+  // Der Wegfall eines Stopps verändert die optimale Route der verbleibenden
+  // Stopps derselben Fahrer-/Datum-Gruppe -> Neuberechnung anstoßen.
+  if (bestehend?.fahrer_id && bestehend?.geplantes_abholdatum) {
+    await loeseNeuberechnungAus(serviceClient, [
+      { fahrerId: bestehend.fahrer_id, datum: bestehend.geplantes_abholdatum },
+    ]);
   }
 
   revalidatePath("/kunden/[id]", "page");

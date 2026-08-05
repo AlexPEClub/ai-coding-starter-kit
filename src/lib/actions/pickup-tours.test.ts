@@ -241,3 +241,34 @@ describe("createPickupTour — PROJ-42 Neuberechnungs-Trigger", () => {
     expect(loeseNeuberechnungAusMock).not.toHaveBeenCalled();
   });
 });
+
+describe("deletePickupTour — Neuberechnungs-Trigger (Bugfix)", () => {
+  it("löst die Neuberechnung für die verbleibende Tourengruppe aus, wenn Fahrer+Datum bekannt sind", async () => {
+    const { client } = createFakeServiceClient({
+      aktuelleTour: { fahrer_id: "fahrer-1", geplantes_abholdatum: "2026-08-05" },
+    });
+    fakeServiceClient = client;
+
+    const { deletePickupTour } = await import("./pickup-tours");
+    const ergebnis = await deletePickupTour("tour-1");
+
+    expect(ergebnis).toEqual({ ok: true });
+    expect(loeseNeuberechnungAusMock).toHaveBeenCalledTimes(1);
+    expect(loeseNeuberechnungAusMock.mock.calls[0][1]).toEqual([
+      { fahrerId: "fahrer-1", datum: "2026-08-05" },
+    ]);
+  });
+
+  it("löst KEINE Neuberechnung aus, wenn die gelöschte Tour keinen Fahrer/kein Datum hatte", async () => {
+    const { client } = createFakeServiceClient({
+      aktuelleTour: { fahrer_id: null, geplantes_abholdatum: null },
+    });
+    fakeServiceClient = client;
+
+    const { deletePickupTour } = await import("./pickup-tours");
+    const ergebnis = await deletePickupTour("tour-1");
+
+    expect(ergebnis).toEqual({ ok: true });
+    expect(loeseNeuberechnungAusMock).not.toHaveBeenCalled();
+  });
+});

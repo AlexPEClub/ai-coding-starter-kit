@@ -94,10 +94,18 @@ export function gruppiereZuTouren(fahrten: RohFahrt[]): Tour[] {
       return !alleStoppsFinal;
     })
     .map((gruppe): Tour => {
+      // Finale Stopps (erledigt/abgeschlossen/archiviert) werden von
+      // berechneUndSpeichereRoute() bewusst NIE neu berechnet (sie tragen
+      // dauerhaft ihren alten routeCalculatedAt-Zeitstempel). Sie dürfen die
+      // Vollständigkeits-Prüfung daher nicht mit einbeziehen, sonst bricht
+      // die Sortierung der gesamten Tour, sobald ein offener Stopp derselben
+      // Gruppe später neu berechnet wird.
+      const finaleStatus = ["erledigt", "abgeschlossen", "archiviert"];
+      const offeneFahrten = gruppe.fahrten.filter((f) => !finaleStatus.includes(f.status));
       const routeVollstaendig =
-        gruppe.fahrten.length > 0 &&
-        gruppe.fahrten.every((f) => f.routeOrder !== null && f.routeCalculatedAt !== null) &&
-        new Set(gruppe.fahrten.map((f) => f.routeCalculatedAt)).size === 1;
+        offeneFahrten.length > 0 &&
+        offeneFahrten.every((f) => f.routeOrder !== null && f.routeCalculatedAt !== null) &&
+        new Set(offeneFahrten.map((f) => f.routeCalculatedAt)).size === 1;
 
       // PROJ-42: Sortiere nach Route-Order, wenn vorhanden.
       // PROJ-44: Nach Route-Order sortieren, aber erledigte Stopps zusätzlich ans Ende sortieren.
@@ -127,8 +135,8 @@ export function gruppiereZuTouren(fahrten: RohFahrt[]): Tour[] {
           ({ fahrerId: _fahrerId, fahrerName: _fahrerName, routeCalculatedAt: _rc, routeDistanzMeter: _rd, routeDauerSekunden: _rs, legDistanzMeter, legDauerSekunden, erledigtAm, ...fahrt }) =>
             ({ ...fahrt, legDistanzMeter, legDauerSekunden, erledigtAm })
         ),
-        gesamtDistanzMeter: routeVollstaendig ? gruppe.fahrten[0].routeDistanzMeter : null,
-        gesamtDauerSekunden: routeVollstaendig ? gruppe.fahrten[0].routeDauerSekunden : null,
+        gesamtDistanzMeter: routeVollstaendig ? offeneFahrten[0].routeDistanzMeter : null,
+        gesamtDauerSekunden: routeVollstaendig ? offeneFahrten[0].routeDauerSekunden : null,
       };
     })
     .sort((a, b) => {
