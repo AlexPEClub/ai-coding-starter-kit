@@ -688,3 +688,12 @@ Beim Löschen einer Fahrt/eines Stopps wird jetzt die verbleibende Tourengruppe 
 
 ### Recommendation
 Das Bugfix-Deployment ist **production-ready**. Nächster Schritt: Deploy per `./scripts/deploy.sh PROJ-42` + Verifizierung durch den User an der besagten Tour in `/fahrer` (erwartet: sortierte Ankunftszeiten, nicht mehr springend/unsortiert).
+
+## Deployment (Bugfix 2026-08-05)
+
+**Deployed:** 2026-08-05 zu https://tms.gudel-werkzeuge.de (`./scripts/deploy.sh PROJ-42`, Pre-Checks lint/build grün, Docker-Image erfolgreich gebaut und gestartet, Live-URL HTTP 200).
+
+- **Verifikation:** Post-Deploy-Smoke-Test zeigt erwartete Playwright-Webkit-Umgebungsprobleme auf dem Dev-Host (bekanntes Muster wie bei PROJ-11/21/29/41/44 — nicht Code-related), **Chromium-Tests grün** (4/4 bestätigt erreichbar).
+- **Live-Verifikation:** `curl https://tms.gudel-werkzeuge.de/login` → HTTP 200, Login-Seite vollständig gerendert.
+- **Nächster Schritt:** User sollte gezielt gegen https://tms.gudel-werkzeuge.de/fahrer verifizieren, dass die Tour vom Di. 04.08.2026 jetzt sortierte Ankunftszeiten zeigt (nicht mehr: 09:43 → 11:32 → 09:13 → ...).
+- Git-Tag `v1.42.1-PROJ-42` erstellt und gepusht.
