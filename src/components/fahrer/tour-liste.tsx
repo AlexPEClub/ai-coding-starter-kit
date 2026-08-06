@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Map } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Accordion,
   AccordionContent,
@@ -19,6 +20,7 @@ import {
   StoppDetailModal,
   type StoppDetailModalZiel,
 } from "@/components/fahrer/stopp-detail-modal";
+import { TourKarteModal } from "@/components/fahrer/tour-karte-modal";
 
 export function formatDatum(datum: string | null): string {
   if (!datum) return "Ohne Datum";
@@ -69,9 +71,15 @@ interface TourListeProps {
   fahrerOptionen: FahrerOption[];
 }
 
+interface KarteLadeZiel {
+  fahrerId: string | null;
+  tourDatum: string | null;
+}
+
 export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptionen }: TourListeProps) {
   const [detailZiel, setDetailZiel] = useState<StoppDetailModalZiel | null>(null);
   const [bearbeitenZiel, setBearbeitenZiel] = useState<BearbeiteFahrtZiel | null>(null);
+  const [karteZiel, setKarteZiel] = useState<KarteLadeZiel | null>(null);
 
   if (touren.length === 0) {
     return <p className="text-sm text-muted-foreground">{leerTitel ?? "Keine offenen Touren."}</p>;
@@ -98,6 +106,28 @@ export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptione
     });
   }
 
+  function handleOeffneKarte(fahrerId: string | null, tourDatum: string | null) {
+    setKarteZiel({ fahrerId, tourDatum });
+  }
+
+  function handleKarteStoppClick(stoppId: string) {
+    // Backend wird den Stopp an der Karte beim Click das StoppDetailModal öffnen
+    // Hier suchen wir die Fahrt und öffnen das Modal
+    const fahrt = touren
+      .flatMap((t) => t.fahrten)
+      .find((f) => f.id === stoppId);
+
+    if (fahrt) {
+      const tour = touren.find((t) =>
+        t.fahrten.some((f) => f.id === stoppId)
+      );
+
+      if (tour) {
+        handleStoppClick(fahrt, tour);
+      }
+    }
+  }
+
   return (
     <>
       <Accordion type="multiple" className="space-y-2">
@@ -110,18 +140,35 @@ export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptione
               className="rounded-2xl border border-border bg-card px-4 shadow-sm"
             >
               <AccordionTrigger className="min-h-[48px] py-3 hover:no-underline">
-                <div className="text-left">
-                  <p className="font-semibold text-foreground">{formatDatum(tour.datum)}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {fahrerLabel ? `${fahrerLabel} — ` : ""}
-                    {tour.fahrten.length} {tour.fahrten.length === 1 ? "Stopp" : "Stopps"}
-                    {tour.gesamtDistanzMeter !== null && tour.gesamtDauerSekunden !== null && (
-                      <span className="tabular-nums">
-                        {" — "}
-                        {formatDistanz(tour.gesamtDistanzMeter)} · {formatDauer(tour.gesamtDauerSekunden)}
-                      </span>
-                    )}
-                  </p>
+                <div className="flex w-full items-center justify-between">
+                  <div className="text-left">
+                    <p className="font-semibold text-foreground">{formatDatum(tour.datum)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {fahrerLabel ? `${fahrerLabel} — ` : ""}
+                      {tour.fahrten.length} {tour.fahrten.length === 1 ? "Stopp" : "Stopps"}
+                      {tour.gesamtDistanzMeter !== null && tour.gesamtDauerSekunden !== null && (
+                        <span className="tabular-nums">
+                          {" — "}
+                          {formatDistanz(tour.gesamtDistanzMeter)} · {formatDauer(tour.gesamtDauerSekunden)}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  {/* PROJ-45: Karte-Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!tour.datum}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOeffneKarte(tour.fahrerId, tour.datum);
+                    }}
+                    className="ml-2 gap-1"
+                    aria-label="Karte dieser Tour anzeigen"
+                  >
+                    <Map className="h-4 w-4" />
+                    <span className="hidden sm:inline">Karte</span>
+                  </Button>
                 </div>
               </AccordionTrigger>
               <AccordionContent>
@@ -191,6 +238,15 @@ export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptione
         ziel={bearbeitenZiel}
         fahrerOptionen={fahrerOptionen}
         onClose={() => setBearbeitenZiel(null)}
+      />
+
+      {/* PROJ-45: Tour-Kartenansicht */}
+      <TourKarteModal
+        isOpen={karteZiel !== null}
+        onClose={() => setKarteZiel(null)}
+        fahrerId={karteZiel?.fahrerId ?? null}
+        tourDatum={karteZiel?.tourDatum ?? null}
+        onStoppClick={handleKarteStoppClick}
       />
     </>
   );
