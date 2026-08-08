@@ -70,8 +70,10 @@ function createFakeAdminClient(options: {
   };
 }
 
-// Struktur verifiziert gegen einen echten Geoapify-Testaufruf (2026-08-03):
+// Struktur verifiziert gegen die offizielle Geoapify-Doku (2026-08-08):
 // job_id liegt in waypoint.actions[], nicht direkt auf dem Wegpunkt.
+// Etappen-Distanz/-Zeit liegen in properties.legs[], referenziert über
+// waypoint.prev_leg_index — nicht direkt auf dem Wegpunkt.
 function geoapifyAntwort(stoppIds: string[]) {
   return {
     features: [
@@ -79,8 +81,15 @@ function geoapifyAntwort(stoppIds: string[]) {
         properties: {
           distance: 12345,
           time: 2400,
+          legs: stoppIds.map((_, index) => ({
+            distance: (index + 1) * 1000,
+            time: (index + 1) * 300,
+            from_waypoint_index: index,
+            to_waypoint_index: index + 1,
+          })),
           waypoints: stoppIds.map((id, index) => ({
             start_time: index * 1200,
+            prev_leg_index: index,
             actions: [{ type: "job", job_id: id }],
           })),
         },
@@ -137,6 +146,10 @@ describe("berechneUndSpeichereRoute", () => {
     expect(updateAufrufe[0].values.route_distance_meters).toBe(12345);
     expect(updateAufrufe[0].values.route_duration_seconds).toBe(2400);
     expect(updateAufrufe[0].values.berechnete_ankunftszeit).toBeTruthy();
+    expect(updateAufrufe[0].values.leg_distance_meters).toBe(1000);
+    expect(updateAufrufe[0].values.leg_duration_seconds).toBe(300);
+    expect(updateAufrufe[1].values.leg_distance_meters).toBe(2000);
+    expect(updateAufrufe[1].values.leg_duration_seconds).toBe(600);
   });
 
   it("Edge Case: Einzel-Stopp-Tour — triviale Position 1, Distanz/Fahrzeit trotzdem berechnet und gespeichert", async () => {
@@ -163,6 +176,8 @@ describe("berechneUndSpeichereRoute", () => {
     });
     expect(updateAufrufe).toHaveLength(1);
     expect(updateAufrufe[0].values.route_order).toBe(1);
+    expect(updateAufrufe[0].values.leg_distance_meters).toBe(1000);
+    expect(updateAufrufe[0].values.leg_duration_seconds).toBe(300);
   });
 
   it("gibt einen No-Op-Erfolg zurück, wenn die Tourengruppe keine offenen Stopps (mehr) hat", async () => {

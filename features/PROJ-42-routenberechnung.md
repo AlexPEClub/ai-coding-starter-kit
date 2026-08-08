@@ -2,7 +2,7 @@
 
 ## Status: ✅ Deployed
 **Created:** 2026-08-02
-**Last Updated:** 2026-08-03
+**Last Updated:** 2026-08-08
 
 > Folge-Baustein zu PROJ-21 (Fahrer — Tourenliste) und PROJ-41 (Fahrt
 > bearbeiten). Echte Routenberechnung war von Anfang an bewusst als
@@ -697,3 +697,33 @@ Das Bugfix-Deployment ist **production-ready**. Nächster Schritt: Deploy per `.
 - **Live-Verifikation:** `curl https://tms.gudel-werkzeuge.de/login` → HTTP 200, Login-Seite vollständig gerendert.
 - **Nächster Schritt:** User sollte gezielt gegen https://tms.gudel-werkzeuge.de/fahrer verifizieren, dass die Tour vom Di. 04.08.2026 jetzt sortierte Ankunftszeiten zeigt (nicht mehr: 09:43 → 11:32 → 09:13 → ...).
 - Git-Tag `v1.42.1-PROJ-42` erstellt und gepusht.
+
+## Bugfix 2026-08-08: Etappen-Distanz/-Fahrzeit (PROJ-44-Felder) immer leer/0
+
+**Meldung:** User berichtete, dass „Etappen-Distanz" und „Etappen-Fahrzeit" im
+Fahrer-Stopp-Detail-Modal (PROJ-44) leer angezeigt werden, obwohl sie aus der
+hier beschriebenen Geoapify-Routenberechnung stammen sollen.
+
+**Root Cause:** `rufeGeoapifyRoutePlanner()` in `src/lib/routing/tour-route.ts`
+las die Etappen-Werte fälschlich direkt von `waypoint.distance`/`waypoint.time`.
+Diese Felder existieren laut offizieller Geoapify-Doku (per WebFetch verifiziert,
+2026-08-08) nicht auf dem Wegpunkt — sie liegen in einem separaten
+`properties.legs[]`-Array auf Agent-Ebene, referenziert über
+`waypoint.prev_leg_index`. Der `?? 0`-Fallback griff dadurch immer, wodurch
+`leg_distance_meters`/`leg_duration_seconds` seit dem PROJ-44-Deploy
+(2026-08-04) durchgängig als `0` statt echter Werte gespeichert wurden;
+ältere, seither nicht neu berechnete Touren blieben bei `NULL` (Backfill lief
+seit PROJ-44 nicht erneut) — im UI dadurch komplett ausgeblendet.
+
+**Fix:** Legs jetzt korrekt aus `agentFeature.properties.legs` gelesen und dem
+Wegpunkt über `prev_leg_index` zugeordnet. Test-Fixture in `tour-route.test.ts`
+um ein realistisches `legs`-Array ergänzt; zuvor prüfte kein Test den Wert von
+`leg_distance_meters`/`leg_duration_seconds` — deshalb fiel der Bug nie durch
+Tests auf. 12/12 Tests in `tour-route.test.ts` grün, volle Unit-Test-Suite
+weiterhin grün, Lint/TypeCheck sauber (bestehende, unabhängige Pre-Existing-
+Warnungen/Fehler in `tests/*.spec.ts`/`revenue-chart.tsx` unverändert).
+
+**Offen:** Nach Deploy muss `npx tsx scripts/PROJ-42_backfill_routen.ts`
+einmalig erneut laufen, damit bestehende Touren die korrigierten Etappen-Werte
+erhalten (kostet echte Geoapify-API-Aufrufe — mit User vor Ausführung gegen
+Produktion abstimmen).

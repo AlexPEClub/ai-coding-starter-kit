@@ -241,6 +241,13 @@ function ermittleTagesstartUtc(): Date {
  * tiefer in `waypoint.actions[]` (Einträge mit `type: "job"` tragen
  * `job_id`) — der Depot-Wegpunkt hat stattdessen eine Aktion `type: "start"`
  * ohne `job_id` und wird dadurch automatisch übersprungen.
+ *
+ * Etappen-Distanz/-Zeit liegen NICHT auf dem Wegpunkt selbst (kein
+ * `waypoint.distance`/`waypoint.time`), sondern in einem separaten
+ * `properties.legs[]`-Array auf Agent-Ebene (jeder Leg trägt `distance`/
+ * `time` sowie `from_waypoint_index`/`to_waypoint_index`). Jeder Wegpunkt
+ * referenziert seinen eingehenden Leg über `prev_leg_index` — gegen die
+ * offizielle Geoapify-Doku verifiziert (2026-08-08).
  */
 async function rufeGeoapifyRoutePlanner(
   depot: Koordinate,
@@ -275,6 +282,11 @@ async function rufeGeoapifyRoutePlanner(
   const json = await response.json();
   const agentFeature = json?.features?.[0];
   const waypoints = agentFeature?.properties?.waypoints;
+  const legs: { distance?: number; time?: number }[] = Array.isArray(
+    agentFeature?.properties?.legs
+  )
+    ? agentFeature.properties.legs
+    : [];
 
   if (!Array.isArray(waypoints) || waypoints.length === 0) {
     throw new Error("Geoapify lieferte keine gültige Wegpunkt-Reihenfolge.");
@@ -299,9 +311,13 @@ async function rufeGeoapifyRoutePlanner(
     const ankunftSekunden: number = waypoint.start_time ?? 0;
     ankunftszeiten.set(jobId, new Date(start.getTime() + ankunftSekunden * 1000).toISOString());
 
-    // PROJ-44: Etappen-Distanz und Fahrzeit pro Stoppp (vom vorherigen Stoppp)
-    const etappenDistanz: number = Math.round(waypoint.distance ?? 0);
-    const etappenDauer: number = Math.round(waypoint.time ?? 0);
+    // PROJ-44: Etappen-Distanz und Fahrzeit pro Stopp (vom vorherigen Stopp).
+    // Liegt im Leg, den der Wegpunkt über prev_leg_index referenziert — nicht
+    // direkt auf dem Wegpunkt (siehe Doku-Hinweis oben an der Funktion).
+    const eingehenderLeg =
+      typeof waypoint.prev_leg_index === "number" ? legs[waypoint.prev_leg_index] : undefined;
+    const etappenDistanz: number = Math.round(eingehenderLeg?.distance ?? 0);
+    const etappenDauer: number = Math.round(eingehenderLeg?.time ?? 0);
     etappenDistanzMeter.set(jobId, etappenDistanz);
     etappenDauerSekunden.set(jobId, etappenDauer);
 
