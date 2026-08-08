@@ -18,10 +18,17 @@ const DEPOT_ICON = L.icon({
   popupAnchor: [0, -40],
 });
 
-/** Funktion, um ein Icon für einen nummerierten Stopp zu erstellen. */
-function erstelleStoppIcon(nummer: number, istErledigt: boolean) {
-  const bgFarbe = istErledigt ? "%23CCCCCC" : "%23FF6B6D"; // Grau wenn erledigt, sonst Koralle
-  const textFarbe = "%23FFFFFF";
+/**
+ * Funktion, um ein Icon für einen nummerierten Stopp zu erstellen.
+ * Bugfix (Refine 2026-08-08): Farben müssen als echtes `#` im rohen SVG
+ * stehen — der ganze SVG-String wird danach genau einmal per
+ * `encodeURIComponent` kodiert. Vorher stand hier bereits `%23` im SVG,
+ * wodurch encodeURIComponent es zu `%2523` doppelt kodiert hat → ungültiger
+ * `fill`-Wert → Browser fällt auf Schwarz zurück (Kreis + Zahl unsichtbar).
+ */
+export function erstelleStoppIcon(nummer: number, istErledigt: boolean) {
+  const bgFarbe = istErledigt ? "#CCCCCC" : "#FF6B6D"; // Grau wenn erledigt, sonst Koralle
+  const textFarbe = "#FFFFFF";
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
@@ -49,9 +56,12 @@ export interface TourKarteInhaltProps {
  * Leaflet-Kartenkomponente.
  * PROJ-45 Tech Design:
  * - Depot-Marker (eigenständiger Icon)
- * - Nummierte Stopp-Marker (Position = route_order)
+ * - Nummierte Stopp-Marker (Position = route_order) mit dauerhaft sichtbarem
+ *   Namen-Label (Refine 2026-08-08)
  * - Erledigte Stopps optisch abgeschwächt (Farbe ausgeblichen)
- * - Routenlinie zwischen Depot → Stopps → Depot
+ * - Routenlinie zwischen Depot → Stopps; folgt der echten Straßenroute, oder
+ *   fällt auf gestrichelte Gerade zurück, falls keine Geometrie vorliegt
+ *   (Refine 2026-08-08)
  * - Automatischer Zoom auf alle Marker (fit bounds)
  * - Marker-Tap öffnet den Stopp-Detail-Modal (via onStoppClick)
  */
@@ -116,6 +126,15 @@ export function TourKarteInhalt({
       `;
       marker.bindPopup(popup, { autoClose: false });
 
+      // Refine 2026-08-08: Name dauerhaft sichtbar neben dem Marker,
+      // nicht erst nach Antippen — Übersicht auf einen Blick.
+      marker.bindTooltip(stopp.name, {
+        permanent: true,
+        direction: "right",
+        offset: [10, 0],
+        className: "tour-karte-stopp-label",
+      });
+
       // Click-Handler
       marker.on("click", () => {
         if (onStoppClick) {
@@ -130,7 +149,10 @@ export function TourKarteInhalt({
       bounds.extend([stopp.breitengrad, stopp.laengengrad]);
     }
 
-    // Routenlinie (falls vorhanden)
+    // Routenlinie: echte Straßenroute, falls vorhanden — sonst Fallback mit
+    // geraden Verbindungslinien zwischen Depot und Stopps in route_order-
+    // Reihenfolge (Refine 2026-08-08), damit der Verlauf trotzdem erkennbar
+    // ist statt gar keine Linie zu zeigen.
     if (karteDaten.routenGeometrie && karteDaten.routenGeometrie.length > 0) {
       const routeLatLngs: LatLng[] = karteDaten.routenGeometrie.map(([lat, lng]) =>
         L.latLng(lat, lng)
@@ -140,6 +162,18 @@ export function TourKarteInhalt({
         color: "#FF6B6D", // Brand-Koralle
         weight: 3,
         opacity: 0.7,
+      }).addTo(map);
+    } else if (karteDaten.stopps.length > 0) {
+      const geradeLinie: LatLng[] = [
+        L.latLng(karteDaten.depot.breitengrad, karteDaten.depot.laengengrad),
+        ...karteDaten.stopps.map((stopp) => L.latLng(stopp.breitengrad, stopp.laengengrad)),
+      ];
+
+      L.polyline(geradeLinie, {
+        color: "#FF6B6D", // Brand-Koralle
+        weight: 3,
+        opacity: 0.7,
+        dashArray: "6, 8", // gestrichelt = erkennbar keine echte Straßenroute
       }).addTo(map);
     }
 

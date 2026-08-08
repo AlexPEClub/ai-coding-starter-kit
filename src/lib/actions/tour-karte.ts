@@ -125,13 +125,24 @@ async function getTourKarteDatenImpl(
     return { ok: false, error: "Keine Tour gefunden." };
   }
 
-  // Prüfe, ob eine aktuelle Berechnung existiert (alle offenen Stopps haben route_order + gleicher route_calculated_at)
+  // Prüfe, ob eine aktuelle Berechnung existiert (alle offenen Stopps haben
+  // route_order + route_geometry + gleicher route_calculated_at).
+  // Bugfix (Refine 2026-08-08): route_geometry wurde hier bisher NICHT
+  // geprüft — Touren, die vor der Migration 20260806120000 (Einführung der
+  // route_geometry-Spalte) berechnet wurden, galten trotz fehlender
+  // Geometrie als "gültig" und wurden nie neu berechnet, wodurch die
+  // Routenlinie auf der Karte für immer fehlte. Ohne separates
+  // Backfill-Skript: der nächste Kartenaufruf für eine betroffene Tour löst
+  // jetzt automatisch die Neuberechnung aus.
   const finaleStatus = ["erledigt", "abgeschlossen", "archiviert"];
   const offeneStopps = stopps.filter((s: any) => !finaleStatus.includes(s.status));
 
   const berechnungGueltig =
     offeneStopps.length > 0 &&
-    offeneStopps.every((s: any) => s.route_order !== null && s.route_calculated_at !== null) &&
+    offeneStopps.every(
+      (s: any) =>
+        s.route_order !== null && s.route_calculated_at !== null && s.route_geometry !== null
+    ) &&
     new Set(offeneStopps.map((s: any) => s.route_calculated_at)).size === 1;
 
   // Falls keine gültige Berechnung existiert, löse synchrone Neuberechnung aus

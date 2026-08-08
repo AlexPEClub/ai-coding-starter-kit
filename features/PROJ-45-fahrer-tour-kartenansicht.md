@@ -1,8 +1,8 @@
 # PROJ-45: Fahrer — Tour-Kartenansicht
 
-## Status: ✅ Deployed — Bugfix successfully deployed to production
+## Status: 🟡 In Progress — Refine-Bugfix (Marker-Nummern, Name-Label, Routenlinie), Deploy ausstehend
 **Created:** 2026-08-05
-**Last Updated:** 2026-08-08 (Bugfix-Redeploy)
+**Last Updated:** 2026-08-08 (Refine: Live-Test deckte Rendering-Bugs auf, Fixes umgesetzt)
 **Initial Deployment:** 2026-08-08 (with critical button-nesting bug)
 **Bugfix Deployment:** 2026-08-08 (Commit d31acd3, tag v1.45.1-PROJ-45, live-verified)
 
@@ -42,6 +42,8 @@
 - [ ] Angenommen der Nutzer befindet sich im Tab "Tourenplanung" und betrachtet die Tour eines anderen Fahrers, wenn er auf "Karte" tippt, dann funktioniert die Kartenansicht identisch zum Tab "Mir zugewiesen"
 - [ ] Angenommen der Nutzer hat weder die Rolle "fahrer" noch "admin", wenn er versucht `/fahrer` aufzurufen, dann wird er (wie bereits heute) auf `/dashboard` umgeleitet und sieht den "Karte"-Button gar nicht
 - [ ] Angenommen die Kartenansicht ist geöffnet, wenn der Fahrer sie schließt (z. B. über einen Schließen-Button), dann kehrt er zur Tourenliste zurück, ohne dass sich am Zustand der Tour etwas geändert hat
+- [ ] Angenommen die Kartenansicht ist offen, wenn der Fahrer auf die Marker schaut, dann ist der Name jedes Stopps dauerhaft als Label neben dem Marker sichtbar, ohne dass er den Marker antippen muss (Refine 2026-08-08)
+- [ ] Angenommen für eine Tour konnte keine echte Straßenroute ermittelt werden (z. B. weil der Kartenanbieter keine Geometrie liefert), wenn die Karte geöffnet wird, dann werden die Stopps trotzdem durch eine gerade Verbindungslinie in der berechneten Reihenfolge verbunden, statt ganz ohne Linie dargestellt zu werden (Refine 2026-08-08)
 
 ## Edge Cases
 - Tour mit nur einem Stopp: Karte zeigt Depot + 1 nummerierten Marker + Route dazwischen — kein Sonderfall.
@@ -50,6 +52,7 @@
 - Zwei Stopps mit (zufällig) identischen oder sehr nahen Koordinaten: Marker dürfen sich nicht gegenseitig verdecken/unklickbar machen (z. B. durch leichtes Auseinanderrücken oder Clustering — technische Detailentscheidung in `/architecture`).
 - Karte wird geöffnet, während im Hintergrund eine neue Routenberechnung für dieselbe Tour ausgelöst wird (z. B. weil parallel ein Stopp bearbeitet wurde): angezeigte Route darf sich nicht mitten in der Nutzung unangekündigt ändern — Karte zeigt den Stand zum Öffnungszeitpunkt, keine Live-Aktualisierung während sie offen ist.
 - Nutzer tippt schnell mehrfach auf "Karte", während die Berechnung noch läuft: darf nicht mehrfach parallele Berechnungen/Kartenöffnungen auslösen.
+- Berechnung erfolgreich, aber der Kartenanbieter liefert (ausnahmsweise) keine Routen-Geometrie zurück (Refine 2026-08-08): Karte zeigt trotzdem eine gerade Verbindungslinie zwischen Depot und Stopps in Reihenfolge, statt komplett ohne Linie zu bleiben.
 
 ## Technical Requirements (optional)
 - Route-Geometrie (Polyline) wird von PROJ-42 aktuell nicht gespeichert — muss für die echte Straßenroute ergänzt werden (on-demand Abruf beim Kartenöffnen oder Persistierung bei der Berechnung; technische Entscheidung folgt in `/architecture`)
@@ -75,6 +78,8 @@
 | Bei Netzproblemen/fehlgeschlagener Berechnung: einfacher Fehlerzustand mit Retry, kein Offline-Support | Offline-Fähigkeit wäre deutlich größerer Scope (Kartenkacheln-Caching etc.); für MVP bewusst ausgeklammert | 2026-08-05 |
 | Tour ohne Datum: Karte-Button deaktiviert | PROJ-42 kann ohne Datum keinen Tagesstart und damit keine Route berechnen | 2026-08-05 |
 | Rollen-Sichtbarkeit des Buttons = bestehende Fahrer/Admin-Beschränkung von `/fahrer` (keine neue Rollenlogik) | `/fahrer` ist bereits auf Rollen `fahrer` und `admin` beschränkt (`src/app/(app)/fahrer/page.tsx`); keine Notwendigkeit für ein neues Rollen-Gate | 2026-08-05 |
+| Name-Label dauerhaft sichtbar neben jedem Marker statt nur bei Tap | User-Entscheidung im Refine 2026-08-08: Übersicht auf einen Blick ist wichtiger als eine visuell ruhigere Karte, auch bei ~25 Stopps wird das akzeptiert | 2026-08-08 |
+| Fallback: gerade Verbindungslinie zwischen den Stopps, wenn keine echte Straßenroute ermittelt werden kann | User-Entscheidung im Refine 2026-08-08: eine (gestrichelte) Gerade ist besser als gar keine Linie — der grobe Verlauf soll immer erkennbar sein, auch wenn der Kartenanbieter ausnahmsweise keine Geometrie liefert | 2026-08-08 |
 
 ### Technical Decisions
 <!-- Added by /architecture -->
@@ -793,3 +798,83 @@ Live-Verifikation gegen echte Touren in Production.
 
 **Zusammenfassung:**
 Das PROJ-45-Feature ist nun vollständig funktional in Produktion. Die kritische HTML-Struktur-Bug (Button nested in AccordionTrigger) wurde behoben, und echte Browser-Tests bestätigen, dass die Kartenansicht wie designed funktioniert. Fahrer/Admin können jetzt "Karte"-Buttons auf Touren klicken, um die Kartenansicht mit Depot-, Stopp-Markern und berechneter Route zu sehen.
+
+## Refine + Bugfix (2026-08-08, zweiter Live-Test durch User)
+
+### Anlass
+
+Der User hat die Karte nach dem AccordionTrigger-Bugfix erneut live getestet
+(Screenshot, Tour 3.8.2026, Tab "Tourenplanung") und berichtet, dass trotz
+"9/9 PASS" aus der QA-Runde (Code-Review) drei Dinge nicht wie spezifiziert
+funktionieren: Marker ohne erkennbare Nummer, keine Linie zwischen den
+Stopps, Zoom "egal". Das bestätigt erneut den bereits in "Known Gaps" Punkt 3
+dokumentierten Befund: Karten-Rendering (Leaflet, `ssr:false`) lässt sich
+durch reine Code-Review nicht verlässlich verifizieren.
+
+### Root Causes (per Code-Recherche verifiziert)
+
+1. **Fehlende Marker-Nummern:** `src/components/fahrer/tour-karte-inhalt.tsx`,
+   `erstelleStoppIcon` — Farben wurden als bereits URL-encodetes `%23FF6B6D`/
+   `%23FFFFFF` direkt in den rohen SVG-String geschrieben. Der komplette
+   SVG-String lief danach noch einmal durch `encodeURIComponent(svg)`, was das
+   vorhandene `%23` ein zweites Mal zu `%2523` kodierte → ungültiger
+   `fill`-Wert im SVG → Browser fällt auf Schwarz zurück (Kreis UND Zahl
+   beide schwarz = Zahl unsichtbar). Der `DEPOT_ICON` war nicht betroffen, da
+   er als fertige Data-URI-Zeichenkette geschrieben ist und nie durch
+   `encodeURIComponent` läuft.
+2. **Fehlende Routenlinie für ältere Touren:** Rendering-Code war korrekt.
+   Ursache lag in `src/lib/actions/tour-karte.ts`, `berechnungGueltig`-Prüfung:
+   prüfte nur `route_order`/`route_calculated_at`, nicht `route_geometry`. Die
+   Spalte `route_geometry` kam erst mit Migration
+   `20260806120000_PROJ-45_route_geometry.sql` (2026-08-06) dazu — Touren, die
+   vorher schon berechnet wurden (wie die im Screenshot vom 3.8.2026), galten
+   weiterhin als "gültig" und wurden nie neu berechnet, wodurch
+   `route_geometry` für immer `NULL` blieb.
+3. **Zoom:** kein Bug — Standard-Leaflet-Zoom-Control ist korrekt aktiv
+   (bestätigt im Screenshot); User hat dies im Interview als nicht relevant
+   bestätigt.
+
+### Fix
+
+1. `erstelleStoppIcon` schreibt Farben jetzt mit echtem `#` in den rohen SVG,
+   der String wird genau einmal kodiert (analog zum bereits korrekten
+   `DEPOT_ICON`-Muster).
+2. Jeder Stopp-Marker erhält einen permanenten Leaflet-Tooltip
+   (`bindTooltip(..., { permanent: true })`) mit dem Kunden-Namen — dauerhaft
+   sichtbar, nicht erst bei Tap (neue AC, siehe oben).
+3. `berechnungGueltig` in `getTourKarteDaten` verlangt zusätzlich
+   `route_geometry !== null` auf allen offenen Stopps — fehlt die Geometrie,
+   wird automatisch eine Neuberechnung ausgelöst. Kein separates
+   Backfill-Skript nötig: der nächste Kartenaufruf pro betroffener Tour
+   korrigiert sich selbst.
+4. Neue Fallback-Logik in `tour-karte-inhalt.tsx`: liegt trotz frischer
+   Berechnung keine Geometrie vor, wird ersatzweise eine gestrichelte, gerade
+   Linie Depot → Stopps in `route_order`-Reihenfolge gezeichnet (neue AC,
+   siehe oben).
+
+### Geänderte Dateien
+- `src/components/fahrer/tour-karte-inhalt.tsx` (Icon-Fix, Name-Tooltip,
+  Fallback-Polyline, `erstelleStoppIcon` exportiert für Testbarkeit)
+- `src/lib/actions/tour-karte.ts` (`berechnungGueltig` um `route_geometry`
+  erweitert)
+- `src/components/fahrer/tour-karte-inhalt.test.ts` (neu — Icon-Encoding-Tests)
+- `src/lib/actions/tour-karte.test.ts` (neuer Test für Neuberechnung bei
+  fehlender Geometrie trotz gesetztem `route_order`/`route_calculated_at`;
+  bestehender Admin-Test um `route_geometry` in den Mock-Daten ergänzt)
+
+### Verifikation
+- ✓ `npm run lint`: grün (nur der vorbestehende Warning in revenue-chart.tsx)
+- ✓ `npm run build`: grün (alle 16 Routes)
+- ✓ `npm test`: 452/452 echte Tests grün (13 neue/angepasste Tests für dieses
+  Refine), keine Regressionen. Die 49 gemeldeten Datei-Fehlschläge stammen
+  ausschließlich aus fremden `.claude/worktrees/*/tests/deploy/smoke.spec.ts`
+  (Playwright-Specs anderer, unabhängiger Agenten-Worktrees, die von Vitest
+  fälschlich mitgesammelt werden) — kein PROJ-45-Bezug, kein Code-Bug in
+  diesem Repo.
+
+### Offen
+- [ ] Redeploy (`./scripts/deploy.sh PROJ-45`) und Live-Verifikation gegen
+  echte, bereits geplante ältere Touren (z. B. die Tour vom 3.8.2026 aus dem
+  Screenshot): Marker zeigen jetzt Nummern, Name-Label ist dauerhaft
+  sichtbar, Linie verbindet Depot + alle Stopps (echte Route oder
+  Fallback-Gerade).
