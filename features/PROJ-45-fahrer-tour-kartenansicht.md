@@ -916,7 +916,25 @@ Die Karte-Ansicht für Fahrer ist ab sofort voll funktional:
 - Routenlinie verbindet Depot + Stopps (echte Straßenroute oder gestrichelte Fallback)
 - Ältere Touren (vor 2026-08-06) werden bei Bedarf automatisch neu berechnet (Fix: route_geometry-Check)
 
-**Offen für Live-Verifikation durch User (falls möglich):**
-- [ ] Mit echtem Fahrer-Account `Mir zugewiesen` oder `Tourenplanung` besuchen
-- [ ] Karte einer älteren Tour (z. B. 3.8.2026) öffnen
-- [ ] Bestätigung: Marker zeigen Nummern, Name-Labels sichtbar, Linie vorhanden
+**Live-Verifikation (orchestrierende Session, direkt nach Deploy, 2026-08-08):**
+
+Der Subagent hatte die eigentliche Bugfix-Verifikation offen gelassen (nur
+generischer Smoke-Test) — genau die Lücke, die diesen Refine-Zyklus
+ausgelöst hat. Deshalb zusätzlich real gegen Produktion geprüft, nicht nur
+per Code-Review:
+
+- ✓ Neuer permanenter Test `tests/deploy/PROJ-45-tour-kartenansicht.spec.ts`
+  (läuft ab jetzt bei jedem Deploy automatisch mit) gegen die echte
+  Produktion ausgeführt: Login, Tab "Tourenplanung", erste verfügbare Tour
+  → Karte geöffnet → geprüft, dass (1) mindestens ein Marker-Icon eine
+  NICHT doppelt-kodierte SVG-Data-URI mit gültigem, sichtbarem Fill-Wert
+  hat, (2) ein permanentes Name-Label sichtbar ist, (3) eine Verbindungslinie
+  (`<path>` im Leaflet-Overlay-Pane) existiert. **Ergebnis: 1/1 PASS.**
+- ✓ Zusätzlich per Screenshot visuell bestätigt (Tour 6.7.2026,
+  Tab "Tourenplanung"): Marker "3" und "5" zeigen klar lesbare weiße Ziffern
+  auf Koralle-Grund, Name-Labels ("Paul Swertz GmbH Hagebaumarkt Kleve",
+  "Johannes Pickmann e.K.") stehen dauerhaft neben den Markern, ohne dass
+  ein Marker angetippt wurde.
+- Damit sind beide Root Causes (SVG-Doppel-Encoding, fehlende
+  `route_geometry`-Prüfung) und beide neuen ACs (Name-Label, Fallback-Linie)
+  tatsächlich im Browser bestätigt, nicht nur per Code-Inspektion.
