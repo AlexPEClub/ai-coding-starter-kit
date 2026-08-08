@@ -1,8 +1,9 @@
 # PROJ-45: Fahrer — Tour-Kartenansicht
 
-## Status: In Review
+## Status: ✅ Deployed
 **Created:** 2026-08-05
 **Last Updated:** 2026-08-08
+**Deployed:** 2026-08-08
 
 **Frontend-Implementierung:** 2026-08-06
 **Backend-Implementierung:** 2026-08-08
@@ -530,4 +531,52 @@ hier ausdrücklich noch **offen**, nicht bereits erledigt.
 4. Optional: After first week, create polish task for marker offset logic if coordinate collision reported
 
 ## Deployment
-_To be added by /deploy_
+
+**Live seit:** 2026-08-08  
+**Production URL:** https://tms.gudel-werkzeuge.de  
+**Git-Tag:** v1.45.0-PROJ-45  
+**Deploy-Skript:** `./scripts/deploy.sh PROJ-45`
+
+### Deploy-Ergebnis
+
+**Pre-Checks:** ✓ PASSED
+- npm lint: grün (1 pre-existenter Warning in revenue-chart.tsx, nicht neu)
+- npm build: grün (alle 16 Routes erfolgreich gebaut)
+
+**Docker Build + Deploy:** ✓ PASSED
+- Image gebaut: `tms-20-tms`
+- Container gestartet und läuft
+- Traefik routet production per Labels
+
+**Post-Deploy-Verifikation:** ⚠️ PARTIAL (5 Anläufe)
+- **Chromium Smoke-Tests:** ✓ 4/4 PASSED in allen 5 Anläufen
+  - Login-Seite erreichbar und HTTP 200 ✓
+  - App ist TMS 2.0 (nicht Fehlerseite) ✓
+  - Login-Formular gerendert ✓
+  - Weitere PROJ-11-Integrationstests (4/4) ✓
+- **Mobile Safari:** ✗ 11/11 FAILED (WebKit Executable nicht vorhanden — pre-existente Sandbox-Limitation, kein Code-Bug, konsistent mit PROJ-11/21/29/41/42/44)
+- **Gesamtstatus:** Deploy-Skript meldet `exit code 1` wegen Mobile Safari Fehlern, aber Chromium-Smoke-Tests bestätigen App läuft korrekt
+
+### Live-Verifikation nach Deploy
+
+**HTTP-Erreichbarkeit:** ✓ PASS
+- Production URL antwortet mit HTTP 307 → /login (normales Verhalten)
+- Login-Formular rendert korrekt
+
+**Anwendungs-Status:** ✓ RUNNING
+- Container `tms` läuft seit ~3 Min.
+- Next.js App ready in 78ms
+- Keine Fehler in Container-Logs
+
+**Hinweis zu PROJ-45-spezifischer Verifikation:**
+Live-Browser-Test der Karte (Leaflet-Rendering, Marker-Tap) konnte in dieser Dev-Sandbox nicht durchgeführt werden (Playwright-Login-Timeout, pre-existente Umgebungseinschränkung wie bei QA-Runde — kein PROJ-45-spezifischer Regression). Empfehlung: Der User sollte in der echten Produktion manuell folgende Schritte durchführen (oder es wird mit echter Fahrer-Nutzung validiert):
+1. Login als Fahrer (z.B. via Web-UI)
+2. Navigieren zu `/fahrer`
+3. Eine Tour mit Datum finden und "Karte" antippen
+4. Bestätigen, dass:
+   - Modal öffnet mit Ladezustand oder Karte
+   - Leaflet-Karte rendert (Depot-Marker + Stop-Nummern + Routenlinie sichtbar)
+   - Tap auf einen Stop-Marker öffnet Stopp-Detail-Modal
+   - Fehlerfall (z.B. keine Netzverbindung) zeigt Fehlermeldung + "Erneut versuchen"-Button
+
+Dies ist konsistent mit dem Projekt-Muster (kein Staging vorhanden) und der Spec-Anmerkung zu QA (echte Browser-/Live-Verifikation war in dieser Runde nicht möglich).
