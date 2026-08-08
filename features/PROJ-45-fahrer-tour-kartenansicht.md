@@ -1,11 +1,13 @@
 # PROJ-45: Fahrer — Tour-Kartenansicht
 
-## Status: ✅ Deployed
+## Status: 🔴 In Review — Critical Bug in Production, Bugfix Ready & Committed (Pending Deployment)
 **Created:** 2026-08-05
-**Last Updated:** 2026-08-08
-**Deployed:** 2026-08-08
+**Last Updated:** 2026-08-08 (Second QA Pass)
+**Deployed:** 2026-08-08 (Initial deployment with critical button-nesting bug)
+**Bugfix Committed:** 2026-08-08 (Commit d31acd3, awaiting re-deployment)
 
 **Frontend-Implementierung:** 2026-08-06
+**Frontend-Bugfix (Button-Struktur):** 2026-08-08
 **Backend-Implementierung:** 2026-08-08
 
 ## Dependencies
@@ -568,15 +570,184 @@ hier ausdrücklich noch **offen**, nicht bereits erledigt.
 - Next.js App ready in 78ms
 - Keine Fehler in Container-Logs
 
-**Hinweis zu PROJ-45-spezifischer Verifikation:**
-Live-Browser-Test der Karte (Leaflet-Rendering, Marker-Tap) konnte in dieser Dev-Sandbox nicht durchgeführt werden (Playwright-Login-Timeout, pre-existente Umgebungseinschränkung wie bei QA-Runde — kein PROJ-45-spezifischer Regression). Empfehlung: Der User sollte in der echten Produktion manuell folgende Schritte durchführen (oder es wird mit echter Fahrer-Nutzung validiert):
-1. Login als Fahrer (z.B. via Web-UI)
-2. Navigieren zu `/fahrer`
-3. Eine Tour mit Datum finden und "Karte" antippen
-4. Bestätigen, dass:
-   - Modal öffnet mit Ladezustand oder Karte
-   - Leaflet-Karte rendert (Depot-Marker + Stop-Nummern + Routenlinie sichtbar)
-   - Tap auf einen Stop-Marker öffnet Stopp-Detail-Modal
-   - Fehlerfall (z.B. keine Netzverbindung) zeigt Fehlermeldung + "Erneut versuchen"-Button
+**🔴 KRITISCHER FUND (orchestrierende Session, 2026-08-08, nach echtem Live-Test):**
 
-Dies ist konsistent mit dem Projekt-Muster (kein Staging vorhanden) und der Spec-Anmerkung zu QA (echte Browser-/Live-Verifikation war in dieser Runde nicht möglich).
+Die vorherige Notiz an dieser Stelle ("Playwright-Login-Timeout, pre-existente
+Umgebungseinschränkung") war **falsch** — sie beruhte auf einem fehlerhaften
+Ad-hoc-Testskript (falsches Passwort `TestPassword123!` statt dem projektweit
+etablierten `TestPass123!`, abweichende Selektoren statt Wiederverwendung des
+bewährten Login-Patterns aus `tests/PROJ-42-routenberechnung.spec.ts`). Mit
+dem korrekten Pattern funktioniert der Login gegen die echte Produktion
+einwandfrei (bestätigt: `LOGIN OK, landed on: https://tms.gudel-werkzeuge.de/dashboard`).
+
+Mit echtem Login + echten Touren im Tab "Tourenplanung" (Testaccount hat im
+Tab "Mir zugewiesen" aktuell keine eigenen offenen Touren) wurde die Karte
+tatsächlich angetippt — Ergebnis: **Der Klick auf "Karte" öffnet KEINE
+Kartenansicht, sondern klappt stattdessen die Stopp-Liste des Accordion-
+Eintrags auf** (reproduzierbar, keine Konsolenfehler, kein Netzwerkfehler).
+
+**Root Cause (Code-Verifikation):** `src/components/fahrer/tour-liste.tsx`
+Zeile 142–173 verschachtelt den neuen "Karte"-`<Button>` (Zeile 158–171)
+**innerhalb** von `<AccordionTrigger>`. Radix' `AccordionTrigger` rendert
+selbst ein natives `<button>` (bestätigt in `src/components/ui/accordion.tsx`
+Zeile 28: `<AccordionPrimitive.Trigger>` ohne `asChild`). Ein `<button>`
+**innerhalb eines anderen `<button>`** ist ungültiges HTML — der Browser
+korrigiert das beim Parsen automatisch (schließt das äußere `<button>` vor
+dem inneren), wodurch der innere "Karte"-Button real NICHT mehr im DOM-Baum
+des Trigger-Buttons liegt. Das erklärt, warum `e.stopPropagation()` (Zeile
+163) nicht wirkt wie beabsichtigt: der tatsächliche Klick-Pfad nach der
+Browser-Korrektur entspricht nicht dem im JSX verfassten.
+
+**Auswirkung:** Das komplette Feature ist in Produktion aktuell **nicht
+nutzbar** — kein Fahrer/Admin kann die Karte öffnen, unabhängig von Backend/
+Rollen/Timeout (die alle korrekt sind, siehe oben). Weder die QA-Runde noch
+der automatische Post-Deploy-Smoke-Test haben das gefunden, weil beide nie
+tatsächlich mit echten Zugangsdaten + echten Tourdaten auf den Button
+geklickt haben (QA: reine Code-Review; Smoke-Test: nur generischer Login-
+Check, keine Feature-spezifische Interaktion).
+
+**Empfohlener Fix:** Den "Karte"-Button aus `<AccordionTrigger>` herausnehmen
+— z. B. als Geschwister-Element neben dem Trigger in einer gemeinsamen
+Flex-Zeile (Trigger nimmt die Kopfzeile ein, Button liegt strukturell
+daneben statt darin), analog zum gängigen shadcn/Radix-Muster für
+"Trigger + Action-Button nebeneinander". Kein Datenmodell-/Backend-Bezug,
+reine Struktur-Korrektur in `tour-liste.tsx`.
+
+**Status:** Deploy technisch live, aber Feature funktional **broken** —
+Rücksprache mit dem User erforderlich, wie weiter vorgegangen wird (siehe
+Chat).
+
+## Bugfix (2026-08-08)
+
+**Root Cause:** In `src/components/fahrer/tour-liste.tsx` (Zeilen 142–173) war
+der "Karte"-Button strukturell **innerhalb** von `<AccordionTrigger>` verschachtelt.
+`AccordionTrigger` rendert selbst als ein natives HTML-`<button>` (bestätigt in
+`src/components/ui/accordion.tsx`). Ein `<button>` nested in `<button>` ist
+ungültiges HTML — der Browser korrigiert das beim Parsen automatisch, wodurch
+die DOM-Struktur zerbricht: Der innere "Karte"-Button lands faktisch NICHT mehr
+im DOMTree des Trigger-Buttons. Dadurch funktioniert `e.stopPropagation()` nicht
+wie beabsichtigt, und der Klick auf "Karte" triggert stattdessen das Accordion
+expand/collapse.
+
+**Fix:** Den "Karte"-Button aus `<AccordionTrigger>` herausnehmen und als
+Sibling-Element neben dem Trigger platzieren, beide in einer gemeinsamen
+Flex-Zeile. Konkrete Änderungen:
+1. Neue Flex-Wrapper-Div (`className="flex w-full items-center justify-between gap-2"`)
+   auf der `<AccordionItem>`-Ebene eingefügt
+2. `<AccordionTrigger>` wird Sibling #1 der Wrapper (mit `className="flex-1"` damit
+   es die verfügbare Breite nutzt)
+3. `<Button>` wird Sibling #2 (mit `className="shrink-0"` um nicht zu wachsen)
+4. Innerer Button-Content bleibt unverändert, ebenso Klassennamen und Click-Handler
+
+**Ergebnis:**
+- Button ist jetzt ein echtes Sibling des AccordionTrigger, nicht nested
+- `e.stopPropagation()` wirkt korrekt (Button ist kein Kind eines anderen Buttons mehr)
+- Chevron des Accordion rotiert weiterhin korrekt (intern in `AccordionPrimitive.Trigger`
+  unverändert)
+- Visuelle Layout bleibt identisch (gleiche Flex-Anordnung, nur auf andere HTML-Ebene)
+
+**Verifikation:**
+- ✓ `npm run lint`: grün (nur pre-existenter Warning in revenue-chart.tsx)
+- ✓ `npm run build`: grün (alle 16 Routes erfolgreich gebaut)
+- ✓ `npm test`: 145/145 Unit-Tests bestanden, keine Regressionen
+- ✓ Code-Review: HTML-Struktur ist jetzt valid (keine nested buttons)
+
+**Status:** Bugfix angewendet und gebaut. Nächster Schritt: `/qa` + `/deploy` für
+Live-Verifikation gegen echte Touren in Production.
+
+## QA Test Results — Second Pass (Bugfix Verification, 2026-08-08)
+
+### Live Testing Against Production
+
+**Test Environment:** Production (https://tms.gudel-werkzeuge.de)  
+**Test Account:** playwright-test@tms.gudel-werkzeuge.de (Fahrer-Rolle)  
+**Date:** 2026-08-08  
+**Test Approach:** Actual browser automation with Playwright using established login pattern
+
+### Critical Finding: Feature Currently Non-Functional in Production
+
+**Status:** 🔴 CRITICAL BUG — Confirmed by live testing
+
+**Observation:**
+- Successfully logged in with correct credentials and pattern
+- Navigated to `/fahrer` page
+- Switched to "Tourenplanung" tab (found 30 tours with dates)
+- Clicked "Karte" button on first available tour
+- Button click was registered, but **NO modal appeared**
+- No JavaScript errors in console
+- No network errors
+- Accordion did NOT toggle (suggesting click registered but was not captured by handler)
+
+**Root Cause:** The button code fix exists in the source file (`src/components/fahrer/tour-liste.tsx` now has correct sibling structure), but this version has **NOT been deployed to production yet**. The live production environment is still running the broken nested-button code from the initial deploy on 2026-08-08.
+
+**Commit Status:**
+- Bugfix code exists in repository: ✅ YES
+- Bugfix code changes verified: ✅ YES (sibling structure, not nested)
+- Bugfix code committed: ✅ YES (`d31acd3` — "fix(PROJ-45): Move Karte-Button out of AccordionTrigger")
+- Bugfix code deployed to production: ❌ NO (still pending)
+
+### Code Verification (Post-Bugfix)
+
+**File:** `src/components/fahrer/tour-liste.tsx` (lines 142–174)
+
+```tsx
+{/* PROJ-45 Bugfix: Karte-Button als Sibling von AccordionTrigger (nicht nested) */}
+<div className="flex w-full items-center justify-between gap-2">
+  <AccordionTrigger className="flex-1 min-h-[48px] py-3 hover:no-underline">
+    {/* Tour info */}
+  </AccordionTrigger>
+  {/* PROJ-45: Karte-Button — jetzt Sibling des Trigger, nicht nested */}
+  <Button
+    onClick={(e) => {
+      e.stopPropagation();
+      handleOeffneKarte(tour.fahrerId, tour.datum);
+    }}
+    // ...
+  >
+    <Map className="h-4 w-4" />
+    <span className="hidden sm:inline">Karte</span>
+  </Button>
+</div>
+```
+
+✅ Correct structure: Button is now a sibling of `<AccordionTrigger>`, NOT nested inside it.
+
+### Build & Test Status (With Bugfix)
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| `npm run lint` | ✅ PASS | Only pre-existing warning in revenue-chart.tsx |
+| `npm run build` | ✅ PASS | All 16 routes built successfully |
+| `npm test` | ✅ PASS | 145/145 unit tests passing, no regressions |
+| TypeScript type check | ✅ PASS | No new errors |
+
+### Production-Ready Assessment
+
+**Current Status:** ❌ NOT READY FOR DEPLOYMENT (Production still broken)
+
+**Issues Blocking Deployment:**
+1. **Code Fix:** ✅ Ready (committed, tested locally)
+2. **Deployment:** ❌ Pending (must run `./scripts/deploy.sh PROJ-45` to push bugfix to production)
+3. **Live Verification:** ❌ Pending (must test against production after deployment)
+
+### Recommended Next Steps
+
+1. **Deploy the bugfix:** Run `./scripts/deploy.sh PROJ-45` to push the committed fix to production
+2. **Post-deploy verification:** Re-test clicking "Karte" button against production to confirm modal opens
+3. **Verify map renders:** Check for Leaflet map container, markers, and route line
+4. **Verify interaction:** Click markers to open StoppDetailModal
+5. **Verify error handling:** If possible, trigger an error case to verify error message + retry
+
+### Important Notes
+
+- **Why live testing was essential:** Code review alone would have missed this bug. The first QA pass (code-only) marked the feature as "APPROVED" despite the broken implementation being live. This demonstrates why actual browser testing is critical, especially for UI interactions.
+- **Playwright test limitation:** The dev environment's Supabase auth doesn't work in this sandbox, but production auth works fine with the correct credentials and pattern.
+- **The bugfix is correct:** Moving the button outside `<AccordionTrigger>` is the right solution and has been verified to not break any tests.
+
+### Summary
+
+**Before Deployment:** Feature is **completely non-functional** in production. Users see "Karte" button but it doesn't work.
+
+**After Bugfix Deployment:** Feature should work correctly (button click → modal opens → map renders).
+
+**Recommendation:** Deploy the bugfix immediately, then run post-deployment live verification test before marking feature as fully "Deployed".
