@@ -22,7 +22,7 @@ interface Koordinate {
   lon: number;
 }
 
-function leseDepotKoordinaten(): Koordinate | null {
+export function leseDepotKoordinaten(): Koordinate | null {
   const lat = Number(process.env.GEOAPIFY_DEPOT_LAT);
   const lon = Number(process.env.GEOAPIFY_DEPOT_LON);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
@@ -142,6 +142,7 @@ export async function berechneUndSpeichereRoute(
           berechnete_ankunftszeit: antwort.ankunftszeiten.get(stopp.id) ?? null,
           leg_distance_meters: antwort.etappenDistanzMeter.get(stopp.id) ?? null, // PROJ-44
           leg_duration_seconds: antwort.etappenDauerSekunden.get(stopp.id) ?? null, // PROJ-44
+          route_geometry: antwort.routenGeometrie, // PROJ-45 (identisch für alle Stopps einer Tour)
         })
         .eq("id", stopp.id);
 
@@ -165,6 +166,8 @@ export async function berechneUndSpeichereRoute(
   };
 }
 
+export type RoutenGeometrie = Array<[number, number]>; // [[lat, lon], [lat, lon], ...]
+
 interface GeoapifyRoutePlannerAntwort {
   reihenfolge: Map<string, number>;
   ankunftszeiten: Map<string, string>;
@@ -172,6 +175,7 @@ interface GeoapifyRoutePlannerAntwort {
   gesamtDauerSekunden: number;
   etappenDistanzMeter: Map<string, number>; // PROJ-44
   etappenDauerSekunden: Map<string, number>; // PROJ-44
+  routenGeometrie: RoutenGeometrie | null; // PROJ-45
 }
 
 /**
@@ -330,6 +334,37 @@ async function rufeGeoapifyRoutePlanner(
     throw new Error("Nicht alle Stopps konnten der Geoapify-Antwort zugeordnet werden.");
   }
 
+  // PROJ-45: Routen-Geometrie aus der Geoapify-Antwort extrahieren.
+  // Liegt in `feature.geometry` (GeoJSON). Gegen einen echten Testaufruf
+  // verifiziert (2026-08-08): der reale Typ ist **MultiLineString** (ein
+  // Segment pro Leg, `coordinates: [[[lon,lat],...], [[lon,lat],...], ...]`),
+  // nicht LineString — die offizielle Doku beschreibt beide als möglich,
+  // aber die Route-Planner-API liefert in der Praxis immer MultiLineString.
+  // `.flat()` (Tiefe 1) fügt die Segmente zu einem durchgehenden Pfad zusammen
+  // (Segment-Übergänge enthalten dabei einen harmlosen doppelten Punkt).
+  // Coordinates sind [lon, lat] (GeoJSON-Standard), werden zu [lat, lon]
+  // konvertiert. Wenn Geometrie fehlt oder unerwartet ist, wird nur eine
+  // Warnung geloggt — die Berechnung schlägt NICHT fehl, Order/Distance/
+  // Duration bleiben in jedem Fall gültig.
+  let routenGeometrie: RoutenGeometrie | null = null;
+  try {
+    const geometry = agentFeature?.geometry;
+    if (geometry && geometry.type === "LineString" && Array.isArray(geometry.coordinates)) {
+      routenGeometrie = geometry.coordinates.map(
+        ([lon, lat]: [number, number]) => [lat, lon]
+      );
+    } else if (geometry && geometry.type === "MultiLineString" && Array.isArray(geometry.coordinates)) {
+      // Falls MultiLineString: alle Segmente in ein Array flattened
+      routenGeometrie = geometry.coordinates.flat().map(
+        ([lon, lat]: [number, number]) => [lat, lon]
+      );
+    } else if (geometry) {
+      console.warn("Geoapify lieferte Geometrie mit unerwartetem Type:", geometry.type);
+    }
+  } catch (fehler) {
+    console.warn("Fehler beim Extrahieren der Routen-Geometrie:", fehler);
+  }
+
   return {
     reihenfolge,
     ankunftszeiten,
@@ -337,6 +372,7 @@ async function rufeGeoapifyRoutePlanner(
     gesamtDauerSekunden: agentFeature?.properties?.time ?? 0,
     etappenDistanzMeter, // PROJ-44
     etappenDauerSekunden, // PROJ-44
+    routenGeometrie, // PROJ-45
   };
 }
 

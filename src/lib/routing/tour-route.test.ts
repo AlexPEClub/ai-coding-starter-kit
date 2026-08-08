@@ -74,27 +74,31 @@ function createFakeAdminClient(options: {
 // job_id liegt in waypoint.actions[], nicht direkt auf dem Wegpunkt.
 // Etappen-Distanz/-Zeit liegen in properties.legs[], referenziert über
 // waypoint.prev_leg_index — nicht direkt auf dem Wegpunkt.
-function geoapifyAntwort(stoppIds: string[]) {
+function geoapifyAntwort(stoppIds: string[], options: { geometry?: any } = {}) {
+  const feature: any = {
+    properties: {
+      distance: 12345,
+      time: 2400,
+      legs: stoppIds.map((_, index) => ({
+        distance: (index + 1) * 1000,
+        time: (index + 1) * 300,
+        from_waypoint_index: index,
+        to_waypoint_index: index + 1,
+      })),
+      waypoints: stoppIds.map((id, index) => ({
+        start_time: index * 1200,
+        prev_leg_index: index,
+        actions: [{ type: "job", job_id: id }],
+      })),
+    },
+  };
+
+  if (options.geometry !== undefined) {
+    feature.geometry = options.geometry;
+  }
+
   return {
-    features: [
-      {
-        properties: {
-          distance: 12345,
-          time: 2400,
-          legs: stoppIds.map((_, index) => ({
-            distance: (index + 1) * 1000,
-            time: (index + 1) * 300,
-            from_waypoint_index: index,
-            to_waypoint_index: index + 1,
-          })),
-          waypoints: stoppIds.map((id, index) => ({
-            start_time: index * 1200,
-            prev_leg_index: index,
-            actions: [{ type: "job", job_id: id }],
-          })),
-        },
-      },
-    ],
+    features: [feature],
   };
 }
 
@@ -275,6 +279,81 @@ describe("berechneUndSpeichereRoute", () => {
 
     expect(ergebnis.ok).toBe(false);
     expect(updateAufrufe).toHaveLength(0);
+  });
+
+  // PROJ-45: Geometrie-Tests
+  it("PROJ-45: speichert Routen-Geometrie korrekt, wenn von Geoapify geliefert (LineString)", async () => {
+    const { client, updateAufrufe } = createFakeAdminClient({
+      stopps: [
+        { id: "stopp-a", partner_id: "partner-1" },
+        { id: "stopp-b", partner_id: "partner-2" },
+      ],
+      adressen: [
+        { partner_id: "partner-1", geoapify_lat: 51.5, geoapify_lon: 7.0 },
+        { partner_id: "partner-2", geoapify_lat: 51.6, geoapify_lon: 7.1 },
+      ],
+    });
+
+    // GeoJSON-Geometrie: Koordinaten in [lon, lat], wird zu [lat, lon] konvertiert
+    const testGeometry = {
+      type: "LineString",
+      coordinates: [
+        [7.0, 51.5],
+        [7.05, 51.55],
+        [7.1, 51.6],
+      ],
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => geoapifyAntwort(["stopp-a", "stopp-b"], { geometry: testGeometry }),
+      })
+    );
+
+    const ergebnis = await berechneUndSpeichereRoute(client as any, "fahrer-1", "2026-08-10");
+
+    expect(ergebnis.ok).toBe(true);
+    expect(updateAufrufe).toHaveLength(2);
+    // Beide Stopps tragen dieselbe Geometrie (identisch pro Tourengruppe)
+    expect(updateAufrufe[0].values.route_geometry).toEqual([
+      [51.5, 7.0],
+      [51.55, 7.05],
+      [51.6, 7.1],
+    ]);
+    expect(updateAufrufe[1].values.route_geometry).toEqual([
+      [51.5, 7.0],
+      [51.55, 7.05],
+      [51.6, 7.1],
+    ]);
+  });
+
+  it("PROJ-45: speichert null für route_geometry und setzt Berechnung fort, wenn Geometrie fehlt oder malformed ist", async () => {
+    const { client, updateAufrufe } = createFakeAdminClient({
+      stopps: [{ id: "stopp-a", partner_id: "partner-1" }],
+      adressen: [{ partner_id: "partner-1", geoapify_lat: 51.5, geoapify_lon: 7.0 }],
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        // geoapifyAntwort ohne geometry Parameter -> keine geometry im Response
+        json: async () => geoapifyAntwort(["stopp-a"]),
+      })
+    );
+
+    const ergebnis = await berechneUndSpeichereRoute(client as any, "fahrer-1", "2026-08-10");
+
+    // Berechnung ist erfolgreich trotz fehlender Geometrie
+    expect(ergebnis.ok).toBe(true);
+    expect(updateAufrufe).toHaveLength(1);
+    // route_geometry wird explizit zu null gespeichert
+    expect(updateAufrufe[0].values.route_geometry).toBe(null);
+    // Aber Order/Distance/Duration sind vorhanden
+    expect(updateAufrufe[0].values.route_order).toBe(1);
+    expect(updateAufrufe[0].values.route_distance_meters).toBe(12345);
   });
 });
 
