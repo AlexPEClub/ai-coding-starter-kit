@@ -723,7 +723,21 @@ Tests auf. 12/12 Tests in `tour-route.test.ts` grün, volle Unit-Test-Suite
 weiterhin grün, Lint/TypeCheck sauber (bestehende, unabhängige Pre-Existing-
 Warnungen/Fehler in `tests/*.spec.ts`/`revenue-chart.tsx` unverändert).
 
-**Offen:** Nach Deploy muss `npx tsx scripts/PROJ-42_backfill_routen.ts`
-einmalig erneut laufen, damit bestehende Touren die korrigierten Etappen-Werte
-erhalten (kostet echte Geoapify-API-Aufrufe — mit User vor Ausführung gegen
-Produktion abstimmen).
+**Deployed:** 2026-08-08 zu https://tms.gudel-werkzeuge.de (`./scripts/deploy.sh
+PROJ-42`, Pre-Checks lint/build grün, Docker-Deploy erfolgreich, Live-URL HTTP
+200). Vor dem Docker-Build wurde unabhängige, nicht committete PROJ-30/PROJ-45-
+Arbeit per `git stash -u` beiseite gelegt und danach wiederhergestellt (Muster
+wie beim PROJ-44-Deploy), damit nur der committete Bugfix ins Image kommt.
+Post-Deploy-Verifikation: Chromium-Smoke grün (4/4), Mobile Safari erneut
+nicht testbar (bekannter Playwright-Webkit-Versions-Drift auf dem Dev-Host,
+identisches Muster wie PROJ-11/21/29/41/44 — kein Code-Bug). Git-Tag
+`v1.42.2-PROJ-42`.
+
+**Backfill danach ausgeführt** (`npm run backfill:routen`): 30 offene
+Tourengruppen gefunden, 27 erfolgreich neu berechnet, 3 fehlgeschlagen (2×
+ungültige/fehlende Kundenadress-Koordinaten, 1× Geoapify-Zuordnungs-
+Sicherheitsnetz — beide Fehlerarten unabhängig vom hier behobenen Bug, kein
+Datenverlust dank Alles-oder-nichts-Schreiblogik). Per Live-DB-Abfrage
+verifiziert: `leg_distance_meters`/`leg_duration_seconds` enthalten jetzt echte,
+von Stopp zu Stopp unterschiedliche Werte (z. B. 458 m/39 s bis 95.115 m/
+3.731 s) statt durchgängig `0`/`NULL`.
