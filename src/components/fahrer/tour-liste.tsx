@@ -139,8 +139,9 @@ export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptione
               value={`${tour.fahrerId ?? "ohne-fahrer"}-${tour.datum ?? "ohne-datum"}`}
               className="rounded-2xl border border-border bg-card px-4 shadow-sm"
             >
-              <AccordionTrigger className="min-h-[48px] py-3 hover:no-underline">
-                <div className="flex w-full items-center justify-between">
+              {/* PROJ-45 Bugfix: Karte-Button als Sibling von AccordionTrigger (nicht nested) */}
+              <div className="flex w-full items-center justify-between gap-2">
+                <AccordionTrigger className="flex-1 min-h-[48px] py-3 hover:no-underline">
                   <div className="text-left">
                     <p className="font-semibold text-foreground">{formatDatum(tour.datum)}</p>
                     <p className="text-sm text-muted-foreground">
@@ -154,23 +155,23 @@ export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptione
                       )}
                     </p>
                   </div>
-                  {/* PROJ-45: Karte-Button */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!tour.datum}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOeffneKarte(tour.fahrerId, tour.datum);
-                    }}
-                    className="ml-2 gap-1"
-                    aria-label="Karte dieser Tour anzeigen"
-                  >
-                    <Map className="h-4 w-4" />
-                    <span className="hidden sm:inline">Karte</span>
-                  </Button>
-                </div>
-              </AccordionTrigger>
+                </AccordionTrigger>
+                {/* PROJ-45: Karte-Button — jetzt Sibling des Trigger, nicht nested */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!tour.datum}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOeffneKarte(tour.fahrerId, tour.datum);
+                  }}
+                  className="shrink-0 gap-1"
+                  aria-label="Karte dieser Tour anzeigen"
+                >
+                  <Map className="h-4 w-4" />
+                  <span className="hidden sm:inline">Karte</span>
+                </Button>
+              </div>
               <AccordionContent>
                 <ul className="space-y-2">
                   {tour.fahrten.map((fahrt) => {
