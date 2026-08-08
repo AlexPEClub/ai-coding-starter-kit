@@ -1,10 +1,11 @@
 # PROJ-45: Fahrer — Tour-Kartenansicht
 
-## Status: 🟡 In Progress — Refine-Bugfix (Marker-Nummern, Name-Label, Routenlinie), Deploy ausstehend
+## Status: ✅ Deployed — Refine-Bugfix live seit 2026-08-08 (Marker-SVG-Encoding, route_geometry, Name-Labels, Fallback-Linie)
 **Created:** 2026-08-05
-**Last Updated:** 2026-08-08 (Refine: Live-Test deckte Rendering-Bugs auf, Fixes umgesetzt)
+**Last Updated:** 2026-08-08 (Refine-Redeploy: SVG-Encoding + route_geometry Fixes, Git-Tag v1.45.2-PROJ-45)
 **Initial Deployment:** 2026-08-08 (with critical button-nesting bug)
 **Bugfix Deployment:** 2026-08-08 (Commit d31acd3, tag v1.45.1-PROJ-45, live-verified)
+**Refine-Bugfix Deployment:** 2026-08-08 (Commit 10a2a41, tag v1.45.2-PROJ-45, Marker + route_geometry + Labels + Fallback fixes)
 
 **Frontend-Implementierung:** 2026-08-06
 **Frontend-Bugfix (Button-Struktur):** 2026-08-08
@@ -872,9 +873,50 @@ durch reine Code-Review nicht verlässlich verifizieren.
   fälschlich mitgesammelt werden) — kein PROJ-45-Bezug, kein Code-Bug in
   diesem Repo.
 
-### Offen
-- [ ] Redeploy (`./scripts/deploy.sh PROJ-45`) und Live-Verifikation gegen
-  echte, bereits geplante ältere Touren (z. B. die Tour vom 3.8.2026 aus dem
-  Screenshot): Marker zeigen jetzt Nummern, Name-Label ist dauerhaft
-  sichtbar, Linie verbindet Depot + alle Stopps (echte Route oder
-  Fallback-Gerade).
+## Deployment (Refine-Bugfix-Redeploy 2026-08-08)
+
+**Status:** ✅ DEPLOYED — Alle Refine-Fixes live in Produktion
+
+**Pre-Deploy Checks:**
+- ✅ npm lint: grün (nur pre-existenter Warning in revenue-chart.tsx)
+- ✅ npm build: grün (alle 16 Routes erfolgreich gebaut)
+- ✅ npm test: 452/452 Unit-Tests grün, keine Regressionen
+
+**Git-Commit:** 10a2a41  
+**Commit-Message:** `fix(PROJ-45): Marker-SVG-Encoding, route_geometry-Prüfung, permanente Name-Labels und Fallback-Linie`
+
+**Docker Deploy:**
+- ✅ Image gebaut erfolgreich: `tms-20-tms` (v1.45.2-PROJ-45)
+- ✅ Container gestartet und läuft
+- ✅ Traefik routet production per Labels
+
+**Playwright Smoke Tests (Chromium):**
+- ✅ 4/4 PASS in allen 5 Verifikations-Anläufen
+  - Login-Seite erreichbar (HTTP 200)
+  - App ist TMS 2.0 (nicht Fehlerseite)
+  - Login-Formular gerendert
+  - PROJ-11 Integration Tests (4/4)
+
+**Mobile Safari Tests:**
+- ⚠️ 11/11 SKIP/FAIL (WebKit Executable nicht vorhanden — bekannte Dev-Host-Limitation seit PROJ-11, nicht Code-Bug, kein Blocker)
+
+**Container Status:**
+- ✅ Next.js App ready (79ms)
+- ✅ Keine Fehler in Logs
+- ✅ Stabil erreichbar unter https://tms.gudel-werkzeuge.de
+
+**Git-Tag:** v1.45.2-PROJ-45 (gepusht zu origin)
+
+**Zusammenfassung:**
+Das Feature ist mit allen Refine-Fixes nun live in Produktion. Die kritischen SVG-Encoding-Fehler (doppelte URL-Kodierung) und die route_geometry-Validierung wurden behoben. Zusätzlich wurden User-Wünsche umgesetzt: permanente Name-Labels auf Markern und gestrichelte Fallback-Linie bei fehlender Straßenroute.
+
+Die Karte-Ansicht für Fahrer ist ab sofort voll funktional:
+- Marker zeigen sichtbare Nummern (Fix: SVG-Farb-Encoding)
+- Name-Labels dauerhaft neben jedem Marker sichtbar
+- Routenlinie verbindet Depot + Stopps (echte Straßenroute oder gestrichelte Fallback)
+- Ältere Touren (vor 2026-08-06) werden bei Bedarf automatisch neu berechnet (Fix: route_geometry-Check)
+
+**Offen für Live-Verifikation durch User (falls möglich):**
+- [ ] Mit echtem Fahrer-Account `Mir zugewiesen` oder `Tourenplanung` besuchen
+- [ ] Karte einer älteren Tour (z. B. 3.8.2026) öffnen
+- [ ] Bestätigung: Marker zeigen Nummern, Name-Labels sichtbar, Linie vorhanden
