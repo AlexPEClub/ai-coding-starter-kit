@@ -1,10 +1,10 @@
 # PROJ-45: Fahrer — Tour-Kartenansicht
 
-## Status: 🔴 In Review — Critical Bug in Production, Bugfix Ready & Committed (Pending Deployment)
+## Status: ✅ Deployed — Bugfix successfully deployed to production
 **Created:** 2026-08-05
-**Last Updated:** 2026-08-08 (Second QA Pass)
-**Deployed:** 2026-08-08 (Initial deployment with critical button-nesting bug)
-**Bugfix Committed:** 2026-08-08 (Commit d31acd3, awaiting re-deployment)
+**Last Updated:** 2026-08-08 (Bugfix-Redeploy)
+**Initial Deployment:** 2026-08-08 (with critical button-nesting bug)
+**Bugfix Deployment:** 2026-08-08 (Commit d31acd3, tag v1.45.1-PROJ-45, live-verified)
 
 **Frontend-Implementierung:** 2026-08-06
 **Frontend-Bugfix (Button-Struktur):** 2026-08-08
@@ -751,3 +751,45 @@ Live-Verifikation gegen echte Touren in Production.
 **After Bugfix Deployment:** Feature should work correctly (button click → modal opens → map renders).
 
 **Recommendation:** Deploy the bugfix immediately, then run post-deployment live verification test before marking feature as fully "Deployed".
+
+## Deployment (Bugfix-Redeploy 2026-08-08)
+
+**Status:** ✅ DEPLOYED — Bugfix successfully deployed to production
+
+**Pre-Deploy Checks:**
+- ✅ npm lint: grün (nur pre-existenter Warning in revenue-chart.tsx)
+- ✅ npm build: grün (alle 16 Routes erfolgreich gebaut)
+- ✅ npm test: 145/145 Unit-Tests bestanden, keine Regressionen
+
+**Docker Deploy:**
+- ✅ Image gebaut erfolgreich
+- ✅ Container gestartet und läuft
+- ✅ Next.js app ready (99ms)
+
+**Smoke Tests (Chromium):**
+- ✅ Login-Seite erreichbar (HTTP 200)
+- ✅ App ist TMS 2.0 (nicht Fehlerseite)
+- ✅ Login-Formular gerendert
+- ✅ PROJ-11 Integration Tests (4/4 passed)
+
+**Post-Deploy Live Verification (2026-08-08):**
+- ✅ Login erfolgreich mit echtem Testaccount (playwright-test@tms.gudel-werkzeuge.de)
+- ✅ /fahrer geladen, 30 Touren in Tourenplanung sichtbar
+- ✅ Karte-Button angeklickt (erste Tour mit echtem Datum)
+- ✅ Modal dialog öffnet sich (Dialog [role="dialog"] erscheint)
+- ✅ Leaflet map rendert (`.leaflet-container` sichtbar)
+- ✅ Map-Marker vorhanden (7 Marker-Icons auf der ersten Tour sichtbar)
+- ✅ **BUGFIX VERIFIZIERT:** Button öffnet jetzt die Kartenansicht statt das Accordion zu togglen
+
+**Container Logs:**
+- ✅ Keine Fehler oder Warnungen in den Logs
+- ✅ App läuft stabil
+
+**Git-Tag:**
+- v1.45.0-PROJ-45 (Original-Deploy mit Bug)
+- v1.45.1-PROJ-45 (Bugfix-Redeploy)
+
+**Live URL:** https://tms.gudel-werkzeuge.de
+
+**Zusammenfassung:**
+Das PROJ-45-Feature ist nun vollständig funktional in Produktion. Die kritische HTML-Struktur-Bug (Button nested in AccordionTrigger) wurde behoben, und echte Browser-Tests bestätigen, dass die Kartenansicht wie designed funktioniert. Fahrer/Admin können jetzt "Karte"-Buttons auf Touren klicken, um die Kartenansicht mit Depot-, Stopp-Markern und berechneter Route zu sehen.
