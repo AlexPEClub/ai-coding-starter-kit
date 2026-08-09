@@ -144,7 +144,8 @@ class TrustedWorkflowGateTest(unittest.TestCase):
         self.assertIn("git status --porcelain=v2 --untracked-files=all", configurator)
         self.assertIn('git hash-object "$artifact"', configurator)
         self.assertIn('git rev-parse "HEAD:$artifact"', configurator)
-        self.assertIn('wait_rule.get("wait_timer") == 0', configurator)
+        self.assertIn("not wait_rules or all", configurator)
+        self.assertIn("branch_rule is not None", configurator)
 
     def test_valid_approved_protected_change_passes(self):
         head = self.approve_with_code()

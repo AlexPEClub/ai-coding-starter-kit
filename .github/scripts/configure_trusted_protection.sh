@@ -72,7 +72,7 @@ print(json.dumps({
     "block_creations": False,
     "required_conversation_resolution": True,
     "lock_branch": False,
-    "allow_fork_syncing": True,
+    "allow_fork_syncing": False,
 }))
 PY
 )"
@@ -89,9 +89,12 @@ environment = json.loads(environment_raw)
 protection = json.loads(protection_raw)
 rules = environment.get("protection_rules", [])
 review_rule = next((rule for rule in rules if rule.get("type") == "required_reviewers"), None)
-wait_rule = next((rule for rule in rules if rule.get("type") == "wait_timer"), None)
+wait_rules = [rule for rule in rules if rule.get("type") == "wait_timer"]
+branch_rule = next((rule for rule in rules if rule.get("type") == "branch_policy"), None)
 assert review_rule is not None
-assert wait_rule is not None and wait_rule.get("wait_timer") == 0
+# GitHub omits the wait_timer rule when the configured value is zero.
+assert not wait_rules or all(rule.get("wait_timer") == 0 for rule in wait_rules)
+assert branch_rule is not None
 assert environment.get("deployment_branch_policy") == {
     "protected_branches": True,
     "custom_branch_policies": False,
@@ -116,6 +119,6 @@ assert protection["allow_deletions"]["enabled"] is False
 assert protection["required_linear_history"]["enabled"] is False
 assert protection["block_creations"]["enabled"] is False
 assert protection["lock_branch"]["enabled"] is False
-assert protection["allow_fork_syncing"]["enabled"] is True
+assert protection["allow_fork_syncing"]["enabled"] is False
 print("Trusted GitHub environment and strict branch protection verified.")
 PY
