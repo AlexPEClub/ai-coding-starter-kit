@@ -26,6 +26,10 @@ class TrustedWorkflowGateTest(unittest.TestCase):
         self.git("config", "user.name", "Trusted CI")
         (self.repo / "features").mkdir()
         self.write_state("Roadmap", "Pending", "Pending")
+        (self.repo / "features" / "PROJ-45-existing.md").write_text(
+            "# PROJ-45: Existing\n\n## Status: Deployed\n",
+            encoding="utf-8",
+        )
         self.git("add", ".")
         self.git("commit", "-m", "docs(PROJ-46): baseline")
         self.base = self.git("rev-parse", "HEAD").strip()

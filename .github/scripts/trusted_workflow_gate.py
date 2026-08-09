@@ -339,18 +339,12 @@ def validate_feature_state(repo: Path, feature: str, head: str) -> None:
         html_feature_headings = re.findall(
             r"(?is)<h[1-6](?:\s[^>]*)?>\s*(PROJ-\d+)\b", text
         )
-        if html_feature_headings:
+        if feature in html_feature_headings:
             raise PolicyError(f"Raw HTML feature heading is not allowed in {path!r}.")
         heading_ids = re.findall(
             r"(?m)^[ \t]*#[ \t]+(PROJ-\d+)(?=[ \t]*(?::|[-–—]|$))",
             text,
         )
-        unrelated_headings = set(heading_ids) - {feature}
-        if unrelated_headings:
-            raise PolicyError(
-                f"Unrelated feature heading in {path!r}: "
-                + ", ".join(sorted(unrelated_headings))
-            )
         headed.extend((path, text) for heading_id in heading_ids if heading_id == feature)
     if len(spec_candidates) != 1:
         raise PolicyError(
