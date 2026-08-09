@@ -1,0 +1,87 @@
+name: Trusted Workflow Gate
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: trusted-workflow-gate-${{ github.event.pull_request.number }}-${{ github.event.pull_request.base.sha }}
+  cancel-in-progress: true
+
+jobs:
+  trusted-policy:
+    name: Trusted Workflow Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: workflow-approval
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
+    steps:
+      - name: Checkout trusted base policy without submodule traversal
+        env:
+          GH_FETCH_TOKEN: ${{ github.token }}
+          FETCH_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
+          FETCH_REF: ${{ github.event.pull_request.base.ref }}
+          FETCH_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          mkdir trusted
+          git -C trusted init
+          git -C trusted remote add origin "https://github.com/${FETCH_REPOSITORY}.git"
+          git -C trusted -c credential.helper= \
+            -c 'credential.helper=!f() { printf "%s\n" "username=x-access-token" "password=$GH_FETCH_TOKEN"; }; f' \
+            fetch --no-tags origin "+refs/heads/${FETCH_REF}:refs/remotes/origin/${FETCH_REF}"
+          git -C trusted checkout --detach "$FETCH_SHA"
+          [[ "$(git -C trusted rev-parse HEAD)" == "$FETCH_SHA" ]]
+          [[ "$(git -C trusted remote get-url origin)" == "https://github.com/${FETCH_REPOSITORY}.git" ]]
+          if git -C trusted config --local --get-regexp '^(http\..*extraheader|credential\.)'; then
+            printf 'Persistent trusted-checkout credentials detected.\n' >&2
+            exit 1
+          fi
+
+      - name: Checkout candidate as untrusted data without submodule traversal
+        env:
+          GH_FETCH_TOKEN: ${{ github.token }}
+          FETCH_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          FETCH_REF: ${{ github.event.pull_request.head.ref }}
+          FETCH_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir candidate
+          git -C candidate init
+          git -C candidate remote add origin "https://github.com/${FETCH_REPOSITORY}.git"
+          git -C candidate -c credential.helper= \
+            -c 'credential.helper=!f() { printf "%s\n" "username=x-access-token" "password=$GH_FETCH_TOKEN"; }; f' \
+            fetch --no-tags origin "+refs/heads/${FETCH_REF}:refs/remotes/origin/${FETCH_REF}"
+          git -C candidate checkout --detach "$FETCH_SHA"
+          [[ "$(git -C candidate rev-parse HEAD)" == "$FETCH_SHA" ]]
+          [[ "$(git -C candidate remote get-url origin)" == "https://github.com/${FETCH_REPOSITORY}.git" ]]
+          if git -C candidate config --local --get-regexp '^(http\..*extraheader|credential\.)'; then
+            printf 'Persistent candidate-checkout credentials detected.\n' >&2
+            exit 1
+          fi
+
+      - name: Import trusted base history into candidate object database
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C trusted bundle create "$RUNNER_TEMP/trusted-base.bundle" HEAD
+          git -C candidate fetch --no-tags "$RUNNER_TEMP/trusted-base.bundle" HEAD
+          git -C candidate cat-file -e "${BASE_SHA}^{commit}"
+          git -C candidate cat-file -e "${HEAD_SHA}^{commit}"
+
+      - name: Test trusted base policy
+        run: python3 trusted/.github/scripts/test_trusted_workflow_gate.py
+
+      - name: Validate candidate with trusted base policy
+        run: |
+          python3 trusted/.github/scripts/trusted_workflow_gate.py \
+            --repo candidate \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA" \
+            --branch "$SOURCE_BRANCH"

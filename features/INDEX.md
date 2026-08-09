@@ -63,14 +63,13 @@
 ## Workflow-Regeln (gültig ab 2026-06-30)
 
 ```
-/init → /write-spec → User-Review ("approved") →
-/architecture → User-Review ("approved") →
-/frontend → /backend → /qa → /deploy
+Feature-Wunsch → grill-me → write-spec → APPROVAL STOP →
+architecture → APPROVAL STOP → frontend → backend → qa → deploy → Git-Tag
 ```
 
-- Nach `/write-spec` und nach `/architecture` **IMMER** auf explizites "approved" vom User warten.
-- Ausnahme: **Trivialer Hotfix** — NUR wenn das Wort "Hotfix" explizit verwendet wird.
-- Vor jeder Code-Änderung: CLAUDE.md, docs/PRD.md und relevante Feature-Datei lesen.
+- Nach `write-spec` und nach `architecture` **IMMER** auf explizites "Approved" vom User warten.
+- Ausnahme nur bei einer eindeutigen, nicht negierten Benutzeranweisung mit dem exakten Wort **`Hotfix`**; die technischen Hotfix-Gates bleiben verbindlich.
+- Vor jeder Code-Änderung: unter Hermes `.hermes.md`, unter Claude Code `CLAUDE.md`, außerdem `docs/PRD.md` und die relevante Feature-Datei lesen.
 - Status in INDEX.md und Feature-Header immer synchron halten.
 
 ## Next Available ID: PROJ-46

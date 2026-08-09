@@ -1,0 +1,104 @@
+name: Workflow Gates
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workflow-gates-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  workflow-gate:
+    name: Workflow Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      SOURCE_BRANCH: ${{ github.head_ref }}
+    steps:
+      - name: Checkout pull request head without submodule traversal
+        env:
+          GH_FETCH_TOKEN: ${{ github.token }}
+          BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git init .
+          git remote add candidate "https://github.com/${HEAD_REPOSITORY}.git"
+          git -c credential.helper= \
+            -c 'credential.helper=!f() { printf "%s\n" "username=x-access-token" "password=$GH_FETCH_TOKEN"; }; f' \
+            fetch --no-tags candidate \
+            "+refs/heads/${HEAD_REF}:refs/remotes/candidate/${HEAD_REF}"
+          git checkout --detach "$HEAD_SHA"
+          [[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]]
+          git remote add base "https://github.com/${BASE_REPOSITORY}.git"
+          git -c credential.helper= \
+            -c 'credential.helper=!f() { printf "%s\n" "username=x-access-token" "password=$GH_FETCH_TOKEN"; }; f' \
+            fetch --no-tags base \
+            "+refs/heads/${BASE_REF}:refs/remotes/base/${BASE_REF}"
+          git cat-file -e "${BASE_SHA}^{commit}"
+          git cat-file -e "${HEAD_SHA}^{commit}"
+          [[ "$(git remote get-url candidate)" == "https://github.com/${HEAD_REPOSITORY}.git" ]]
+          [[ "$(git remote get-url base)" == "https://github.com/${BASE_REPOSITORY}.git" ]]
+          if git config --local --get-regexp '^(http\..*extraheader|credential\.)'; then
+            printf 'Persistent checkout credentials detected.\n' >&2
+            exit 1
+          fi
+
+      - name: Validate Hermes workflow and commit state
+        shell: bash
+        run: |
+          required_paths=(
+            .hermes/hooks/workflow_gate.py
+            tests/hermes/test_workflow_gate.py
+            tests/hermes/test_skills.py
+            .githooks/pre-commit
+            .githooks/commit-msg
+            scripts/setup-git-hooks.sh
+          )
+          base_count=0
+          head_count=0
+          for path in "${required_paths[@]}"; do
+            if git cat-file -e "$BASE_SHA:$path" 2>/dev/null; then
+              ((base_count += 1))
+            fi
+            if [[ -f "$path" ]]; then
+              ((head_count += 1))
+            fi
+          done
+          if (( head_count == ${#required_paths[@]} )); then
+            python3 -m unittest discover -s tests/hermes -v
+            python3 -m py_compile .hermes/hooks/workflow_gate.py tests/hermes/test_workflow_gate.py tests/hermes/test_skills.py
+            bash -n .githooks/pre-commit .githooks/commit-msg scripts/setup-git-hooks.sh scripts/deploy.sh
+            python3 .hermes/hooks/workflow_gate.py ci "$BASE_SHA" "$HEAD_SHA" "$SOURCE_BRANCH"
+          elif (( base_count == 0 && head_count == 0 )); then
+            printf 'Hermes workflow implementation is not present on either side; bootstrap compatibility check passed.\n'
+          else
+            printf 'Hermes workflow implementation is partial or was removed (base=%d, head=%d, required=%d).\n' \
+              "$base_count" "$head_count" "${#required_paths[@]}" >&2
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Source unit tests
+        run: npx vitest run src
+
+      - name: Production build
+        run: npm run build
