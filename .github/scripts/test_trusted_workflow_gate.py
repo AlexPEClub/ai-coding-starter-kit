@@ -121,7 +121,10 @@ class TrustedWorkflowGateTest(unittest.TestCase):
         text = (root / "features" / "INDEX.md").read_text(encoding="utf-8")
         rows = policy.index_rows(text)
         self.assertEqual(rows["PROJ-45"][0], "Deployed")
-        self.assertEqual(policy.next_available_id(text), "PROJ-46")
+        self.assertEqual(
+            policy.next_available_id(text),
+            f"PROJ-{max(int(feature.split('-', 1)[1]) for feature in rows) + 1}",
+        )
         workflow = (root / ".github/workflows/trusted-workflow-gate.yml").read_text()
         self.assertIn("python3 trusted/.github/scripts/test_trusted_workflow_gate.py", workflow)
         self.assertNotIn("python3 -m unittest -v trusted/", workflow)
