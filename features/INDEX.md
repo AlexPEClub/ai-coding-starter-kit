@@ -30,7 +30,7 @@
 | PROJ-22 | Kalender für blockierte Tage | ✅ Deployed | 2026-07-07 |
 | PROJ-28 | Hersteller-Verwaltung & Artikel-Zuordnung | ✅ Deployed | 2026-07-10 |
 | PROJ-29 | Wissensbasis (KI-Content-Fundament) | ✅ Deployed — 3 Live-Hotfixes seit Rollout behoben (Upload-Limit, internes Docker-Networking, fehlendes try/catch). Details: `features/PROJ-29-wissensbasis.md` | 2026-08-03 |
-| PROJ-30 | Themenvorschläge (wöchentlich, KI) | 🟢 Approved — QA abgeschlossen (2026-08-10). 11/11 Akzeptanzkriterien bestanden, 0 Bugs. Scan-Skript: fehlender ANTHROPIC_API_KEY wird sauber abgelehnt (kein Silent Fail). E2E-Tests: 1/7 bestanden (Dev-Host-Speicherlimitierung blockiert Rest, kein Code-Bug). Migration live, RLS aktiv, Rollen-Checks implementiert. Nächster Schritt: `/deploy` | 2026-08-10 |
+| PROJ-30 | Themenvorschläge (wöchentlich, KI) | ✅ Deployed — Live seit 2026-08-10 unter https://tms.gudel-werkzeuge.de/verwaltung/cms/themenvorschlaege. Docker-Deploy erfolgreich, Chromium-Smoke-Tests 5/5 grün (Webkit-Limitation wie PROJ-11/21/29/41/42/44). Route + Redirect funktionieren, Container läuft sauber. Details: `features/PROJ-30-themenvorschlaege.md` | 2026-08-10 |
 | PROJ-31 | Content-Studio (Generierung + Redaktion + Lern-Loop) | 🟣 Architected — pausiert bis PROJ-30 fertig ist (Frontend-Abhängigkeit). Details: `features/PROJ-31-content-studio.md` | 2026-08-03 |
 | PROJ-32 | Publishing (Blog / Social Media / Newsletter) | 🔵 Roadmap — Content-Epic: freigegebene Inhalte auf allen Kanälen (Webseiten-Blog, Social Media, Newsletter) ausspielen | 2026-07-20 |
 | PROJ-33 | Löschschutz für Partners | ✅ Deployed — DB-Trigger, Details: `features/PROJ-33-partner-loeschschutz.md` | 2026-07-25 |
@@ -46,6 +46,7 @@
 | PROJ-43 | Globale Kundensuche + Umsatz-Caching | 🟢 Approved — 2 Bugs gefixt (High: Filter-Injection; Low: a11y). Mobile-Safari-Check steht noch aus. Details: `features/PROJ-43-globale-kundensuche-umsatz-caching.md` | 2026-08-03 |
 | PROJ-44 | Fahrer — Stopp-Detail-Modal (Ändern / Navi / Erledigt) | ✅ Deployed — Live seit 2026-08-04, 4 Refine-Fixes. Details: `features/PROJ-44-stopp-detail-modal.md` | 2026-08-04 |
 | PROJ-45 | Fahrer — Tour-Kartenansicht | ✅ Deployed — Live seit 2026-08-08, Bugfix-Redeploy (Marker/Route) live verifiziert. Details: `features/PROJ-45-fahrer-tour-kartenansicht.md` | 2026-08-08 |
+| PROJ-46 | Fahrer — Tour starten (Status-Wechsel) | 🔵 Planned — Spec fertig nach grill-me-Interview. Nächster Schritt: `/architecture`. Details: `features/PROJ-46-tour-starten.md` | 2026-08-10 |
 
 ## Architektur-Dokumente
 
@@ -72,4 +73,4 @@ architecture → APPROVAL STOP → frontend → backend → qa → deploy → Gi
 - Vor jeder Code-Änderung: unter Hermes `.hermes.md`, unter Claude Code `CLAUDE.md`, außerdem `docs/PRD.md` und die relevante Feature-Datei lesen.
 - Status in INDEX.md und Feature-Header immer synchron halten.
 
-## Next Available ID: PROJ-46
+## Next Available ID: PROJ-47

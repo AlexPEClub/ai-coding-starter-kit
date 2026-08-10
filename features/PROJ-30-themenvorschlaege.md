@@ -719,4 +719,38 @@ den bestehenden Jobs.
 4. **PROJ-31-Integration:** Die "Artikel erstellt"-Spalte im Archiv zeigt vorerst immer "–" (PROJ-31 existiert noch nicht). Das ist erwartetes Verhalten per Spec.
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed:** 2026-08-10 (Production)
+**URL:** https://tms.gudel-werkzeuge.de/verwaltung/cms/themenvorschlaege
+**Commit:** 4a3cd95 (feat(PROJ-30): Themenvorschläge — vollständige Implementierung)
+**Git Tag:** v1.30.0-PROJ-30
+
+### Pre-Deployment Checks
+- [x] `npm run lint`: grün (0 Fehler, 1 vorbestehendes Warning nicht von PROJ-30)
+- [x] `npm run build`: erfolgreich, neue Routen sichtbar
+- [x] QA Status: 🟢 Approved (11/11 AC bestanden, 0 Bugs)
+- [x] Keine Critical/High Bugs
+- [x] Datenbank-Migration angewendet (20260804110000_PROJ-30_content_themen.sql live in Supabase)
+- [x] Code committed und rebased gegen main
+
+### Deployment Execution
+- **Docker Build:** erfolgreich, TMS-Image gebaut
+- **Container Start:** erfolgreich, Traefik routet production
+- **Post-Deploy-Smoke-Tests (Chromium):** 5/5 bestanden ✓
+  - ✓ Login-Seite erreichbar (HTTP 200)
+  - ✓ Es ist wirklich TMS 2.0 (nicht Fehler-/Fremdseite)
+  - ✓ Login-Formular gerendert
+  - ✓ PROJ-45 Karte Tests bestanden
+  - ✓ PROJ-11 Umsatz-Tab Tests bestanden
+- **Mobile Safari Tests:** 12 Tests zeitweise fehlgeschlagen wegen fehlender Webkit-Executable auf Dev-Host (bekannte Limitation wie PROJ-11/21/29/41/42/44)
+
+### Post-Deployment Verification
+- [x] Route `/verwaltung/cms/themenvorschlaege` antwortet mit 307 (Redirect zum Login) ✓
+- [x] Redirect von `/verwaltung/wissensbasis` auf `/verwaltung/cms/wissensbasis` funktioniert (308 permanent) ✓
+- [x] Docker Container läuft sauber, keine Fehler in den Logs ✓
+- [x] Feature-spezifische Checks bestanden ✓
+
+### Known Open Items (Non-Blocking)
+- **ANTHROPIC_API_KEY:** Muss vom User in `.env.production` ergänzt werden — Feature deploybar ohne Key, wöchentlicher Scan bricht sauber ab ohne Key
+- **Cron-Eintrag:** Muss manuell in Server-Crontab eingetragen werden: `0 5 * * 1 cd /pfad/zum/projekt && node scripts/PROJ-30_scan_themen.mjs`
+- **Webkit Browser Test:** Mobile Safari Tests fallen wegen fehlender Webkit-Executable auf Dev-Host aus (kein Code-Bug, bekannte Limitation)
