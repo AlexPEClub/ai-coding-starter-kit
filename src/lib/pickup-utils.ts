@@ -3,8 +3,6 @@
  * PROJ-20: Logistik & Abholung
  */
 
-const DAY_NAMES = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
-
 /**
  * Berechnet Ostersonntag nach dem Gauß-Algorithmus
  */
@@ -68,56 +66,3 @@ export function isHoliday(date: Date, holidays?: Array<{ datum: Date; name: stri
     );
 }
 
-/**
- * Holt den Namen eines Feiertags (falls es einer ist)
- */
-export function getHolidayName(date: Date, holidays?: Array<{ datum: Date; name: string }>): string | null {
-    if (!holidays) {
-        holidays = calculateHolidays(date.getFullYear());
-    }
-    const found = holidays.find(h => 
-        h.datum.getFullYear() === date.getFullYear() &&
-        h.datum.getMonth() === date.getMonth() &&
-        h.datum.getDate() === date.getDate()
-    );
-    return found?.name || null;
-}
-
-/**
- * Wochentag als Text (1=Montag, ..., 7=Sonntag)
- */
-export function getDayName(dayIndex: number): string {
-    // dayIndex: 0=Sonntag, 1=Montag, ..., 6=Samstag (JavaScript.getDay())
-    return DAY_NAMES[dayIndex] || "";
-}
-
-/**
- * Konvertiert ISO-Wochentag (1=Montag, ..., 7=Sonntag) zu JavaScript (0=Sonntag, ..., 6=Samstag)
- */
-export function isoDayToJsDay(isoDay: number): number {
-    // ISO: 1=Mo, 2=Di, ..., 6=Sa, 7=So
-    // JS:  0=So, 1=Mo, ..., 5=Sa, 6=So
-    return isoDay === 7 ? 0 : isoDay;
-}
-
-/**
- * Konvertiert JavaScript-Wochentag zu ISO
- */
-export function jsDayToIsoDay(jsDay: number): number {
-    // JS:  0=So, 1=Mo, ..., 5=Sa, 6=So
-    // ISO: 1=Mo, 2=Di, ..., 6=Sa, 7=So
-    return jsDay === 0 ? 7 : jsDay;
-}
-
-/**
- * Gibt die verfügbaren Abholtage zurück (Mo-Fr)
- */
-export function getPickupDayOptions(): Array<{ value: number; label: string }> {
-    return [
-        { value: 1, label: "Montag" },
-        { value: 2, label: "Dienstag" },
-        { value: 3, label: "Mittwoch" },
-        { value: 4, label: "Donnerstag" },
-        { value: 5, label: "Freitag" },
-    ];
-}
