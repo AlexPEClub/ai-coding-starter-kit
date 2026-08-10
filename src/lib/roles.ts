@@ -35,7 +35,7 @@ export const ROLE_HOME: Record<UserRole, string> = {
   qs: "/dashboard",
   warenausgang: "/dashboard",
   fahrer: "/dashboard",
-  redaktion: "/verwaltung/wissensbasis",
+  redaktion: "/verwaltung/cms/wissensbasis",
 };
 
 export function roleLabel(role: UserRole): string {

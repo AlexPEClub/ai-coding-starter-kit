@@ -15,9 +15,11 @@
     "test:deploy": "playwright test --config=playwright.deploy.config.ts",
     "test:all": "vitest run && playwright test",
     "backfill:routen": "tsx scripts/PROJ-42_backfill_routen.ts",
-    "cache:umsatz": "node scripts/PROJ-43_cache_umsatz.mjs"
+    "cache:umsatz": "node scripts/PROJ-43_cache_umsatz.mjs",
+    "scan:themen": "node scripts/PROJ-30_scan_themen.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",

@@ -48,6 +48,7 @@ After completing work on any feature, you MUST update tracking files. Follow thi
 
 **What to update in `features/INDEX.md`:**
 - Feature status column must match the feature spec header
+- **Keep the status-column entry to ONE short sentence** (status + current headline, max ~150 chars). `INDEX.md` is auto-loaded into every single session via the `@features/INDEX.md` import in CLAUDE.md — long paragraphs of deploy/bugfix history bloat every future conversation's context. Put narrative detail (what was built, root causes, verification steps) ONLY in the feature spec file (`features/PROJ-X-*.md`) and link to it from the INDEX row (e.g. "Details: `features/PROJ-X-name.md`")
 - Valid statuses: Roadmap → Planned → Architected → In Progress → In Review → Approved → Deployed
   - **Roadmap**: after `/init` — feature identified, no spec file yet
   - **Planned**: after `/write-spec`

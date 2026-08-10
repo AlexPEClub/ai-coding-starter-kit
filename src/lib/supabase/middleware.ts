@@ -11,7 +11,7 @@ const PASSWORD_PATH = "/passwort-aendern";
  * - nicht angemeldet -> /login
  * - deaktiviert -> abmelden + /login?error=disabled
  * - Passwortwechsel offen -> /passwort-aendern
- * - /verwaltung nur für Rolle "admin"
+ * - /verwaltung nur für Rolle "admin", außer /verwaltung/cms (zusätzlich "redaktion")
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -82,7 +82,10 @@ export async function updateSession(request: NextRequest) {
     return redirectTo("/dashboard");
   }
 
-  if (pathname.startsWith("/verwaltung") && !profile.roles?.includes("admin")) {
+  const hasAdmin = !!profile.roles?.includes("admin");
+  const hasRedaktion = !!profile.roles?.includes("redaktion");
+  const isCmsPath = pathname.startsWith("/verwaltung/cms");
+  if (pathname.startsWith("/verwaltung") && !hasAdmin && !(isCmsPath && hasRedaktion)) {
     return redirectTo("/dashboard");
   }
 

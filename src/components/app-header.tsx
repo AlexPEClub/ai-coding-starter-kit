@@ -21,6 +21,7 @@ import {
   Factory,
   PackageSearch,
   BookOpen,
+  Lightbulb,
 } from "lucide-react";
 
 import { type UserRole } from "@/lib/roles";
@@ -84,7 +85,8 @@ const adminNavItems: NavItem[] = [
 ];
 
 const redaktionNavItems: NavItem[] = [
-  { href: "/verwaltung/wissensbasis", label: "Wissensbasis", icon: BookOpen },
+  { href: "/verwaltung/cms/wissensbasis", label: "Wissensbasis", icon: BookOpen },
+  { href: "/verwaltung/cms/themenvorschlaege", label: "Themenvorschläge", icon: Lightbulb },
 ];
 
 function NavigationSheet({
@@ -175,11 +177,11 @@ function NavigationSheet({
             </>
           )}
 
-          {/* Redaktion-Bereich */}
+          {/* CMS-Bereich */}
           {(isRedaktion || isAdmin) && (
             <div className="border-t border-border mt-2 pt-2">
               <div className="px-4 py-1 text-xs font-semibold uppercase text-muted-foreground">
-                Redaktion
+                CMS
               </div>
               {redaktionNavItems.map((item) => {
                 const Icon = item.icon;

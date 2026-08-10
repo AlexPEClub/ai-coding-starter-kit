@@ -10,6 +10,15 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "25mb",
     },
   },
+  async redirects() {
+    return [
+      {
+        source: "/verwaltung/wissensbasis",
+        destination: "/verwaltung/cms/wissensbasis",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

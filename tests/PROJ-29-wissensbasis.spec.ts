@@ -13,7 +13,7 @@ const KORRUPT_PDF = 'tests/fixtures/proj29-korrupt.pdf';
 
 test.describe('Wissensbasis — Zugang & Grundgerüst', () => {
   test('nicht angemeldeter Zugriff wird zum Login umgeleitet', async ({ page }) => {
-    await page.goto('/verwaltung/wissensbasis');
+    await page.goto('/verwaltung/cms/wissensbasis');
     await page.waitForURL('**/login');
     await expect(page).toHaveURL(/\/login/);
   });
@@ -26,7 +26,7 @@ test.describe('Wissensbasis — Redaktion/Admin', () => {
     await page.fill('input[type="password"]', 'TestPass123!');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/dashboard');
-    await page.goto('/verwaltung/wissensbasis');
+    await page.goto('/verwaltung/cms/wissensbasis');
     // shadcn CardTitle rendert als <div>, nicht als semantisches Heading — daher Text statt Rolle.
     await expect(page.getByText('Wissensbasis', { exact: true })).toBeVisible();
   });

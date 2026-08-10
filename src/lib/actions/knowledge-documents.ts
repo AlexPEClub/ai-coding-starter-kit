@@ -61,7 +61,7 @@ async function requireAdmin(): Promise<boolean> {
 }
 
 function revalidateWissensbasis() {
-  revalidatePath("/verwaltung/wissensbasis");
+  revalidatePath("/verwaltung/cms/wissensbasis");
 }
 
 /* ═══════════════════════════════════════════
