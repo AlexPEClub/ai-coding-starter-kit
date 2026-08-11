@@ -142,7 +142,7 @@ export function FahrtBearbeitenDialog({ ziel, fahrerOptionen, onClose }: FahrtBe
 
   return (
     <Dialog open={!!ziel} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md rounded-2xl">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Stopp bearbeiten</DialogTitle>
