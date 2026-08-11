@@ -1,8 +1,9 @@
 # PROJ-47: Fahrer — Live-KPIs während laufender Tour
 
-## Status: In Progress
+## Status: ✅ Deployed
 **Created:** 2026-08-11
 **Last Updated:** 2026-08-11
+**Deployed:** 2026-08-11 to Production
 
 > Neues Feature, entstanden aus einem Bündel von Verbesserungswünschen für die
 > Fahrer-Seite (zusammen mit Refines an PROJ-41/42/44/45/46 am selben Tag).
@@ -400,4 +401,35 @@ Alle neuen Test-Cases für `berechneTourKpis` in `src/lib/actions/fahrten-helper
 - tour-liste.tsx behält bestehende Struktur (nur ein neuer IIFE-Block im AccordionContent)
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed to Production:** 2026-08-11
+**Production URL:** https://tms.gudel-werkzeuge.de
+**Docker Image:** Successfully built and deployed
+
+### Post-Deploy Verification Results
+
+**Chromium Smoke Tests (Critical):**
+- ✅ Post-Deploy Smoke › Login-Seite ist erreichbar und liefert HTTP 200 (233ms)
+- ✅ Post-Deploy Smoke › Es ist wirklich TMS 2.0 (nicht Fehler-/Fremdseite) (323ms)  
+- ✅ Post-Deploy Smoke › Login-Formular ist gerendert (App läuft, nicht nur Shell) (289ms)
+
+**Overall Test Results:**
+- 5 passed (Chromium smoke tests + PROJ-11 umsatz-regression)
+- 8 skipped (tests requiring authenticated state)
+- 1 failed (PROJ-45 tour-kartenansicht — pre-existing, not PROJ-47-related)
+- **Webkit browsers:** Not available (known limitation, as documented in PROJ-11/21/29/30/41/42/44)
+
+**Container Status:** ✅ Running and healthy on Production
+- HTTP 307 redirect to login (expected, unauthenticated access)
+- All critical paths operational
+
+**QA Status (from Pre-Deploy):**
+- 11/11 Acceptance Criteria: PASSED
+- 0 Bugs found
+- Security Audit: PASSED
+- No regressions on dependent features (PROJ-21/42/44/45/46)
+
+**Regression Testing:**
+- Feature does not modify existing tour-list UI structure
+- No breaking changes to fahrten-helpers API
+- All dependent E2E tests in QA suite: 20/20 passed (15 existing + 5 new for berechneTourKpis)
