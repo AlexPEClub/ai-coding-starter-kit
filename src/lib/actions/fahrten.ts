@@ -493,18 +493,28 @@ export type MarkiereAlsErlediltResult = { ok: true } | { ok: false; error: strin
  * Markiert einen Stopp als "erledigt" und erstellt einen Chronologie-Eintrag.
  * Serverseitige Absicherung: Status darf nur von nicht-finalem Zustand nach "erledigt" wechseln.
  * Rollenprüfung: nur Fahrer/Admin.
+ *
+ * PROJ-44-Refine: Löst optional eine standortbasierte Neuberechnung aus, wenn ein Startpunkt
+ * übergeben wird oder die Stopps-Koordinate verfügbar ist. Fallback-Kette:
+ * 1. Übergeben `startPunkt` (Geräte-Geolocation)
+ * 2. Sonst: Koordinate des gerade erledigten Stopps (aus partner_addresses)
+ * 3. Sonst: keine Neuberechnung (nur Statuswechsel, Fehler protokolliert)
+ * Die Neuberechnung unterliegt dem bestehenden 30s-Cooldown (kein `umgeheCooldown`).
  */
-export async function markiereFahrtAlsErledigt(fahrtId: string): Promise<MarkiereAlsErlediltResult> {
+export async function markiereFahrtAlsErledigt(
+  fahrtId: string,
+  startPunkt?: { lat: number; lon: number } | null
+): Promise<MarkiereAlsErlediltResult> {
   const zugriff = await pruefeFahrerZugriff();
   if (!zugriff.ok) return zugriff;
   const { profile } = zugriff;
 
   const adminClient = createAdminClient({ schema: "tms" });
 
-  // Fahrt laden: prüfe aktuellen Status
+  // Fahrt laden: prüfe aktuellen Status + lade Fahrt-Metadaten für ggf. Neuberechnung
   const { data: aktuelleFahrt, error: leseFehler } = await adminClient
     .from("tours")
-    .select("id, status")
+    .select("id, status, fahrer_id, geplantes_abholdatum, partner_id")
     .eq("id", fahrtId)
     .single();
 
@@ -556,8 +566,71 @@ export async function markiereFahrtAlsErledigt(fahrtId: string): Promise<Markier
     console.error("markiereFahrtAlsErledigt (Verlauf) error:", verlaufFehler);
   }
 
-  // Nicht wie bearbeiteFahrt: Status-Änderung allein löst KEINE Neuberechnung aus
-  // (siehe Decision Log: Statuswechsel ändert weder Fahrer noch Datum noch Adressen)
+  // PROJ-44-Refine: Neuberechnung mit Fallback-Kette
+  try {
+    let neuberechnungsStartPunkt = startPunkt;
+
+    // Fallback 1: Über den Geräte-Standort wurde bereits übergeben, ggf. null
+    if (!neuberechnungsStartPunkt && aktuelleFahrt.partner_id) {
+      // Fallback 2: Lade die Koordinate des gerade erledigten Stopps
+      const { data: adressen, error: adressFehler } = await adminClient
+        .from("partner_addresses")
+        .select("geoapify_lat, geoapify_lon")
+        .eq("partner_id", aktuelleFahrt.partner_id)
+        .eq("address_type", "shipping")
+        .limit(1);
+
+      if (!adressFehler && adressen && adressen.length > 0) {
+        const adresse = adressen[0];
+        if (
+          typeof adresse.geoapify_lat === "number" &&
+          typeof adresse.geoapify_lon === "number"
+        ) {
+          neuberechnungsStartPunkt = {
+            lat: adresse.geoapify_lat,
+            lon: adresse.geoapify_lon,
+          };
+        }
+      }
+    }
+
+    // Nur wenn wir einen Startpunkt haben: Neuberechnung auslösen (mit Cooldown)
+    if (neuberechnungsStartPunkt) {
+      try {
+        await loeseNeuberechnungAus(
+          adminClient,
+          [
+            {
+              fahrerId: aktuelleFahrt.fahrer_id,
+              datum: aktuelleFahrt.geplantes_abholdatum,
+            },
+          ],
+          {
+            startPunkt: neuberechnungsStartPunkt,
+            startZeit: new Date(), // Tatsächlicher Bestätigungs-Zeitpunkt
+            // Kein umgeheCooldown: der 30s-Cooldown bleibt aktiv (PROJ-44 Decision Log)
+          }
+        );
+      } catch (fehler) {
+        // Neuberechnung fehlgeschlagen — aber Status-Wechsel bleibt erfolgreich
+        console.error(
+          `markiereFahrtAlsErledigt: Neuberechnung fehlgeschlagen für Fahrt ${fahrtId}:`,
+          fehler
+        );
+      }
+    } else {
+      // Weder Geräte-Standort noch Stopp-Koordinate verfügbar
+      console.warn(
+        `markiereFahrtAlsErledigt: Neuberechnung übersprungen für Fahrt ${fahrtId} — kein Startpunkt verfügbar.`
+      );
+    }
+  } catch (fehler) {
+    // Sicherheits-Netz: Falls etwas beim Neuberechnungs-Setup schief geht
+    console.error(
+      `markiereFahrtAlsErledigt: Fehler beim Setup der Neuberechnung für Fahrt ${fahrtId}:`,
+      fehler
+    );
+  }
 
   revalidatePath("/fahrer");
   return { ok: true };

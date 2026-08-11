@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { ExternalLink, AlertCircle, MapPin, CheckCircle2 } from "lucide-react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -164,6 +165,8 @@ export function StoppDetailModal({
   const [erledeltBestaetigung, setErledeltBestaetigung] = useState(false);
   const [erledeltLaedt, setErledeltLaedt] = useState(false);
   const [erledeltError, setErledeltError] = useState<string | null>(null);
+  const [erfolgsAnimation, setErfolgsAnimation] = useState(false);
+  const bestaetigungsButtonRef = useRef<HTMLButtonElement>(null);
 
   // Lade Chronologie beim Öffnen des Modals
   useEffect(() => {
@@ -210,19 +213,62 @@ export function StoppDetailModal({
 
     setErledeltLaedt(true);
     setErledeltError(null);
+
+    // PROJ-44-Refine: Geolocation-Erfassung mit Timeout (5 Sekunden)
+    // Analog zu PROJ-46 handleTourStarten, aber ohne Depot-Fallback
+    let startPunkt: { lat: number; lon: number } | null = null;
+
+    if (navigator.geolocation) {
+      try {
+        // Wrapper für Geolocation mit Timeout
+        const geolocationPromise = new Promise<GeolocationCoordinates | null>((resolve) => {
+          const timeoutId = setTimeout(() => {
+            resolve(null); // Timeout: null zurückgeben, nicht abbrechen
+          }, 5000);
+
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              clearTimeout(timeoutId);
+              resolve(position.coords);
+            },
+            () => {
+              // Fehler (Berechtigung verweigert, GPS aus, etc.): null zurückgeben
+              clearTimeout(timeoutId);
+              resolve(null);
+            }
+          );
+        });
+
+        const coords = await geolocationPromise;
+        if (coords) {
+          startPunkt = { lat: coords.latitude, lon: coords.longitude };
+        }
+      } catch {
+        // Fehler bei Geolocation-API: null, weitermachen mit Fallback
+      }
+    }
+
     try {
-      const result = await markiereFahrtAlsErledigt(ziel.fahrt.id);
+      // PROJ-44-Refine: markiereFahrtAlsErledigt wird mit optionalem startPunkt-Parameter aufgerufen
+      const result = await markiereFahrtAlsErledigt(ziel.fahrt.id, startPunkt || undefined);
       if (!result.ok) {
         setErledeltError(result.error || "Fehler beim Speichern.");
         setErledeltLaedt(false);
         return;
       }
 
+      // PROJ-44-Refine: Kurze Erfolgs-Animation triggern, bevor Modal schließt
+      setErfolgsAnimation(true);
       toast.success("Stopp als erledigt markiert.");
-      setErledeltBestaetigung(false);
-      onClose();
-      // revalidatePath wird von der Server-Action aufgerufen, also ist kein
-      // zusätzlicher router.refresh() nötig — die Tour-Listen werden automatisch neu geladen
+
+      // Nach kurzer Animation schließen
+      setTimeout(() => {
+        setErledeltBestaetigung(false);
+        onClose();
+        setErfolgsAnimation(false);
+        // revalidatePath wird von der Server-Action aufgerufen, also ist kein
+        // zusätzlicher router.refresh() nötig — die Tour-Listen werden automatisch neu geladen
+      }, 300);
     } catch (err) {
       setErledeltError("Unerwarteter Fehler beim Speichern. Bitte erneut versuchen.");
       setErledeltLaedt(false);
@@ -232,7 +278,7 @@ export function StoppDetailModal({
   return (
     <>
       <Dialog open={!!ziel} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">{ziel.fahrt.kunde.name}</DialogTitle>
             {ziel.fahrt.kunde.strasse && (
@@ -469,13 +515,21 @@ export function StoppDetailModal({
           </AlertDialogHeader>
           <div className="flex gap-3">
             <AlertDialogCancel className="min-h-[48px]">Nein</AlertDialogCancel>
-            <AlertDialogAction
-              className="min-h-[48px]"
-              onClick={handleErledigt}
-              disabled={erledeltLaedt}
+            {/* PROJ-44-Refine: Erfolgs-Animation beim Bestätigen */}
+            <motion.div
+              animate={erfolgsAnimation ? { scale: [1, 1.05, 1] } : {}}
+              transition={{ duration: 0.3 }}
+              className="flex-1"
             >
-              {erledeltLaedt ? "Lädt…" : "Ja"}
-            </AlertDialogAction>
+              <AlertDialogAction
+                ref={bestaetigungsButtonRef}
+                className="min-h-[48px]"
+                onClick={handleErledigt}
+                disabled={erledeltLaedt || erfolgsAnimation}
+              >
+                {erledeltLaedt ? "Lädt…" : "Ja"}
+              </AlertDialogAction>
+            </motion.div>
           </div>
         </AlertDialogContent>
       </AlertDialog>
