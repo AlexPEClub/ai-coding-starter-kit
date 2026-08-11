@@ -44,7 +44,7 @@
 | PROJ-41 | Fahrer — Fahrt bearbeiten (Fahrer/Datum/Notiz + Änderungsverlauf) | ✅ Deployed — Live seit 2026-08-02. Details: `features/PROJ-41-fahrt-bearbeiten.md` | 2026-08-02 |
 | PROJ-42 | Routenberechnung für Touren (Geoapify) | ✅ Deployed — Refine 2026-08-11: Engine bekommt optionalen Standort/-zeit-Startpunkt für PROJ-46/PROJ-44, Spec aktualisiert, Code-Umsetzung steht noch aus. Details: `features/PROJ-42-routenberechnung.md` | 2026-08-11 |
 | PROJ-43 | Globale Kundensuche + Umsatz-Caching | 🟢 Approved — 2 Bugs gefixt (High: Filter-Injection; Low: a11y). Mobile-Safari-Check steht noch aus. Details: `features/PROJ-43-globale-kundensuche-umsatz-caching.md` | 2026-08-03 |
-| PROJ-44 | Fahrer — Stopp-Detail-Modal (Ändern / Navi / Erledigt) | ✅ Deployed — Live seit 2026-08-04, 4 Refine-Fixes. Details: `features/PROJ-44-stopp-detail-modal.md` | 2026-08-04 |
+| PROJ-44 | Fahrer — Stopp-Detail-Modal (Ändern / Navi / Erledigt) | ✅ Deployed — Refine 2026-08-11: Erledigt löst jetzt standortbasierte Neuberechnung aus, Mobile-Rounding + Status-Animation ergänzt, Code-Umsetzung steht noch aus. Details: `features/PROJ-44-stopp-detail-modal.md` | 2026-08-11 |
 | PROJ-45 | Fahrer — Tour-Kartenansicht | ✅ Deployed — Live seit 2026-08-08, Bugfix-Redeploy (Marker/Route) live verifiziert. Details: `features/PROJ-45-fahrer-tour-kartenansicht.md` | 2026-08-08 |
 | PROJ-46 | Fahrer — Tour starten (Status-Wechsel) | ✅ Deployed — Refine 2026-08-11: Button-Style (Grün+Pfeil) + standortbasierte Neuberechnung bei Start ergänzt, Code-Umsetzung steht noch aus. Details: `features/PROJ-46-tour-starten.md` | 2026-08-11 |
 

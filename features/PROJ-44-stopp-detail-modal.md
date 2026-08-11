@@ -2,7 +2,7 @@
 
 ## Status: Approved (Refine QA Completed 2026-08-04)
 **Created:** 2026-08-04
-**Last Updated:** 2026-08-04
+**Last Updated:** 2026-08-11
 **Frontend Started:** 2026-08-04
 **Backend Started:** 2026-08-04
 **Backend Completed:** 2026-08-04
@@ -11,7 +11,8 @@
 ## Dependencies
 - Requires: PROJ-21 (Fahrer — Tourenliste) — Tour-/Stopp-Liste, Rollen-Gate `/fahrer`
 - Requires: PROJ-41 (Fahrt bearbeiten) — Bearbeiten-Dialog (Fahrer/Datum/Notiz), Chronologie-Mechanismus (`tms.tour_aenderungen`, `getFahrtAenderungen()`)
-- Requires: PROJ-42 (Routenberechnung) — liefert `routeOrder`, `berechneteAnkunftszeit`, Gesamtstrecke/-fahrzeit der Tour. **Wird von diesem Feature erweitert** um eine Etappen-Distanz/-Fahrzeit pro Stopp (siehe Technical Requirements)
+- Requires: PROJ-42 (Routenberechnung) — liefert `routeOrder`, `berechneteAnkunftszeit`, Gesamtstrecke/-fahrzeit der Tour. **Wird von diesem Feature erweitert** um eine Etappen-Distanz/-Fahrzeit pro Stopp (siehe Technical Requirements). Seit Refine 2026-08-11 nutzt "Erledigt" außerdem die dort ergänzte Fähigkeit, mit einem optionalen Startpunkt/-zeit statt Depot/09:00 zu rechnen.
+- Verwandt: PROJ-46 (Tour starten) — nutzt dieselbe PROJ-42-Erweiterung für den Tour-Start-Auslöser; beide Features wurden am selben Tag parallel refined.
 
 ## Kontext
 
@@ -39,6 +40,16 @@ erledigt abhaken.
   werden können.
 - Als Admin möchte ich in der Tourenplanung genauso wie der Fahrer Stopps
   abhaken können, damit ich bei Bedarf für einen Fahrer nachpflegen kann.
+- **(Neu, 2026-08-11)** Als Fahrer möchte ich, dass sich beim Abschließen eines
+  Stopps die restliche Route ab meinem tatsächlichen Standort/Zeitpunkt neu
+  berechnet, damit Reihenfolge und Ankunftszeiten der übrigen Stopps realistisch
+  bleiben statt auf der morgens fix berechneten Schätzung zu basieren.
+- **(Neu, 2026-08-11)** Als Fahrer möchte ich, dass das Detail-Modal auf dem
+  Smartphone genauso gut aussieht wie auf dem Desktop (runde Ecken, passende
+  Abstände), damit die Bedienung am Terminal/Tablet nicht "kaputt" wirkt.
+- **(Neu, 2026-08-11)** Als Fahrer möchte ich beim Markieren eines Stopps als
+  "erledigt" ein sichtbares, kurzes visuelles Feedback (Farbwechsel/Icon-Animation),
+  damit die Aktion sich bestätigt und lebendig anfühlt statt abrupt umzuspringen.
 
 ## Out of Scope
 - **Rückgängig machen ("Erledigt" zurücknehmen)** — kein Undo in diesem
@@ -88,12 +99,21 @@ erledigt abhaken.
 - [ ] Angenommen ein Nutzer mit Rolle Fahrer öffnet einen ihm zugewiesenen Stopp, dann kann er „Erledigt“ auslösen.
 - [ ] Angenommen ein Nutzer mit Rolle Admin öffnet einen Stopp über den Tab „Tourenplanung“, dann kann er „Erledigt“ auslösen (analog zur bestehenden Berechtigung für „Ändern“ aus PROJ-41).
 
+### Standortbasierte Neuberechnung, Mobile-Styling & Animation (Refine 2026-08-11)
+- [ ] Angenommen der Nutzer bestätigt „Erledigt“ (Klick auf „Ja“) und der Browser liefert den Geräte-Standort, wenn der Status erfolgreich auf „erledigt“ gesetzt wurde, dann wird die verbleibende (noch offene) Route der Tourengruppe neu berechnet (PROJ-42-Engine) mit diesem Standort als Startpunkt und dem tatsächlichen Bestätigungs-Zeitpunkt als Startzeit — unterliegt dem bestehenden 30s-Cooldown pro Tourengruppe aus PROJ-42.
+- [ ] Angenommen der Geräte-Standort ist beim Bestätigen nicht verfügbar (Berechtigung verweigert, GPS aus, Timeout), wenn die Bestätigung trotzdem erfolgt, dann wird ersatzweise die Koordinate des gerade erledigten Stopps als Startpunkt verwendet (weiterhin mit dem tatsächlichen Bestätigungs-Zeitpunkt statt fix 09:00) — das Markieren als „erledigt“ selbst schlägt in keinem Fall fehl, unabhängig vom Standort-Ergebnis.
+- [ ] Angenommen weder Geräte-Standort noch die Koordinate des gerade erledigten Stopps sind verfügbar (z. B. ungültige Kundenadresse), wenn die Bestätigung trotzdem erfolgt, dann unterbleibt die Neuberechnung komplett (Fehler wird nur protokolliert) — eine vorherige Berechnung bleibt unverändert stehen, der Status-Wechsel selbst ist davon unberührt.
+- [ ] Angenommen das Detail-Modal wird auf einem schmalen Bildschirm (Mobile) angezeigt, dann hat es dieselben runden Ecken (`rounded-2xl`) wie auf Desktop und angepasste Innenabstände für kleine Displays — kein visueller Bruch zwischen Mobile und Desktop.
+- [ ] Angenommen ein Stopp wird erfolgreich als „erledigt“ markiert, dann läuft ein kurzer, klar abgegrenzter visueller Übergang (Farbwechsel/Icon-Animation) statt eines abrupten Sprungs — die Animation blockiert keine weitere Interaktion und dauert nur wenige hundert Millisekunden.
+
 ## Edge Cases
 - Stopp wird von zwei Personen gleichzeitig geöffnet (z.B. Fahrer + Admin) und einer markiert ihn als erledigt, während der andere das Detail-Modal noch offen hat → letzter Schreibvorgang gewinnt (wie beim bestehenden Bearbeiten-Dialog), keine Konflikterkennung in diesem Feature.
 - Route wurde berechnet, aber genau für diesen einzelnen Stopp fehlt aus irgendeinem Grund die Etappen-Distanz (z.B. Backfill nur teilweise gelaufen) → Etappen-Distanz/-Fahrzeit/Ankunftszeit werden für diesen Stopp weggelassen, keine Fehlermeldung.
 - Nutzer klickt "Erledigt", schließt aber den Browser-Tab bevor er die Ja/Nein-Bestätigung beantwortet → keine Änderung, Stopp bleibt im ursprünglichen Status (Bestätigung wird nie serverseitig ausgelöst).
 - Kundenadresse enthält Sonderzeichen (Umlaute, Straße mit "/") → müssen für den Google-Maps-Link korrekt URL-encodiert werden.
 - Stopp ist bereits erledigt, aber der Nutzer öffnet trotzdem das Detail-Modal → alle Infos + Chronologie weiterhin einsehbar, nur der "Erledigt"-Button fehlt (siehe Acceptance Criteria).
+- **(Neu, 2026-08-11)** Der gerade erledigte Stopp war bereits der letzte offene Stopp der Tourengruppe (keine offenen Stopps mehr übrig): Die Neuberechnung wird trotzdem ausgelöst, liefert aber laut bestehendem PROJ-42-Verhalten `{ ok: true, stoppAnzahl: 0 }` zurück — kein Sonderfall nötig, keine Fehlermeldung.
+- **(Neu, 2026-08-11)** Fahrer markiert mehrere Stopps sehr schnell hintereinander als „erledigt“ (z. B. zwei Stopps innerhalb von Sekunden): Der 30s-Cooldown aus PROJ-42 greift — nur die erste Neuberechnung läuft wirklich, die zweite wird übersprungen und nur protokolliert; beide Statuswechsel selbst sind davon unberührt und schlagen unabhängig davon erfolgreich durch.
 
 ## Technical Requirements (optional)
 - **Datenmodell-Erweiterung (berührt PROJ-42):** Pro Stopp muss zusätzlich die
@@ -121,6 +141,14 @@ erledigt abhaken.
   entschieden: ja, das bestehende Skript wird nach diesem Deploy einmalig
   erneut ausgeführt (es überschreibt laut eigener Regel ohnehin vorhandene
   Werte); kein neues Skript nötig, siehe Technical Decisions.
+- [ ] Exakter UX-Wortlaut/Timeout-Dauer für den Standort-Berechtigungs-Ladezustand
+  beim Bestätigen von „Erledigt" (analog zur gleichen offenen Frage in
+  PROJ-46) — bewusst offen gelassen für `/frontend` (reine UX-Feinjustierung,
+  keine Architektur-Auswirkung; die Fallback-Kette selbst ist bereits in den
+  Acceptance Criteria festgelegt).
+- [ ] Exakte Animations-Spezifikation (Dauer, genaue Farbwerte/Icon) für den
+  „erledigt"-Übergang — bewusst offen gelassen für `/frontend`, analog zu den
+  bereits an anderer Stelle (PROJ-45/PROJ-46) offen gelassenen Feinjustierungen.
 
 ## Decision Log
 
@@ -146,7 +174,13 @@ erledigt abhaken.
 | Neue, eigene Server-Aktion für „Erledigt" statt Erweiterung von `bearbeiteFahrt()` | `bearbeiteFahrt()` ist bereits produktiv und behandelt Fahrer/Datum/Notiz; ein Status-Übergang ist fachlich etwas anderes (andere Validierung, kein Neuberechnungs-Trigger) — eigene, kleinere Funktion reduziert das Risiko einer Nebenwirkung auf den bestehenden, funktionierenden Pfad | 2026-08-04 |
 | „Erledigt"-Aktion nutzt dieselbe Berechtigungsprüfung (Rolle `fahrer` oder `admin`, jeder darf jeden Stopp) wie „Ändern" | Konsistent mit der expliziten Spec-Vorgabe „analog zur bestehenden Berechtigung für Ändern aus PROJ-41" und der dort bereits getroffenen Team-Transparenz-Entscheidung | 2026-08-04 |
 | Serverseitige Zusatzprüfung: Status darf nur von einem nicht-finalen Zustand (geplant/unterwegs/angekommen/problem) nach „erledigt" wechseln, nie von einem bereits finalen Zustand aus | Schützt auch dann, wenn der ausblendende Button clientseitig umgangen würde (z. B. per direkt konstruiertem Aufruf) — gleiche Denkweise wie das bereits bekannte BUG-1-Muster aus der PROJ-41-QA | 2026-08-04 |
-| Keine Auslösung der PROJ-42-Routenneuberechnung durch „Erledigt" | Bereits in der PROJ-42-Spec als Out of Scope festgehalten („Neuberechnung durch Statuswechsel" — es gibt aktuell keinen Code-Pfad, der den Status einer Fahrt setzt); dieses Feature ist zwar genau dieser erste Code-Pfad, löst aber bewusst trotzdem keine Neuberechnung aus, weil sich an Reihenfolge/Distanz nichts ändert, nur der Status | 2026-08-04 |
+| ~~Keine Auslösung der PROJ-42-Routenneuberechnung durch „Erledigt"~~ — **überholt, siehe Refine-Zeile unten (2026-08-11)** | Bereits in der PROJ-42-Spec als Out of Scope festgehalten („Neuberechnung durch Statuswechsel" — es gibt aktuell keinen Code-Pfad, der den Status einer Fahrt setzt); dieses Feature ist zwar genau dieser erste Code-Pfad, löst aber bewusst trotzdem keine Neuberechnung aus, weil sich an Reihenfolge/Distanz nichts ändert, nur der Status | 2026-08-04 |
+| **(Refine)** Kehrtwende: „Erledigt" löst jetzt doch eine PROJ-42-Neuberechnung aus, ab Geräte-Standort statt Depot/09:00 | User-Anforderung (2026-08-11): reale Zwischenzeiten für die restliche Route nach jedem abgeschlossenen Stopp, statt einer nur morgens einmalig berechneten, driftenden Schätzung. Die alte Begründung ("ändert nichts an Reihenfolge/Distanz") stimmt bei fixem Depot/09:00 — bei einem neuen, echten Standort/Zeitpunkt als Startpunkt ändert sich die Berechnungsgrundlage aber tatsächlich, weshalb die Neuberechnung jetzt einen echten Mehrwert hat | 2026-08-11 |
+| **(Refine)** Fallback-Kette bei fehlendem Geräte-Standort: 1. gerade erledigter Stopp (eigene Koordinate) 2. keine Neuberechnung | Es gibt beim Erledigt-Klick — anders als beim Tour-Start (PROJ-46, dort: Depot) — bereits einen konkreten, gerade bestätigten Referenzpunkt (den Stopp selbst) | 2026-08-11 |
+| **(Refine)** Startzeit bei der Neuberechnung ist der tatsächliche Bestätigungs-Zeitpunkt, nicht mehr fix 09:00 — auch im Fallback-Fall | Konsistent mit derselben Entscheidung in PROJ-42/PROJ-46; eine Uhrzeit ohne Bezug zur Realität wäre bei einem echten, live ausgelösten Ereignis nicht sinnvoll | 2026-08-11 |
+| **(Refine)** Erledigt-Klick unterliegt weiterhin dem bestehenden 30s-Cooldown aus PROJ-42 (im Unterschied zu PROJ-46/Tour-Start, der ihn umgeht) | Mehrere Stopps können in kurzer Zeit hintereinander abgeschlossen werden — ohne Cooldown würde das potenziell mehrere kostenpflichtige Geoapify-Aufrufe in Sekundenabstand auslösen | 2026-08-11 |
+| **(Refine)** Detail-Modal bekommt konsistente `rounded-2xl`-Rundung auch auf Mobile (statt `sm:rounded-lg` aus der shadcn-Basis) | Entspricht der Design-System-Vorgabe (`docs/design-system.md`, Radien-Regel) und der bereits so umgesetzten Kartenansicht (PROJ-45) — Inkonsistenz zwischen den Fahrer-Modalen wird behoben | 2026-08-11 |
+| **(Refine)** Kurze visuelle Übergangs-Animation beim Setzen auf „erledigt" (Farbwechsel + Icon-Pop), keine neue Bestätigungs-UI | Rein zusätzliches Feedback auf einer bereits bestehenden Interaktion — kein neuer Interaktionsschritt, keine Verzögerung der eigentlichen Aktion | 2026-08-11 |
 | Tour-Ladefunktionen (`getEigeneOffeneTouren`/`getAlleOffeneTouren`) laden künftig zusätzlich Stopps mit Status „erledigt" (bisher nur geplant/unterwegs/angekommen/problem) | Ohne diese Erweiterung würde ein gerade erledigter Stopp sofort spurlos aus der Liste verschwinden, statt wie gefordert durchgestrichen am Ende der Tour zu erscheinen | 2026-08-04 |
 | Neue Nachfilterung auf Ebene der Tourengruppierung: eine Fahrer+Datum-Gruppe, in der ausnahmslos alle geladenen Stopps „erledigt" sind, wird komplett aus der Liste entfernt | Bildet die Anforderung „Tour verschwindet erst, wenn wirklich alles erledigt ist" nach, ohne die Datenbank-Abfrage selbst komplizierter zu machen — reine Nachbearbeitung der bereits geladenen Daten | 2026-08-04 |
 | Innerhalb einer Tourengruppe werden erledigte Stopps nach der bestehenden Routen-/Datums-Sortierung zusätzlich ans Ende sortiert | Zusätzlicher, letzter Sortierschritt — verändert die bestehende PROJ-42-Sortierlogik nicht, ergänzt sie nur um einen Sonderfall | 2026-08-04 |
