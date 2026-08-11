@@ -5,6 +5,8 @@ import {
   getAlleOffeneTouren,
   getEigeneOffeneTouren,
   listFahrerOptionen,
+  ladeTourStarts,
+  type LadeTourStartsResult,
 } from "@/lib/actions/fahrten";
 import { TourListe } from "@/components/fahrer/tour-liste";
 import { TourenplanungClient } from "@/components/fahrer/tourenplanung-client";
@@ -39,6 +41,32 @@ export default async function FahrerPage() {
 
   const heute = heutigesDatumBerlin();
 
+  // PROJ-46: Lade Tour-Start-Einträge für alle Touren beider Tabs
+  let tourStartsResult: LadeTourStartsResult = { ok: true, data: {} };
+  if (eigeneResult.ok || alleResult.ok) {
+    const allTouren = [
+      ...(eigeneResult.ok ? eigeneResult.data : []),
+      ...(alleResult.ok ? alleResult.data : []),
+    ];
+
+    // Extrahiere alle Fahrer+Datum-Kombinationen
+    const fahrerDaten = new Set<string>();
+    for (const tour of allTouren) {
+      if (tour.fahrerId && tour.datum) {
+        fahrerDaten.add(`${tour.fahrerId}|${tour.datum}`);
+      }
+    }
+
+    if (fahrerDaten.size > 0) {
+      tourStartsResult = await ladeTourStarts(
+        Array.from(fahrerDaten).map((item) => {
+          const [fahrerId, datum] = item.split("|");
+          return { fahrerId, datum };
+        })
+      );
+    }
+  }
+
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="text-2xl font-bold text-foreground">Fahrer</h1>
@@ -63,6 +91,8 @@ export default async function FahrerPage() {
               leerTitel="Keine offenen Touren."
               heute={heute}
               fahrerOptionen={fahrerOptionenResult.ok ? fahrerOptionenResult.data : []}
+              zeigeTourStarten={true}
+              tourStarts={tourStartsResult.ok ? tourStartsResult.data : {}}
             />
           )}
         </TabsContent>
@@ -75,6 +105,7 @@ export default async function FahrerPage() {
               touren={alleResult.data}
               fahrerOptionen={fahrerOptionenResult.ok ? fahrerOptionenResult.data : []}
               heute={heute}
+              tourStarts={tourStartsResult.ok ? tourStartsResult.data : {}}
             />
           )}
         </TabsContent>

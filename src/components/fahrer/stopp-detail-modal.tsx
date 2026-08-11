@@ -23,6 +23,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   getFahrtAenderungen,
   markiereFahrtAlsErledigt,
   type Fahrt,
@@ -76,6 +82,28 @@ function berechneAbweichungMinuten(berechneteAnkunftszeit: string, erledigtAm: s
   );
 }
 
+/**
+ * PROJ-46: Formatiert die Pünktlichkeits-Abweichung benutzerfreundlich.
+ * - 0 Min: "pünktlich"
+ * - < 5 Min verspätet: "X Min. später"
+ * - < 120 Min verspätet: "X Min. später"
+ * - >= 120 Min verspätet: "> 2 Std. später"
+ * - < 0 Min (zu früh): "X Min. früher"
+ */
+function formatPuenktlichkeit(abweichungMinuten: number): { text: string; variant: "neutral" | "positive" | "negative" } {
+  if (abweichungMinuten === 0) {
+    return { text: "pünktlich", variant: "neutral" };
+  }
+  if (abweichungMinuten < 0) {
+    const minutenAbs = Math.abs(abweichungMinuten);
+    return { text: `${minutenAbs} Min. früher`, variant: "positive" };
+  }
+  if (abweichungMinuten < 120) {
+    return { text: `${abweichungMinuten} Min. später`, variant: "negative" };
+  }
+  return { text: "> 2 Std. später", variant: "negative" };
+}
+
 /** Etappen-Distanz in km, z. B. "2,3 km". */
 function formatDistanz(distanzMeter: number): string {
   return `${(distanzMeter / 1000).toLocaleString("de-DE", { maximumFractionDigits: 1 })} km`;
@@ -111,6 +139,7 @@ export interface StoppDetailModalZiel {
   legDistanceMeters?: number | null; // PROJ-44: Etappen-Distanz in Metern
   legDurationSeconds?: number | null; // PROJ-44: Etappen-Fahrzeit in Sekunden
   heute: string;
+  tourGestartet?: boolean; // PROJ-46: Ob die Tour, zu der dieser Stopp gehört, gestartet wurde
 }
 
 interface StoppDetailModalProps {
@@ -263,7 +292,7 @@ export function StoppDetailModal({
                   </p>
                 </div>
 
-                {/* Erledigt-Zeit + Abweichung (PROJ-44-Refine) */}
+                {/* Erledigt-Zeit + Abweichung (PROJ-44-Refine, PROJ-46: formatiert) */}
                 {ziel.fahrt.erledigtAm && (
                   <div>
                     <p className="text-xs font-medium uppercase text-muted-foreground">
@@ -272,17 +301,20 @@ export function StoppDetailModal({
                     <p className="text-sm text-foreground">
                       {formatAnkunftszeit(ziel.fahrt.erledigtAm)} Uhr
                       {abweichungMinuten !== null && (
-                        <span
-                          className={
-                            abweichungMinuten > 0
-                              ? "ml-2 font-medium text-destructive"
-                              : abweichungMinuten < 0
-                                ? "ml-2 font-medium text-green-600"
-                                : "ml-2 font-medium text-muted-foreground"
-                          }
-                        >
-                          {abweichungMinuten > 0 ? `+${abweichungMinuten}` : abweichungMinuten} Min.
-                        </span>
+                        (() => {
+                          const puenktlichkeit = formatPuenktlichkeit(abweichungMinuten);
+                          const colorClass =
+                            puenktlichkeit.variant === "positive"
+                              ? "text-green-600"
+                              : puenktlichkeit.variant === "negative"
+                                ? "text-destructive"
+                                : "text-muted-foreground";
+                          return (
+                            <span className={`ml-2 font-medium ${colorClass}`}>
+                              {puenktlichkeit.text}
+                            </span>
+                          );
+                        })()
                       )}
                     </p>
                   </div>
@@ -352,29 +384,74 @@ export function StoppDetailModal({
                 Ändern
               </Button>
             )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="min-h-[48px] flex-1"
-              asChild
-            >
-              <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
-                <MapPin className="h-4 w-4 mr-2" />
-                Navi
-              </a>
-            </Button>
-            {!istErledigt && (
+
+            {/* PROJ-46: Navi-Button deaktivieren, wenn Tour nicht gestartet */}
+            {ziel.tourGestartet === false ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="min-h-[48px] flex-1"
+                      disabled
+                    >
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Navi
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Erst nach Tour-Start verfügbar</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
               <Button
                 type="button"
-                variant="default"
+                variant="outline"
                 size="sm"
                 className="min-h-[48px] flex-1"
-                onClick={() => setErledeltBestaetigung(true)}
-                disabled={erledeltLaedt}
+                asChild
               >
-                {erledeltLaedt ? "Lädt…" : "Erledigt"}
+                <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Navi
+                </a>
               </Button>
+            )}
+
+            {!istErledigt && (
+              <>
+                {/* PROJ-46: Erledigt-Button deaktivieren, wenn Tour nicht gestartet */}
+                {ziel.tourGestartet === false ? (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="default"
+                          size="sm"
+                          className="min-h-[48px] flex-1"
+                          disabled
+                        >
+                          Erledigt
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Erst nach Tour-Start verfügbar</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    className="min-h-[48px] flex-1"
+                    onClick={() => setErledeltBestaetigung(true)}
+                    disabled={erledeltLaedt}
+                  >
+                    {erledeltLaedt ? "Lädt…" : "Erledigt"}
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </DialogContent>

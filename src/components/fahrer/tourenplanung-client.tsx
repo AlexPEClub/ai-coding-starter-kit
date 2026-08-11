@@ -19,9 +19,11 @@ interface TourenplanungClientProps {
   touren: Tour[];
   fahrerOptionen: FahrerOption[];
   heute: string;
+  /** PROJ-46: Tour-Start-Zeiten als Map (Key: "fahrerId-datum"). */
+  tourStarts?: Record<string, string | null>;
 }
 
-export function TourenplanungClient({ touren, fahrerOptionen, heute }: TourenplanungClientProps) {
+export function TourenplanungClient({ touren, fahrerOptionen, heute, tourStarts = {} }: TourenplanungClientProps) {
   const [fahrerFilter, setFahrerFilter] = useState<string>(ALLE_FAHRER);
   const [datumFilter, setDatumFilter] = useState<string>("");
 
@@ -85,6 +87,8 @@ export function TourenplanungClient({ touren, fahrerOptionen, heute }: Tourenpla
         leerTitel="Keine Touren für diese Auswahl."
         heute={heute}
         fahrerOptionen={fahrerOptionen}
+        zeigeTourStarten={false}
+        tourStarts={tourStarts}
       />
     </div>
   );

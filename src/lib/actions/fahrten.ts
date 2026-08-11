@@ -106,6 +106,7 @@ export async function getEigeneOffeneTouren(): Promise<FahrtenResult> {
       berechnete_ankunftszeit,
       leg_distance_meters,
       leg_duration_seconds,
+      abgeschlossen_am,
       geaendert_am,
       partners:partner_id ( display_name, company_name )
     `
@@ -141,7 +142,7 @@ export async function getEigeneOffeneTouren(): Promise<FahrtenResult> {
       berechneteAnkunftszeit: row.berechnete_ankunftszeit ?? null,
       legDistanzMeter: row.leg_distance_meters ?? null,
       legDauerSekunden: row.leg_duration_seconds ?? null,
-      erledigtAm: row.status === "erledigt" ? row.geaendert_am ?? null : null,
+      erledigtAm: row.status === "erledigt" ? row.abgeschlossen_am ?? null : null,
       kunde: {
         name: row.partners?.display_name ?? row.partners?.company_name ?? "Unbekannter Kunde",
         ...adresse,
@@ -176,6 +177,7 @@ export async function getAlleOffeneTouren(): Promise<FahrtenResult> {
       berechnete_ankunftszeit,
       leg_distance_meters,
       leg_duration_seconds,
+      abgeschlossen_am,
       geaendert_am,
       partners:partner_id ( display_name, company_name )
     `
@@ -231,7 +233,7 @@ export async function getAlleOffeneTouren(): Promise<FahrtenResult> {
       berechneteAnkunftszeit: row.berechnete_ankunftszeit ?? null,
       legDistanzMeter: row.leg_distance_meters ?? null,
       legDauerSekunden: row.leg_duration_seconds ?? null,
-      erledigtAm: row.status === "erledigt" ? row.geaendert_am ?? null : null,
+      erledigtAm: row.status === "erledigt" ? row.abgeschlossen_am ?? null : null,
       kunde: {
         name: row.partners?.display_name ?? row.partners?.company_name ?? "Unbekannter Kunde",
         ...adresse,
@@ -517,12 +519,20 @@ export async function markiereFahrtAlsErledigt(fahrtId: string): Promise<Markier
     return { ok: false, error: "Stopp ist bereits in einem finalen Status." };
   }
 
-  // Status setzen auf "erledigt"
+  // PROJ-46: Prüfe, ob die Tour des Stopps bereits gestartet wurde
+  const tourStartGepruefte = await pruefeTourIstGestartet(fahrtId, adminClient);
+  if (!tourStartGepruefte.ok) {
+    return tourStartGepruefte;
+  }
+
+  // Status setzen auf "erledigt" + Zeitstempel setzen
+  const jetzt = new Date().toISOString();
   const { error: updateFehler } = await adminClient
     .from("tours")
     .update({
       status: "erledigt",
-      geaendert_am: new Date().toISOString(),
+      abgeschlossen_am: jetzt,
+      geaendert_am: jetzt,
     })
     .eq("id", fahrtId);
 
@@ -550,5 +560,169 @@ export async function markiereFahrtAlsErledigt(fahrtId: string): Promise<Markier
   // (siehe Decision Log: Statuswechsel ändert weder Fahrer noch Datum noch Adressen)
 
   revalidatePath("/fahrer");
+  return { ok: true };
+}
+
+// PROJ-46: Tour-Start-Funktionen
+
+export type TourStartResult =
+  | { ok: true; gestartetAm: string }
+  | { ok: false; error: string };
+
+export type LadeTourStartsResult =
+  | { ok: true; data: Record<string, string | null> }
+  | { ok: false; error: string };
+
+/**
+ * PROJ-46: Fahrer startet eine Tour für einen bestimmten Tag.
+ * Idempotent: ein zweiter Aufruf für dieselbe Tour liefert den bestehenden
+ * Zeitstempel zurück (kein Fehler, kein doppelter Eintrag).
+ *
+ * Der Datums-String muss im Format "YYYY-MM-DD" sein (DATE Datentyp in der DB).
+ */
+export async function tourStarten(
+  fahrerId: string,
+  datum: string
+): Promise<TourStartResult> {
+  const zugriff = await pruefeFahrerZugriff();
+  if (!zugriff.ok) return zugriff;
+  const { profile } = zugriff;
+
+  // Nur der Fahrer selbst oder ein Admin darf diese Aktion für einen Fahrer durchführen
+  if (profile.id !== fahrerId && !profile.roles?.includes("admin")) {
+    return { ok: false, error: "Keine Berechtigung für diesen Fahrer." };
+  }
+
+  const adminClient = createAdminClient({ schema: "tms" });
+
+  // Idempotenter Insert + Read-Pattern:
+  // 1. Versuch den Eintrag einzufügen
+  // 2. Bei UNIQUE-Constraint-Konflikt ignorieren (der Eintrag existiert bereits)
+  // 3. Lese den Eintrag (neu eingefügt oder schon vorhanden)
+  await adminClient
+    .from("tour_starts")
+    .insert({
+      fahrer_id: fahrerId,
+      datum: datum,
+      // gestartet_am: wird von der DB mit now() gesetzt
+      erstellt_von: profile.id,
+    });
+  // Fehler bei Insert ignorieren (könnte UNIQUE-Violation sein, das ist ok)
+
+  const { data: tourStart, error: leseFehler } = await adminClient
+    .from("tour_starts")
+    .select("gestartet_am")
+    .eq("fahrer_id", fahrerId)
+    .eq("datum", datum)
+    .single();
+
+  if (leseFehler || !tourStart) {
+    console.error("tourStarten (read after insert) error:", leseFehler);
+    return { ok: false, error: "Tour-Start konnte nicht gespeichert werden." };
+  }
+
+  revalidatePath("/fahrer");
+  return { ok: true, gestartetAm: tourStart.gestartet_am };
+}
+
+/**
+ * PROJ-46: Lädt die Tour-Start-Zeitstempel für eine Liste von Fahrer+Datum-Kombinationen.
+ * Gibt ein Mapping zurück: Key = "fahrerId-datum", Value = ISO-Zeitstempel oder null (wenn nicht gestartet).
+ *
+ * Admin/Verwaltung darf alle Starts laden, Fahrer dürfen nur ihre eigenen laden.
+ */
+export async function ladeTourStarts(
+  fahrer_daten: Array<{ fahrerId: string; datum: string }>
+): Promise<LadeTourStartsResult> {
+  const zugriff = await pruefeFahrerZugriff();
+  if (!zugriff.ok) return zugriff;
+  const { profile } = zugriff;
+
+  if (fahrer_daten.length === 0) {
+    return { ok: true, data: {} };
+  }
+
+  // Überprüfe Zugriffsberechtigung: nur Admin darf alle, Fahrer nur ihre eigenen
+  if (!profile.roles?.includes("admin")) {
+    // Fahrer: filtere auf die IDs, die dem aktuellen Nutzer gehören
+    const allowedData = fahrer_daten.filter((fd) => fd.fahrerId === profile.id);
+    if (allowedData.length === 0) {
+      return { ok: true, data: {} };
+    }
+    fahrer_daten = allowedData;
+  }
+
+  if (fahrer_daten.length === 0) {
+    return { ok: true, data: {} };
+  }
+
+  const adminClient = createAdminClient({ schema: "tms" });
+
+  // Extrahiere eindeutige fahrerIds
+  const fahrerIds = [...new Set(fahrer_daten.map((f) => f.fahrerId))];
+
+  // Lade alle Starts für diese Fahrer
+  const { data: starts, error: ladeFehler } = await adminClient
+    .from("tour_starts")
+    .select("fahrer_id, datum, gestartet_am")
+    .in("fahrer_id", fahrerIds);
+
+  if (ladeFehler) {
+    console.error("ladeTourStarts error:", ladeFehler);
+    return { ok: false, error: "Tour-Starts konnten nicht geladen werden." };
+  }
+
+  // Baue das Mapping: für jede angeforderte Kombination suche den Start (oder null)
+  const mapping: Record<string, string | null> = {};
+  for (const fd of fahrer_daten) {
+    const key = `${fd.fahrerId}-${fd.datum}`;
+    const start = (starts ?? []).find((s) => s.fahrer_id === fd.fahrerId && s.datum === fd.datum);
+    mapping[key] = start ? start.gestartet_am : null;
+  }
+
+  return { ok: true, data: mapping };
+}
+
+/**
+ * PROJ-46: Serverseitige Gating-Prüfung für "Erledigt"-Aktion.
+ * Prüft, ob die Tour des betroffenen Stopps bereits gestartet wurde.
+ * Falls nein: gibt einen Fehler zurück.
+ *
+ * Diese Funktion wird von markiereFahrtAlsErledigt aufgerufen, bevor der Status-Wechsel erfolgt.
+ */
+async function pruefeTourIstGestartet(
+  fahrtId: string,
+  adminClient: ReturnType<typeof createAdminClient>
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Lade Fahrt um fahrer_id und geplantes_abholdatum zu bekommen
+  const { data: fahrt, error: fahrtFehler } = await adminClient
+    .from("tours")
+    .select("fahrer_id, geplantes_abholdatum")
+    .eq("id", fahrtId)
+    .single();
+
+  if (fahrtFehler || !fahrt) {
+    console.error("pruefeTourIstGestartet (fahrt read) error:", fahrtFehler);
+    return { ok: false, error: "Fahrt konnte nicht geladen werden." };
+  }
+
+  // Prüfe, ob für diesen Fahrer+Datum ein Tour-Start-Eintrag existiert
+  // Falls kein Datum oder kein Fahrer: Tour ist nicht gestartet
+  if (!fahrt.geplantes_abholdatum || !fahrt.fahrer_id) {
+    return { ok: false, error: "Tour hat kein Datum oder keinen Fahrer zugewiesen — Tour-Start nicht möglich." };
+  }
+
+  const { data: tourStart, error: startFehler } = await adminClient
+    .from("tour_starts")
+    .select("id")
+    .eq("fahrer_id", fahrt.fahrer_id)
+    .eq("datum", fahrt.geplantes_abholdatum)
+    .single();
+
+  // Falls kein Eintrag existiert (single() gibt error zurück):
+  if (!tourStart) {
+    return { ok: false, error: "Diese Tour wurde noch nicht gestartet. Bitte zuerst 'Tour starten' drücken." };
+  }
+
   return { ok: true };
 }

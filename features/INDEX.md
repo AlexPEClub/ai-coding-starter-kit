@@ -46,7 +46,7 @@
 | PROJ-43 | Globale Kundensuche + Umsatz-Caching | 🟢 Approved — 2 Bugs gefixt (High: Filter-Injection; Low: a11y). Mobile-Safari-Check steht noch aus. Details: `features/PROJ-43-globale-kundensuche-umsatz-caching.md` | 2026-08-03 |
 | PROJ-44 | Fahrer — Stopp-Detail-Modal (Ändern / Navi / Erledigt) | ✅ Deployed — Live seit 2026-08-04, 4 Refine-Fixes. Details: `features/PROJ-44-stopp-detail-modal.md` | 2026-08-04 |
 | PROJ-45 | Fahrer — Tour-Kartenansicht | ✅ Deployed — Live seit 2026-08-08, Bugfix-Redeploy (Marker/Route) live verifiziert. Details: `features/PROJ-45-fahrer-tour-kartenansicht.md` | 2026-08-08 |
-| PROJ-46 | Fahrer — Tour starten (Status-Wechsel) | 🔵 Planned — Spec fertig nach grill-me-Interview. Nächster Schritt: `/architecture`. Details: `features/PROJ-46-tour-starten.md` | 2026-08-10 |
+| PROJ-46 | Fahrer — Tour starten (Status-Wechsel) | ✅ Deployed — Live seit 2026-08-11. Migration erfolgreich, Docker-Deploy grün, Production-URL erreichbar. Details: `features/PROJ-46-tour-starten.md` | 2026-08-11 |
 
 ## Architektur-Dokumente
 

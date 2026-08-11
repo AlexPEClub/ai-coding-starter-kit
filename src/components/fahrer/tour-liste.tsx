@@ -10,7 +10,16 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import type { Fahrt, FahrerOption, Tour } from "@/lib/actions/fahrten";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { tourStarten, type Fahrt, type FahrerOption, type Tour } from "@/lib/actions/fahrten";
 import { berechneFahrtBadge } from "@/lib/actions/fahrten-helpers";
 import {
   FahrtBearbeitenDialog,
@@ -60,6 +69,15 @@ function formatAnkunftszeit(ankunftszeit: string): string {
   });
 }
 
+/** PROJ-46: Format eines Zeitstempels zu HH:MM (z. B. "09:15"). */
+function formatZeitstempel(iso: string): string {
+  return new Date(iso).toLocaleTimeString("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Berlin",
+  });
+}
+
 interface TourListeProps {
   touren: Tour[];
   leerTitel?: string;
@@ -69,6 +87,10 @@ interface TourListeProps {
   heute: string;
   /** Fahrerliste für den Bearbeiten-Dialog (Fahrer wechseln). */
   fahrerOptionen: FahrerOption[];
+  /** PROJ-46: Im Tab "Mir zugewiesen" (zeigeFahrer === false) den "Tour starten"-Button anzeigen. */
+  zeigeTourStarten?: boolean;
+  /** PROJ-46: Zwischengespeicherte Tour-Start-Zeiten als Map (Key: "fahrerId-datum", Value: ISO-String oder null). */
+  tourStarts?: Record<string, string | null>;
 }
 
 interface KarteLadeZiel {
@@ -76,16 +98,33 @@ interface KarteLadeZiel {
   tourDatum: string | null;
 }
 
-export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptionen }: TourListeProps) {
+export function TourListe({
+  touren,
+  leerTitel,
+  zeigeFahrer,
+  heute,
+  fahrerOptionen,
+  zeigeTourStarten = false,
+  tourStarts = {},
+}: TourListeProps) {
   const [detailZiel, setDetailZiel] = useState<StoppDetailModalZiel | null>(null);
   const [bearbeitenZiel, setBearbeitenZiel] = useState<BearbeiteFahrtZiel | null>(null);
   const [karteZiel, setKarteZiel] = useState<KarteLadeZiel | null>(null);
+
+  // PROJ-46: Tour-Start-Dialog Steuerung
+  const [tourStartBestaetigung, setTourStartBestaetigung] = useState<{ fahrerId: string | null; datum: string | null } | null>(null);
+  const [tourStartLaedt, setTourStartLaedt] = useState(false);
+  const [tourStartError, setTourStartError] = useState<string | null>(null);
 
   if (touren.length === 0) {
     return <p className="text-sm text-muted-foreground">{leerTitel ?? "Keine offenen Touren."}</p>;
   }
 
   function handleStoppClick(fahrt: Fahrt, tour: Tour) {
+    // PROJ-46: Prüfe, ob die Tour gestartet wurde
+    const tourKey = `${tour.fahrerId ?? "ohne-fahrer"}-${tour.datum ?? "ohne-datum"}`;
+    const tourGestartet = !!tourStarts?.[tourKey];
+
     setDetailZiel({
       fahrt,
       tourFahrerId: tour.fahrerId,
@@ -94,6 +133,7 @@ export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptione
       legDistanceMeters: fahrt.legDistanzMeter ?? null,
       legDurationSeconds: fahrt.legDauerSekunden ?? null,
       heute,
+      tourGestartet,
     });
   }
 
@@ -128,6 +168,36 @@ export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptione
     }
   }
 
+  // PROJ-46: Tour-Start-Dialog öffnen
+  function handleOeffneTourStartBestaetigung(fahrerId: string | null, datum: string | null) {
+    setTourStartError(null);
+    setTourStartBestaetigung({ fahrerId, datum });
+  }
+
+  // PROJ-46: Tour-Start durchführen
+  async function handleTourStarten() {
+    if (!tourStartBestaetigung?.fahrerId || !tourStartBestaetigung?.datum) return;
+
+    setTourStartLaedt(true);
+    setTourStartError(null);
+
+    try {
+      const result = await tourStarten(tourStartBestaetigung.fahrerId, tourStartBestaetigung.datum);
+      if (!result.ok) {
+        setTourStartError(result.error || "Fehler beim Starten der Tour.");
+        setTourStartLaedt(false);
+        return;
+      }
+
+      setTourStartBestaetigung(null);
+      setTourStartLaedt(false);
+      // revalidatePath wird von der Server-Action aufgerufen, kein zusätzliches Refresh nötig
+    } catch (err) {
+      setTourStartError("Unerwarteter Fehler beim Starten der Tour. Bitte erneut versuchen.");
+      setTourStartLaedt(false);
+    }
+  }
+
   return (
     <>
       <Accordion type="multiple" className="space-y-2">
@@ -156,6 +226,39 @@ export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptione
                     </p>
                   </div>
                 </AccordionTrigger>
+
+                {/* PROJ-46: Tour-Start-Button oder "Gestartet um HH:MM"-Text */}
+                {zeigeTourStarten && tour.fahrten.length > 0 && (
+                  (() => {
+                    const tourKey = `${tour.fahrerId ?? "ohne-fahrer"}-${tour.datum ?? "ohne-datum"}`;
+                    const gestartetAm = tourStarts?.[tourKey];
+
+                    if (gestartetAm) {
+                      // Tour bereits gestartet: Hinweis-Text anzeigen
+                      return (
+                        <div className="text-xs text-muted-foreground whitespace-nowrap">
+                          Gestartet um {formatZeitstempel(gestartetAm)}
+                        </div>
+                      );
+                    }
+
+                    // Tour noch nicht gestartet: Button anzeigen
+                    return (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="shrink-0 min-h-[48px]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOeffneTourStartBestaetigung(tour.fahrerId, tour.datum);
+                        }}
+                      >
+                        Tour starten
+                      </Button>
+                    );
+                  })()
+                )}
+
                 {/* PROJ-45: Karte-Button — jetzt Sibling des Trigger, nicht nested */}
                 <Button
                   variant="outline"
@@ -249,6 +352,28 @@ export function TourListe({ touren, leerTitel, zeigeFahrer, heute, fahrerOptione
         tourDatum={karteZiel?.tourDatum ?? null}
         onStoppClick={handleKarteStoppClick}
       />
+
+      {/* PROJ-46: Tour-Start-Bestätigung */}
+      <AlertDialog open={!!tourStartBestaetigung} onOpenChange={(open) => !open && setTourStartBestaetigung(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tour wirklich starten?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Die Tour wird als gestartet markiert. Danach können Sie Stopps bearbeiten und die Navigation nutzen.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3">
+            <AlertDialogCancel className="min-h-[48px]">Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              className="min-h-[48px]"
+              onClick={handleTourStarten}
+              disabled={tourStartLaedt}
+            >
+              {tourStartLaedt ? "Lädt…" : "Tour starten"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
