@@ -37,18 +37,32 @@ export function leseDepotKoordinaten(): Koordinate | null {
  * eine evtl. vorherige Berechnung); bei jedem Fehlschlag wird NICHTS
  * geschrieben und eine vorherige Berechnung bleibt unverändert stehen
  * (kein Teil-/Rateergebnis).
+ *
+ * @param options.startPunkt — optionale Koordinate statt Depot als Startpunkt
+ *   (z. B. aktueller Fahrer-Standort bei Tour-Start oder nach Stopp-Erledigung).
+ *   Ohne diesen Parameter wird weiterhin das fest konfigurierte Depot verwendet.
+ * @param options.startZeit — optionaler Zeitpunkt als Basis für die
+ *   Ankunftszeiten-Berechnung statt ermittleTagesstartUtc() (09:00 Uhr).
+ *   Verwendet, wenn echter Standort/Echtzeit-Kontext vorhanden ist.
  */
 export async function berechneUndSpeichereRoute(
   adminClient: AdminClient,
   fahrerId: string,
-  datum: string
+  datum: string,
+  options?: { startPunkt?: Koordinate; startZeit?: Date }
 ): Promise<RouteBerechnungErgebnis> {
-  const depot = leseDepotKoordinaten();
-  if (!depot) {
-    return {
-      ok: false,
-      grund: "Depot-Koordinaten sind nicht konfiguriert (GEOAPIFY_DEPOT_LAT/GEOAPIFY_DEPOT_LON).",
-    };
+  let startPunkt: Koordinate;
+  if (options?.startPunkt) {
+    startPunkt = options.startPunkt;
+  } else {
+    const depot = leseDepotKoordinaten();
+    if (!depot) {
+      return {
+        ok: false,
+        grund: "Depot-Koordinaten sind nicht konfiguriert (GEOAPIFY_DEPOT_LAT/GEOAPIFY_DEPOT_LON).",
+      };
+    }
+    startPunkt = depot;
   }
 
   const apiKey = process.env.GEOAPIFY_API_KEY;
@@ -120,7 +134,7 @@ export async function berechneUndSpeichereRoute(
 
   let antwort: GeoapifyRoutePlannerAntwort;
   try {
-    antwort = await rufeGeoapifyRoutePlanner(depot, validierteStopps, apiKey);
+    antwort = await rufeGeoapifyRoutePlanner(startPunkt, validierteStopps, apiKey, options?.startZeit);
   } catch (fehler) {
     console.error("berechneUndSpeichereRoute (Geoapify) error:", fehler);
     const grund = fehler instanceof Error ? fehler.message : "Unbekannter Fehler bei Geoapify.";
@@ -233,7 +247,7 @@ function ermittleTagesstartUtc(): Date {
 }
 
 /**
- * Ruft Geoapifys Route-Planner-API mit dem festen Depot als Start und den
+ * Ruft Geoapifys Route-Planner-API mit einem Start-Punkt (Standard: Depot) und den
  * validierten Stopp-Koordinaten als Wegpunkten auf. Ein Fahrzeug, kein
  * Rückweg zum Depot (kein `end_location` gesetzt), Modus "drive". Jeder Job
  * trägt eine feste Verweilzeit (`duration`), die Geoapify automatisch in
@@ -252,17 +266,23 @@ function ermittleTagesstartUtc(): Date {
  * `time` sowie `from_waypoint_index`/`to_waypoint_index`). Jeder Wegpunkt
  * referenziert seinen eingehenden Leg über `prev_leg_index` — gegen die
  * offizielle Geoapify-Doku verifiziert (2026-08-08).
+ *
+ * @param startZeit — optionaler Zeitpunkt für die Ankunftszeiten-Berechnung
+ *   (Standard: ermittleTagesstartUtc(), 09:00 Uhr Europe/Berlin).
+ *   Wird verwendet, wenn die Berechnung von einem aktuellen Ereignis ausgelöst wird
+ *   (z. B. Tour-Start oder Stopp-Erledigung mit Standort).
  */
 async function rufeGeoapifyRoutePlanner(
-  depot: Koordinate,
+  startPunkt: Koordinate,
   stopps: { id: string; koordinate: Koordinate }[],
-  apiKey: string
+  apiKey: string,
+  startZeit?: Date
 ): Promise<GeoapifyRoutePlannerAntwort> {
   const body = {
     mode: "drive",
     agents: [
       {
-        start_location: [depot.lon, depot.lat],
+        start_location: [startPunkt.lon, startPunkt.lat],
         time_windows: [[0, 12 * 60 * 60]],
       },
     ],
@@ -296,7 +316,7 @@ async function rufeGeoapifyRoutePlanner(
     throw new Error("Geoapify lieferte keine gültige Wegpunkt-Reihenfolge.");
   }
 
-  const start = ermittleTagesstartUtc();
+  const start = startZeit ?? ermittleTagesstartUtc();
 
   const reihenfolge = new Map<string, number>();
   const ankunftszeiten = new Map<string, string>();
@@ -399,10 +419,17 @@ const letzteAusloesung = new Map<string, number>();
  * darf davon unter keinen Umständen beeinträchtigt werden. Pro Tourengruppe
  * gilt zusätzlich ein kurzer Cooldown (siehe BUG-2), um Geoapify-Kosten bei
  * schnellem wiederholtem Ändern zu begrenzen.
+ *
+ * @param options.startPunkt — optional an berechneUndSpeichereRoute() durchgereicht
+ * @param options.startZeit — optional an berechneUndSpeichereRoute() durchgereicht
+ * @param options.umgeheCooldown — falls true, wird die Cooldown-Prüfung für DIESEN
+ *   Aufruf übersprungen. Der Zeitstempel wird trotzdem aktualisiert für alle anderen
+ *   Aufrufer. Nützlich für Echtzeit-Events wie Tour-Start oder Stopp-Erledigung.
  */
 export async function loeseNeuberechnungAus(
   adminClient: AdminClient,
-  gruppen: Tourengruppe[]
+  gruppen: Tourengruppe[],
+  options?: { startPunkt?: Koordinate; startZeit?: Date; umgeheCooldown?: boolean }
 ): Promise<void> {
   const eindeutigeGruppen = new Map<string, { fahrerId: string; datum: string }>();
   for (const gruppe of gruppen) {
@@ -416,7 +443,7 @@ export async function loeseNeuberechnungAus(
   await Promise.all(
     Array.from(eindeutigeGruppen.entries()).map(async ([schluessel, { fahrerId, datum }]) => {
       const zuletztAusgeloest = letzteAusloesung.get(schluessel);
-      if (zuletztAusgeloest !== undefined && Date.now() - zuletztAusgeloest < NEUBERECHNUNG_COOLDOWN_MS) {
+      if (!options?.umgeheCooldown && zuletztAusgeloest !== undefined && Date.now() - zuletztAusgeloest < NEUBERECHNUNG_COOLDOWN_MS) {
         console.warn(
           `Routenberechnung übersprungen für Fahrer ${fahrerId} / ${datum}: Cooldown aktiv (zuletzt vor ${Math.round(
             (Date.now() - zuletztAusgeloest) / 1000
@@ -427,7 +454,10 @@ export async function loeseNeuberechnungAus(
       letzteAusloesung.set(schluessel, Date.now());
 
       try {
-        const ergebnis = await berechneUndSpeichereRoute(adminClient, fahrerId, datum);
+        const ergebnis = await berechneUndSpeichereRoute(adminClient, fahrerId, datum, {
+          startPunkt: options?.startPunkt,
+          startZeit: options?.startZeit,
+        });
         if (!ergebnis.ok) {
           console.warn(
             `Routenberechnung übersprungen für Fahrer ${fahrerId} / ${datum}: ${ergebnis.grund}`

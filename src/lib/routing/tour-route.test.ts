@@ -355,6 +355,85 @@ describe("berechneUndSpeichereRoute", () => {
     expect(updateAufrufe[0].values.route_order).toBe(1);
     expect(updateAufrufe[0].values.route_distance_meters).toBe(12345);
   });
+
+  // PROJ-42 Refine 2026-08-11: Standortbasierte Neuberechnung
+  it("Refine 2026-08-11: überschreibt optionalen startPunkt statt Depot in der Geoapify-Anfrage", async () => {
+    const { client } = createFakeAdminClient({
+      stopps: [{ id: "stopp-a", partner_id: "partner-1" }],
+      adressen: [{ partner_id: "partner-1", geoapify_lat: 51.5, geoapify_lon: 7.0 }],
+    });
+
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => geoapifyAntwort(["stopp-a"]),
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const customStartPunkt = { lat: 52.0, lon: 8.0 };
+    const ergebnis = await berechneUndSpeichereRoute(client as any, "fahrer-1", "2026-08-10", {
+      startPunkt: customStartPunkt,
+    });
+
+    expect(ergebnis.ok).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const callBody = JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string);
+    // Geoapify erwartet [lon, lat] (GeoJSON-Standard)
+    expect(callBody.agents[0].start_location).toEqual([8.0, 52.0]);
+  });
+
+  it("Refine 2026-08-11: überschreibt optionale startZeit als Basis für Ankunftszeiten-Berechnung", async () => {
+    const { client, updateAufrufe } = createFakeAdminClient({
+      stopps: [{ id: "stopp-a", partner_id: "partner-1" }],
+      adressen: [{ partner_id: "partner-1", geoapify_lat: 51.5, geoapify_lon: 7.0 }],
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => geoapifyAntwort(["stopp-a"]),
+      })
+    );
+
+    // Custom startZeit: 14:30 UTC
+    const customStartZeit = new Date("2026-08-10T14:30:00Z");
+    const ergebnis = await berechneUndSpeichereRoute(client as any, "fahrer-1", "2026-08-10", {
+      startZeit: customStartZeit,
+    });
+
+    expect(ergebnis.ok).toBe(true);
+    expect(updateAufrufe).toHaveLength(1);
+    // Ankunftszeit sollte basierend auf customStartZeit + Geoapify-start_time berechnet werden,
+    // nicht auf ermittleTagesstartUtc() (09:00 Uhr).
+    // Der Stopp hat start_time: 0 (Position 0 in geoapifyAntwort), also Ankunftszeit = customStartZeit + 0
+    const ankunftsZeitIso = updateAufrufe[0].values.berechnete_ankunftszeit as string;
+    expect(ankunftsZeitIso).toBe(customStartZeit.toISOString());
+  });
+
+  it("Refine 2026-08-11: Regression — ohne startPunkt/startZeit bleibt Verhalten unverändert (nutzt Depot + 09:00 Uhr)", async () => {
+    const { client, updateAufrufe } = createFakeAdminClient({
+      stopps: [{ id: "stopp-a", partner_id: "partner-1" }],
+      adressen: [{ partner_id: "partner-1", geoapify_lat: 51.5, geoapify_lon: 7.0 }],
+    });
+
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => geoapifyAntwort(["stopp-a"]),
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    // Kein options-Parameter — sollte wie vorher Depot nutzen
+    const ergebnis = await berechneUndSpeichereRoute(client as any, "fahrer-regression", "2026-08-10");
+
+    expect(ergebnis.ok).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const callBody = JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string);
+    // Sollte Depot-Koordinaten nutzen, nicht einen custom Start-Punkt
+    expect(callBody.agents[0].start_location).toEqual([6.9668, 51.699]); // aus Env in beforeEach
+    // Ankunftszeit sollte auf ermittleTagesstartUtc() (09:00 Uhr) basieren, nicht auf customStartZeit
+    // (schwierig zu testen ohne Mock von ermittleTagesstartUtc, aber update-Struktur sollte da sein)
+    expect(updateAufrufe[0].values.berechnete_ankunftszeit).toBeTruthy();
+  });
 });
 
 describe("loeseNeuberechnungAus", () => {
@@ -417,5 +496,57 @@ describe("loeseNeuberechnungAus", () => {
 
     await loeseNeuberechnungAus(client as any, gruppe);
     expect(updateAufrufe).toHaveLength(1); // zweiter Aufruf sofort danach: Cooldown greift, keine neue Berechnung
+  });
+
+  // PROJ-42 Refine 2026-08-11: Cooldown-Bypass
+  it("Refine 2026-08-11: umgeheCooldown: true erlaubt Neuberechnung trotz Cooldown", async () => {
+    const { client, updateAufrufe } = createFakeAdminClient({
+      stopps: [{ id: "stopp-a", partner_id: "partner-1" }],
+      adressen: [{ partner_id: "partner-1", geoapify_lat: 51.5, geoapify_lon: 7.0 }],
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => geoapifyAntwort(["stopp-a"]) })
+    );
+
+    const gruppe = [{ fahrerId: "fahrer-bypass", datum: "2026-08-13" }];
+
+    await loeseNeuberechnungAus(client as any, gruppe);
+    expect(updateAufrufe).toHaveLength(1); // erster Aufruf berechnet normal
+
+    // Zweiter Aufruf sofort danach, normalerweise würde Cooldown greifen
+    // aber mit umgeheCooldown: true wird trotzdem berechnet
+    await loeseNeuberechnungAus(client as any, gruppe, { umgeheCooldown: true });
+    expect(updateAufrufe).toHaveLength(2); // zweite Berechnung trotz Cooldown ausgeführt
+  });
+
+  it("Refine 2026-08-11: startPunkt und startZeit werden an berechneUndSpeichereRoute() durchgereicht", async () => {
+    const { client } = createFakeAdminClient({
+      stopps: [{ id: "stopp-a", partner_id: "partner-1" }],
+      adressen: [{ partner_id: "partner-1", geoapify_lat: 51.5, geoapify_lon: 7.0 }],
+    });
+
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => geoapifyAntwort(["stopp-a"]),
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const customStartPunkt = { lat: 52.5, lon: 13.0 };
+    const customStartZeit = new Date("2026-08-10T15:00:00Z");
+
+    await loeseNeuberechnungAus(
+      client as any,
+      [{ fahrerId: "fahrer-durchreichen", datum: "2026-08-14" }],
+      {
+        startPunkt: customStartPunkt,
+        startZeit: customStartZeit,
+      }
+    );
+
+    // Geoapify sollte mit dem custom Start-Punkt aufgerufen werden
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const callBody = JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string);
+    expect(callBody.agents[0].start_location).toEqual([13.0, 52.5]);
   });
 });

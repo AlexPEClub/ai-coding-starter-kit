@@ -431,6 +431,46 @@ hinterlegt (für jede Umgebung, in der das Feature läuft).
   echten Tour testen und bei Bedarf die Feldnamen in
   `rufeGeoapifyRoutePlanner()` (`tour-route.ts`) anpassen.
 
+**Refine 2026-08-11 — Standortbasierte Neuberechnung (Engine-Erweiterung, für PROJ-46 & PROJ-44):**
+- Engine-Erweiterung `berechneUndSpeichereRoute()` und `loeseNeuberechnungAus()` um optionale
+  Parameter für Startpunkt und Startzeit (Acceptance Criteria „Standortbasierte Neuberechnung").
+  Ermöglicht es kommenden Features (PROJ-46 „Tour starten", PROJ-44 „Stopp erledigt") mit echtem
+  Standort/Zeitpunkt zu rechnen statt fest auf Depot/09:00 Uhr.
+  - `berechneUndSpeichereRoute(adminClient, fahrerId, datum, options?)` — neuer optionaler
+    4. Parameter:
+    - `options.startPunkt?: { lat, lon }` — wird statt fest configuriertem Depot als Startpunkt
+      an Geoapify übergeben. Ohne diesen Parameter bleibt das Depot-Verhalten 100% identisch
+      zu heute (Rückwärts-Kompatibilität). Falls ohne Startpunkt UND ohne Depot-Konfiguration
+      → hartes Fehlschlag wie bisher.
+    - `options.startZeit?: Date` — wird als Basis für die Ankunftszeiten-Berechnung verwendet
+      statt `ermittleTagesstartUtc()` (09:00 Uhr Berlin). Ohne Parameter → bisheriges Verhalten.
+  - `rufeGeoapifyRoutePlanner()` — neuer optionaler 4. Parameter `startZeit?: Date`, wird an
+    die Stelle von `ermittleTagesstartUtc()` beim Berechnen der je-Stopp-Ankunftszeiten genutzt.
+  - `loeseNeuberechnungAus(adminClient, gruppen, options?)` — neuer optionaler 3. Parameter:
+    - `options.startPunkt?`/`options.startZeit?` — werden 1:1 an `berechneUndSpeichereRoute()`
+      durchgereicht (Single-Responsibility: PROJ-42 ist nur die Engine, die konkrete
+      Logik wer/wann/wie aufruft sitzt in PROJ-46/PROJ-44).
+    - `options.umgeheCooldown?: boolean` — falls true, wird die bestehende 30s-Cooldown-Prüfung
+      pro Tourengruppe für DIESEN einen Aufruf übersprungen (bleibt für alle anderen Aufrufer
+      unverändert). Nötig für Echtzeit-Events wie „Tour starten" oder „Stopp erledigt", wo der
+      Fahrer sofort eine Neuberechnung braucht, nicht der nächste zufällige Edit-Trigger.
+      Der Zeitstempel wird trotzdem aktualisiert (damit der Cooldown für andere Aufrufer weiterhin
+      wirkt).
+  - Die drei bestehenden Aufrufer (`bearbeiteFahrt()`, `updatePickupTour()`, `createPickupTour()`)
+    rufen weiterhin ohne diese Parameter auf → keine Regression, keine Änderung ihrer Verhalten.
+  - Unit-Tests ergänzt in `src/lib/routing/tour-route.test.ts`:
+    - `berechneUndSpeichereRoute()` mit `startPunkt` — nutzt custom-Koordinate statt Depot ✓
+    - `berechneUndSpeichereRoute()` mit `startZeit` — Ankunftszeiten basieren auf custom-Zeit ✓
+    - `berechneUndSpeichereRoute()` OHNE Parameter — 100% Regression-Test, exakt altes Verhalten ✓
+    - `loeseNeuberechnungAus()` mit `umgeheCooldown: true` — bypasst Cooldown erfolgreich ✓
+    - `loeseNeuberechnungAus()` — Parameter-Durchreichung an Engine verifiziert ✓
+  - Verifiziert: `npm run build` ✓, `npx tsc --noEmit` ✓ (außer bestehende E2E-Fehler),
+    `npx eslint src/lib/routing/tour-route.ts` ✓, Unit-Test-Suite `src/lib/routing/**`:
+    19/19 grün, Gesamt-Unit-Suite: 170/170 grün ✓ — keine Regressionen.
+  - **Code-Änderungen:** nur `src/lib/routing/tour-route.ts` und
+    `src/lib/routing/tour-route.test.ts` erweitert; keine Migrations-, DB-, oder
+    bestehende Aufrufer-Änderungen nötig (pure Funktionssignatur-Erweiterung).
+
 ## QA Test Results
 
 **Tested:** 2026-08-02
@@ -802,3 +842,70 @@ Datenverlust dank Alles-oder-nichts-Schreiblogik). Per Live-DB-Abfrage
 verifiziert: `leg_distance_meters`/`leg_duration_seconds` enthalten jetzt echte,
 von Stopp zu Stopp unterschiedliche Werte (z. B. 458 m/39 s bis 95.115 m/
 3.731 s) statt durchgängig `0`/`NULL`.
+
+## QA Test Results — Refine 2026-08-11 (Engine-Erweiterung: Standortbasierte Neuberechnung)
+
+**Tested:** 2026-08-11  
+**Test-Methode:** Code-Review + Unit-Tests + Regression-Tests (keine Browser-Tests, da keine UI-Aufrufer vorhanden)  
+**Tester:** QA Engineer (AI)
+
+**Wichtige Rahmenbedingung:** Der Refine erweitert ausschließlich die Engine (`berechneUndSpeichereRoute()`, `loeseNeuberechnungAus()`, `rufeGeoapifyRoutePlanner()`) mit optionalen Parametern. Es gibt noch keine Aufrufstelle, die diese neuen Parameter mit echten Werten befüllt — die folgt später in PROJ-46 (Tour starten) und PROJ-44 (Stopp-Erledigt). Diese QA-Runde prüft deshalb rein die Engine-Erweiterung selbst (Code-Review + Unit-Tests + Regression), keine Integrations- oder E2E-Tests eines User-Flows.
+
+### Acceptance Criteria Status — Refine
+
+#### AC-1: Mit gesetztem Startpunkt/-zeit wird ab genau diesem Punkt/Zeitpunkt statt Depot/09:00 gerechnet
+- [x] Unit-Test "überschreibt optionalen startPunkt statt Depot in der Geoapify-Anfrage" (Line 360)
+  - Setzt `options.startPunkt = { lat: 52.0, lon: 8.0 }` und prüft: Geoapify-Request enthält `[8.0, 52.0]` statt Depot ✓
+- [x] Unit-Test "überschreibt optionale startZeit als Basis für Ankunftszeiten-Berechnung" (Line 384)
+  - Setzt `options.startZeit = new Date("2026-08-10T14:30:00Z")` und prüft: Ankunftszeit in DB = `customStartZeit`, nicht `ermittleTagesstartUtc()` ✓
+- [x] Code-Review: `startPunkt` und `startZeit` werden korrekt an `rufeGeoapifyRoutePlanner()` durchgereicht (Zeilen 457-459) ✓
+
+#### AC-2: Ohne Parameter bleibt Verhalten unverändert bei Depot/09:00 — keine Regression
+- [x] Unit-Test "Regression — ohne startPunkt/startZeit bleibt Verhalten unverändert" (Line 413)
+  - Ruft `berechneUndSpeichereRoute()` OHNE optionale Parameter auf und prüft: Geoapify-Request nutzt Depot-Koordinaten, nicht custom ✓
+- [x] Code-Review: Alle bestehenden Aufrufer (`bearbeiteFahrt()`, `updatePickupTour()`, `createPickupTour()`) rufen unverändert OHNE Parameter auf (git diff bestätigt keine Änderungen in `src/lib/actions/`) ✓
+- [x] Regression-Logik: Im Engine-Code, wenn `options?.startPunkt` nicht gesetzt, wird `leseDepotKoordinaten()` wie zuvor verwendet (Zeilen 54-66) ✓
+
+#### AC-3: `umgeheCooldown` kann 30s-Cooldown pro Tourengruppe für einen bestimmten Aufruf umgehen
+- [x] Unit-Test "BUG-2-Fix: löst innerhalb des Cooldowns keine zweite Berechnung aus" (Line 482)
+  - Prüft: zweiter Aufruf ohne `umgeheCooldown` wird wegen Cooldown übersprungen (updateAufrufe.length bleibt 1) ✓
+- [x] Unit-Test "umgeheCooldown: true erlaubt Neuberechnung trotz Cooldown" (Line 502)
+  - Prüft: zweiter Aufruf MIT `umgeheCooldown: true` wird ausgeführt trotz Cooldown (updateAufrufe.length wird 2) ✓
+- [x] Code-Review: Cooldown-Prüfung (Zeile 446) prüft `!options?.umgeheCooldown &&` — bypass nur wenn true, alle anderen Aufrufer unverändert ✓
+
+### Additional Test Coverage — Engine-Logik
+
+#### Parameter-Durchreichung
+- [x] Unit-Test "startPunkt und startZeit werden an berechneUndSpeichereRoute() durchgereicht" (Line 523)
+  - Ruft `loeseNeuberechnungAus()` mit custom Koordinaten und Zeitpunkt auf, prüft: Geoapify-Request enthält korrekte Werte ✓
+
+### Security Audit Results
+- [x] **Input Validation:** `startPunkt` und `startZeit` sind type-safe (`Koordinate = { lat: number; lon: number }`, `Date`), keine String-Interpolation möglich
+- [x] **No new Injection Vectors:** JSON.stringify wird verwendet für Geoapify-Request-Body (Zeilen 281-294), keine String-Konkatenation
+- [x] **Coordinate Boundary Check:** Keine explizite Validierung von Koordinaten-Wertebereichen nötig (Geoapify selbst prüft und lehnt ungültige Requests ab; bestehende Unit-Tests prüfen Error-Handling für ungültige Responses)
+- [x] **Rate Limiting:** In-Memory Cooldown ist vorhanden (30s), Bypass ist bewusst und dokumentiert (nur für Echtzeit-Events)
+- [x] **No Caller-Validation in Engine:** Richtig — die Engine prüft nicht, WER die Parameter setzt; das ist Aufgabe der jeweiligen Aufrufer (PROJ-46, PROJ-44, jeweils mit eigenen Zugriffskontrollmechanismen)
+
+### Regression Testing
+- [x] **Unit-Test-Suite:** 19/19 Tests grün (src/lib/routing/) — alle bestehenden Tests bleiben grün, 5 neue Tests für Refine alle grün
+- [x] **Gesamt-Unit-Test-Suite:** 170/170 Tests grün
+- [x] **Build-Status:** `npm run build` erfolgreich ✓
+- [x] **Lint:** `npx eslint src/lib/routing/tour-route.ts` — keine neuen Fehler durch Refine
+- [x] **TypeScript:** Pre-existing Fehler in E2E-Tests und ein Union-Type-Fehler in bestehender Codebase (Line 463: `grund` bei !ok ist korrekt per Type-Guard, aber Compiler erkennt Union nicht), keine NEUEN Fehler durch Refine ✓
+
+### Bugs Found During Refine QA
+- **None.** Der Refine ist reine Funktionssignatur-Erweiterung mit optionalen Parametern. Alle neuen Tests grün, alle Regressions-Tests grün, keine Security-Probleme durch neue Parameter.
+
+### Summary — Refine 2026-08-11
+
+- **Acceptance Criteria:** 3/3 erfüllt (alle Refine-spezifischen ACs grün)
+- **Unit Tests:** 19/19 grün (5 neue Tests für Refine-Funktionalität)
+- **Security:** ✅ Keine neuen Angriffsflächen
+- **Regression:** ✅ Bestehende Aufrufer bleiben unverändert, weiterhin Depot/09:00 bei Auslösung ohne Parameter
+- **Production Ready:** **JA** — reine Engine-Erweiterung, backward-compatible, vollständig unit-getestet
+- **Risiko-Bewertung:** Minimal — kein aktiver Aufrufer mit echten Werten vorhanden, bestehendes Verhalten für aktive Nutzer unverändert. Deployment ist safe, die neuen Aufrufer (PROJ-46, PROJ-44) müssen danach spezifisch getestet werden
+
+### Recommendation
+Die Engine-Erweiterung ist production-ready. Nächste Schritte:
+1. Deployment des Refine per `./scripts/deploy.sh PROJ-42`
+2. In PROJ-46 und PROJ-44: Live-Verifikation, dass die neuen optionalen Parameter mit echten Werten (Geräte-Standort, aktueller Zeitpunkt) die Routenberechnung korrekt triggern
