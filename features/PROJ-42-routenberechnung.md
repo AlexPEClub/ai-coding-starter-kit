@@ -2,7 +2,7 @@
 
 ## Status: ✅ Deployed
 **Created:** 2026-08-02
-**Last Updated:** 2026-08-08
+**Last Updated:** 2026-08-11
 
 > Folge-Baustein zu PROJ-21 (Fahrer — Tourenliste) und PROJ-41 (Fahrt
 > bearbeiten). Echte Routenberechnung war von Anfang an bewusst als
@@ -22,6 +22,13 @@
 - **Geoapify** (externer Dienst) — bereits im Projekt fürs Geocoding der
   Kundenadressen im Einsatz, wird hier zusätzlich für die eigentliche
   Routenberechnung (Reihenfolge + Fahrzeit) genutzt.
+- **PROJ-46 (Tour starten)** — neuer Konsument der in diesem Refine (2026-08-11)
+  ergänzten Fähigkeit "ab optionalem Startpunkt/-zeit statt Depot/09:00
+  rechnen"; die konkrete Standort-Erfassung/Fallback-Logik beim Tour-Start
+  wird in der PROJ-46-Spec selbst beschrieben.
+- **PROJ-44 (Stopp-Detail-Modal / "Erledigt")** — zweiter neuer Konsument
+  derselben Fähigkeit; Standort-Erfassung/Fallback-Logik beim Erledigt-Klick
+  wird in der PROJ-44-Spec selbst beschrieben.
 
 ## User Stories
 - Als Fahrer/Admin möchte ich, dass die Stopps einer Tour in der sinnvollsten
@@ -34,6 +41,11 @@
   Reihenfolge nie veraltet ist — egal wo die Änderung vorgenommen wurde.
 - Als Admin möchte ich, dass eine einzelne fehlerhafte Tour (z. B. ungültige
   Kundenadresse) nicht die Berechnung aller anderen Touren blockiert.
+- **(Neu, 2026-08-11)** Als Fahrer möchte ich, dass sich Reihenfolge und
+  Ankunftszeiten der restlichen Stopps aktualisieren, sobald ich einen Stopp
+  abschließe oder meine Tour starte — ausgehend von meinem tatsächlichen
+  Standort/Zeitpunkt statt einer am Morgen fix berechneten Schätzung, die im
+  Tagesverlauf zunehmend von der Realität abweicht.
 
 ## Out of Scope
 - **Manuelles Überschreiben der berechneten Reihenfolge** — `route_manual_override`
@@ -44,11 +56,17 @@
   die ereignisbasierte automatische Neuberechnung alles aktuell.
 - **Rückfahrt zum Depot** in Distanz-/Fahrzeit-Berechnung — Route endet beim
   letzten Stopp.
-- **Echtzeit-Verkehrsdaten, mehrere Depots, mehrere Fahrzeugtypen** — ein
-  fester Depot-Ort, eine feste Start-Uhrzeit (09:00), Standard-Fahrzeug.
-- **Neuberechnung durch Statuswechsel** (z. B. „erledigt") — es gibt aktuell
-  keinen Code-Pfad, der den Status einer Fahrt setzt (kommt erst mit
-  PROJ-36/37/38); sobald einer existiert, ist das ein eigenes Anschluss-Thema.
+- **Echtzeit-Verkehrsdaten, mehrere Depots, mehrere Fahrzeugtypen** — für die
+  drei ursprünglichen Auslöser (Fahrer/Datum-Änderung, Pickup-Mutationen)
+  weiterhin ein fester Depot-Ort, eine feste Start-Uhrzeit (09:00),
+  Standard-Fahrzeug; siehe Abschnitt „Standortbasierte Neuberechnung" für die
+  seit 2026-08-11 abweichende Behandlung von Tour-Start (PROJ-46) und
+  Erledigt-Klick (PROJ-44).
+- ~~Neuberechnung durch Statuswechsel (z. B. „erledigt")~~ — **überholt,
+  2026-08-11:** dieser Ausschluss galt, solange es keinen Code-Pfad für
+  Statuswechsel gab. PROJ-44 hat diesen Pfad seither geschaffen, und der User
+  hat eine Neuberechnung bei "erledigt" explizit angefordert — siehe neuer
+  Abschnitt „Standortbasierte Neuberechnung" in den Acceptance Criteria.
 - **Zeitplan-basierte automatische Neuberechnung** (Cronjob) — nur
   ereignisbasiert (bei Fahrer-/Datum-Änderung einer Fahrt), kein
   Hintergrund-Zeitplan.
@@ -60,9 +78,13 @@
 
 ### Depot & Grundlage
 - [ ] Angenommen die Depot-Adresse (Gudel Werkzeuge GmbH & Co. KG, Zur
-  Reithalle 86, Dorsten) ist hinterlegt, wenn eine Routenberechnung für
-  irgendeine Tour ausgeführt wird, dann wird immer von diesem festen Ort als
-  Startpunkt gerechnet — nie vom Standort eines Fahrers.
+  Reithalle 86, Dorsten) ist hinterlegt, wenn eine Routenberechnung über
+  einen der drei ursprünglichen Auslöser (Fahrer/Datum-Änderung,
+  Pickup-Mutationen) ausgeführt wird, dann wird immer von diesem festen Ort
+  als Startpunkt gerechnet. **Ausnahme seit 2026-08-11:** Tour-Start
+  (PROJ-46) und Erledigt-Klick (PROJ-44) können stattdessen einen
+  Geräte-Standort als Startpunkt übergeben — siehe Abschnitt
+  „Standortbasierte Neuberechnung" unten.
 - [ ] Angenommen die Depot-Adresse kann nicht geocodiert werden, wenn eine
   Berechnung (Backfill oder automatisch) versucht wird, dann schlägt sie mit
   einer klaren Fehlermeldung fehl, ohne dass unnötig Kundenadressen
@@ -119,7 +141,41 @@
   bisher nach Datum/Anlage-Reihenfolge angezeigt, ohne Gesamtstrecke-/
   Fahrzeit- oder Ankunftszeit-Anzeige.
 
+### Standortbasierte Neuberechnung (Erweiterung 2026-08-11, für PROJ-46 & PROJ-44)
+Dieser Abschnitt beschreibt ausschließlich die Erweiterung des gemeinsamen
+Berechnungsmoduls (`berechneUndSpeichereRoute()`/`loeseNeuberechnungAus()`
+in `src/lib/routing/tour-route.ts`) um einen optionalen Startpunkt/-zeit.
+Wer diese Fähigkeit wie aufruft (Tour-Start vs. Erledigt-Klick, inkl.
+jeweiliger Fallback-Regel) wird in den Specs von PROJ-46 bzw. PROJ-44
+festgelegt, nicht hier — Single-Responsibility zwischen Engine (PROJ-42) und
+Aufrufern (PROJ-46/PROJ-44).
+
+- [ ] Angenommen das Berechnungsmodul wird mit einem optionalen Startpunkt
+  (Koordinate) und einer Startzeit aufgerufen, wenn diese Parameter gesetzt
+  sind, dann wird die Route ab genau diesem Punkt/Zeitpunkt berechnet statt
+  ab Depot/09:00 Uhr — für alle offenen Stopps der Tourengruppe unverändert
+  nach denselben Regeln (Alles-oder-nichts bei fehlenden Koordinaten,
+  gleiche Geoapify-Anfrage-Struktur).
+- [ ] Angenommen das Berechnungsmodul wird wie bisher ohne diese Parameter
+  aufgerufen (die drei ursprünglichen Auslöser), wenn das passiert, dann
+  bleibt das Verhalten unverändert bei Depot/09:00 Uhr — keine Regression
+  für bestehende Aufrufer.
+- [ ] Angenommen ein Aufrufer möchte den bestehenden 30s-Cooldown pro
+  Tourengruppe (`loeseNeuberechnungAus()`) für einen bestimmten Aufruf
+  bewusst umgehen (z. B. Tour-Start, siehe PROJ-46), wenn das passiert, dann
+  kann das über einen expliziten Parameter gesteuert werden, ohne das
+  bestehende Cooldown-Verhalten für andere Aufrufer zu verändern.
+
 ## Edge Cases
+- **Standort-Berechtigung dauerhaft verweigert:** Fällt bei jedem weiteren
+  Aufruf konsequent auf die vom jeweiligen Aufrufer (PROJ-46/PROJ-44)
+  definierte Fallback-Logik zurück — kein wiederholter Permission-Prompt pro
+  Klick nötig, das ist Browser-Standardverhalten.
+- **Standortbasierter Aufruf, aber keine offenen Stopps mehr übrig** (z. B.
+  letzter Stopp der Tourengruppe wurde gerade erledigt): Bestehendes
+  Verhalten von `berechneUndSpeichereRoute()` greift bereits unverändert
+  (gibt `{ ok: true, stoppAnzahl: 0 }` zurück, siehe Zeile ~71-75) — kein
+  neuer Sonderfall nötig.
 - **Tour mit nur einem Stopp:** Route besteht nur aus Depot → dieser eine
   Stopp; Reihenfolge ist trivial (immer Position 1), Distanz/Fahrzeit werden
   trotzdem berechnet und angezeigt.
@@ -174,6 +230,11 @@ _Keine offenen Fragen mehr — alle im Spec-Review geklärt._
 | Fehlschlagende Routenberechnung blockiert NICHT das eigentliche Speichern von Fahrer/Datum/Notiz | Die Fahrt-Bearbeitung (PROJ-41) soll unabhängig von einem externen Dienst zuverlässig funktionieren — Routenberechnung ist ein nachgelagerter, optionaler Zusatzschritt | 2026-08-02 |
 | Berechnete Ankunftszeit wird zusätzlich zur Gesamtstrecke/-fahrzeit auch je Stopp angezeigt | Ohne sichtbare Anzeige hätte die eigens für diesen Zweck festgelegte Start-Uhrzeit (09:00) keinen praktischen Nutzen | 2026-08-02 |
 | Feste Verweilzeit von 15 Minuten pro Kundenstopp, fix und nicht pro Kunde/Fahrer konfigurierbar (MVP) | User-Feedback nach dem ersten Live-Test: ohne Verweilzeit wirkten die angezeigten Ankunftszeiten unrealistisch gestaucht (nur reine Fahrzeit zwischen Stopps) | 2026-08-03 |
+| **(Refine)** Engine bekommt optionalen Startpunkt/-zeit-Parameter statt fest Depot/09:00 | User will echte, live-genaue Zwischenzeiten nach Tour-Start und nach jedem erledigten Stopp, nicht nur eine am Morgen einmalig berechnete, driftende Schätzung | 2026-08-11 |
+| **(Refine)** Startzeit bei einem standortbasierten Aufruf ist immer der tatsächliche Klick-/Ereignis-Zeitpunkt, nicht mehr fix 09:00 — unabhängig davon, ob der Startpunkt von echtem Geräte-Standort oder einem Fallback-Wert des Aufrufers stammt | Eine feste Uhrzeit ohne Bezug zur Realität wäre bei einem echten, live ausgelösten Ereignis nicht mehr sinnvoll | 2026-08-11 |
+| **(Refine)** Die drei ursprünglichen Auslöser (Fahrer/Datum-Änderung, Pickup-Mutationen) bleiben unverändert bei Depot/09:00, bekommen keinen Standortbezug | Das sind vorausschauende Planungs-Änderungen (oft durch Admin, nicht live im Feld) — es gibt dabei keinen sinnvollen Bezug zu einem echten Geräte-Standort/-Zeitpunkt | 2026-08-11 |
+| **(Refine)** Der bisherige Out-of-Scope-Punkt „Neuberechnung durch Statuswechsel" ist überholt und wird gestrichen | Er setzte voraus, dass kein Code-Pfad für Statuswechsel existiert — PROJ-44 hat diesen seither geschaffen, und der User hat die Neuberechnung bei „erledigt" jetzt explizit angefordert | 2026-08-11 |
+| **(Refine)** Detail-Verhalten von Tour-Start (PROJ-46) und Erledigt-Klick (PROJ-44) — insb. Fallback-Regeln bei fehlendem Standort und Cooldown-Bypass — wird in den jeweiligen Feature-Specs dokumentiert, nicht hier | Single Responsibility: PROJ-42 beschreibt nur die gemeinsame Engine-Fähigkeit, nicht jeden einzelnen Aufrufer | 2026-08-11 |
 
 ### Technical Decisions
 <!-- Added by /architecture -->
