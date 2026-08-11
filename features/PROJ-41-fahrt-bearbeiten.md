@@ -435,9 +435,9 @@ Alle Live-Tests liefen gegen echte Produktions-Stopps (Rhehag GmbH, Tönnissen E
 
 ## Deployment
 
-**Deployed:** 2026-08-02
+**Initial Deployment:** 2026-08-02
 **Production URL:** https://tms.gudel-werkzeuge.de/fahrer
-**Git Tag:** `v1.41.0-PROJ-41`
+**Git Tag (Initial):** `v1.41.0-PROJ-41`
 
 - Pre-Checks (Lint + Build) grün, `docker compose build` + `up -d` erfolgreich.
 - Automatische Post-Deploy-Verifikation (`./scripts/deploy.sh PROJ-41`): grün im
@@ -451,6 +451,19 @@ Alle Live-Tests liefen gegen echte Produktions-Stopps (Rhehag GmbH, Tönnissen E
   die QA-Aufräumaktion leer).
 - Container-Logs (`docker compose logs`) auf Fehler/Exceptions geprüft —
   keine gefunden.
+
+### Refine Deployment (2026-08-11)
+
+**Refine Deployed:** 2026-08-11 (Mobile-Rounding-Konsistenz CSS-Fix)
+**Git Tag (Refine):** `v1.41.1-PROJ-41`
+
+- Pre-Checks (Lint + Build) grün, Docker-Image erfolgreich gebaut und deployed.
+- Automatische Post-Deploy-Verifikation via `./scripts/deploy.sh PROJ-41`: 
+  **Chromium-Tests 6/6 grün** (Smoke-Tests bestätigen Live-Deployment), 
+  WebKit-Tests übersprungen (bekannte Limitation, siehe Codebase-Dokumentation).
+- Live-URL erreichbar (HTTP 200), Login-Formular gerendert, App läuft.
+- CSS-Fix (`rounded-2xl` auf DialogContent) verursacht keine Regressions —
+  bestehende E2E-Tests weiterhin stabil.
 
 ### Bekannte offene Punkte nach Deploy
 - **BUG-1** wurde bereits vor diesem Deploy gefixt (siehe QA Test Results).
