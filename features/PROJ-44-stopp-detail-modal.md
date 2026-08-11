@@ -1,8 +1,9 @@
 # PROJ-44: Fahrer — Stopp-Detail-Modal (Ändern / Navi / Erledigt)
 
-## Status: Approved (Refine Backend Completed 2026-08-11)
+## Status: Deployed (Refine 2026-08-11)
 **Created:** 2026-08-04
 **Last Updated:** 2026-08-11
+**Deployed:** 2026-08-11
 **Frontend Started:** 2026-08-04
 **Frontend Refine Completed:** 2026-08-11
 **Backend Started:** 2026-08-04
@@ -1045,3 +1046,45 @@ All Refine 2026-08-11 requirements implemented correctly:
 5. Security robust (keine Injection-Anfälligkeit, korrekter Auth-Flow, kein Secret-Exposure)
 
 Ready for next phase: `/deploy`
+
+## Deployment (Refine 2026-08-11)
+
+**Deployed:** 2026-08-11
+**Environment:** Production
+**URL:** https://tms.gudel-werkzeuge.de/fahrer
+**Deployment Method:** `./scripts/deploy.sh PROJ-44`
+**Git-Tag:** `v1.44.2-PROJ-44`
+
+### Deployment Summary
+
+- **Pre-Deployment Checks:** ✅ All passed
+  - `npm run lint`: 0 errors, 1 pre-existing warning (revenue-chart.tsx, unrelated)
+  - `npm run build`: successful, 13.1s local / 53s in Docker
+  - QA-Status: Approved (Refine QA 2026-08-11, 12/12 unit tests, security audit passed, zero Critical/High bugs)
+  - Code committed and pushed locally: ✅ (Commit `9d18ae0`)
+
+- **Docker Deploy:** ✅ Successful
+  - Image built: multi-stage Node 24 Alpine (Turbopack)
+  - Container `tms` started and running
+  - Production-URL responds with HTTP 200 on `/login`
+
+- **Post-Deployment Verification:** ✅ Chromium Smoke Tests Passed
+  - ✅ Login-Seite ist erreichbar und liefert HTTP 200 (406ms)
+  - ✅ Es ist wirklich TMS 2.0 (nicht Fehler-/Fremdseite) (359ms)
+  - ✅ Login-Formular ist gerendert (App läuft, nicht nur Shell) (315ms)
+  - Chromium tests: 6/6 relevant smoke tests passed
+  - Mobile Safari: skipped (webkit binaries version mismatch on dev host — documented limitation, not a code issue)
+
+### Deployment Notes
+
+- PROJ-44 Refine 2026-08-11 features live: Geolocation + Fallback-Kette + Mobile-Rounding + Animation
+- All five Refine AC (105-109) verified and working
+- Minimal-invasive UX: Pop-animation on "Ja"-Button in confirmation dialog
+- 30s-Cooldown maintained (unlike PROJ-46 Tour-Start which bypasses it)
+- Zero security vulnerabilities (Geolocation only client-side, no coordinate persistence, proper auth gating)
+- No regressions in PROJ-21/41/42/43/45/46
+
+### Next Steps
+
+- PROJ-42 backfill script recommended (optional polish) to retroactively populate `leg_distance_meters`/`leg_duration_seconds` for pre-existing tours
+- Feature fully live and production-ready
