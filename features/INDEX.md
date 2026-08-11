@@ -47,7 +47,7 @@
 | PROJ-44 | Fahrer — Stopp-Detail-Modal (Ändern / Navi / Erledigt) | ✅ Deployed — Refine 2026-08-11: Erledigt löst jetzt standortbasierte Neuberechnung aus, Mobile-Rounding + Status-Animation ergänzt, Code-Umsetzung steht noch aus. Details: `features/PROJ-44-stopp-detail-modal.md` | 2026-08-11 |
 | PROJ-45 | Fahrer — Tour-Kartenansicht | ✅ Deployed — Refine 2026-08-11: doppeltes Schließen-X wird entfernt + Modal-Animation ergänzt, Code-Umsetzung steht noch aus. Details: `features/PROJ-45-fahrer-tour-kartenansicht.md` | 2026-08-11 |
 | PROJ-46 | Fahrer — Tour starten (Status-Wechsel) | ✅ Deployed — Refine 2026-08-11: Button-Style (Grün+Pfeil) + standortbasierte Neuberechnung bei Start ergänzt, Code-Umsetzung steht noch aus. Details: `features/PROJ-46-tour-starten.md` | 2026-08-11 |
-| PROJ-47 | Fahrer — Live-KPIs während laufender Tour | 🔵 Planned — kompakte KPI-Leiste im Accordion (Fortschritt, verbleibende Stopps, Tourende, nächster Kunde), sichtbar für Fahrer+Admin nach Tour-Start. Details: `features/PROJ-47-live-kpis-laufende-tour.md` | 2026-08-11 |
+| PROJ-47 | Fahrer — Live-KPIs während laufender Tour | 🟣 Architected — kein neuer Datenabruf, reine Ableitung aus bereits geladenen PROJ-21/42/44/46-Daten, neue Komponente `tour-kpi-leiste.tsx`. Details: `features/PROJ-47-live-kpis-laufende-tour.md` | 2026-08-11 |
 
 ## Architektur-Dokumente
 

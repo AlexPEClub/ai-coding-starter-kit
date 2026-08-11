@@ -89,12 +89,127 @@
 <!-- Added by /architecture -->
 | Decision | Rationale | Date |
 |----------|-----------|------|
+| Berechnungslogik als neue, reine Hilfsfunktion `berechneTourKpis` in `src/lib/actions/fahrten-helpers.ts` (gleiche Datei wie das bestehende `berechneFahrtBadge`), statt Berechnung direkt in der JSX von `tour-liste.tsx` | Gleiches, bereits etabliertes Muster wie bei `berechneFahrtBadge`: reine Funktion ohne Server-Client-Import bleibt isoliert unit-testbar in der bereits vorhandenen `fahrten-helpers.test.ts`, ohne Rendering aufzusetzen | 2026-08-11 |
+| Darstellung als eigene, kleine Präsentations-Komponente `src/components/fahrer/tour-kpi-leiste.tsx`, von `tour-liste.tsx` importiert, statt weiterer Inline-JSX in der bereits gewachsenen `tour-liste.tsx` (380 Zeilen) | Konsistent mit dem bestehenden Muster, nach dem abgegrenzte UI-Bausteine (Stopp-Detail-Modal, Fahrt-Bearbeiten-Dialog, Tour-Karte-Modal) bereits als eigene Dateien neben `tour-liste.tsx` liegen; hält Einzelverantwortung und Testbarkeit der Kernkomponente hoch | 2026-08-11 |
+| Fortschrittsbalken nutzt die bereits im Projekt installierte shadcn/ui-Komponente `Progress` (bereits verwendet in der Wissensbasis, PROJ-29) | Keine neue Abhängigkeit nötig; folgt der verbindlichen "shadcn/ui first"-Regel statt einer selbstgebauten Balken-Implementierung | 2026-08-11 |
+| Gating über denselben, bereits vorhandenen `tourStarts`-Prop und dieselbe Schlüsselbildung (`fahrerId-datum`), die `tour-liste.tsx` schon für den "Tour starten"-Button/"Gestartet um HH:MM"-Text verwendet — kein neuer Prop auf `TourListe` | Vermeidet doppelte Zustandsführung; die Sichtbarkeits-Bedingung ist identisch mit der bereits bestehenden PROJ-46-Logik, nur an einer zweiten Stelle im selben Render-Durchlauf ausgewertet | 2026-08-11 |
+| "Nächster offener Stopp" = erster Eintrag in `tour.fahrten` mit Status ungleich "erledigt"; "voraussichtliches Tourende" = `berechneteAnkunftszeit` des letzten offenen Eintrags — beide ohne zusätzliche eigene Sortierung | `gruppiereZuTouren` in `fahrten-helpers.ts` sortiert `tour.fahrten` bereits verlässlich (offene Stopps nach `routeOrder`, erledigte ans Ende); eine zweite, redundante Sortierung in der neuen KPI-Funktion wäre unnötiges Duplikat mit Divergenz-Risiko | 2026-08-11 |
+| "Erledigt" für die Fortschritts-Zählung = Status exakt `"erledigt"` (kein zusätzlicher Abgleich mit `"abgeschlossen"`/`"archiviert"`) | Diese beiden Status kommen laut `GELAD_STATUS`-Konstante in `fahrten.ts` nie in geladenen Tour-Daten vor (sie werden nur defensiv in einer andernorts verwendeten Filterliste erwähnt); Konsistenz mit der bereits bestehenden `istErledigt`-Prüfung in `tour-liste.tsx`, die ebenfalls nur auf `"erledigt"` prüft | 2026-08-11 |
+| `berechneTourKpis` liefert `null` (KPI-Leiste rendert dann nichts), falls die Tour keine Stopps enthält, statt eine Division durch Null zu riskieren | Defensive Absicherung eines Randfalls, der laut Datenmodell zwar praktisch nicht auftreten kann (eine Tourengruppe entsteht in `gruppiereZuTouren` nur aus mindestens einer Fahrt), aber im Sinne von "Security & Robustheit vor Geschwindigkeit" günstig abzusichern ist | 2026-08-11 |
+| Keine neuen Felder in `Fahrt`/`Tour` (aus `fahrten-helpers.ts`) und keine Änderung an `getEigeneOffeneTouren`/`getAlleOffeneTouren` in `fahrten.ts` | Bestätigt durch Code-Review: `status`, `routeOrder`, `berechneteAnkunftszeit` und `kunde.name` sind bereits Teil des geladenen `Fahrt`-Typs — die Spec-Vorgabe "keine neue Server-Aktion/kein neuer Datenbank-Zugriff" ist ohne jede Datenmodell-Änderung erfüllbar | 2026-08-11 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Ausgangslage (Code-Review vor dem Entwurf)
+
+Vor dem Entwurf wurden die bestehenden Bausteine gelesen, auf denen PROJ-47
+laut Spec aufbauen soll:
+
+- `src/components/fahrer/tour-liste.tsx` — die Accordion-Liste, in die die
+  KPI-Leiste eingehängt wird. Das PROJ-46-Gating (`tourStarts`-Prop,
+  Schlüssel `fahrerId-datum`) existiert dort bereits und wird für den
+  bestehenden "Tour starten"-Button/"Gestartet um HH:MM"-Text verwendet.
+- `src/lib/actions/fahrten-helpers.ts` — enthält bereits die Typen `Fahrt`
+  und `Tour` sowie die reine Sortier-Funktion `gruppiereZuTouren` (sortiert
+  Stopps nach `routeOrder`, erledigte Stopps ans Ende) und die reine
+  Badge-Funktion `berechneFahrtBadge`. Der `Fahrt`-Typ enthält bereits
+  `status`, `routeOrder`, `berechneteAnkunftszeit` und `kunde.name` — exakt
+  die Felder, die PROJ-47 benötigt.
+- `src/lib/actions/fahrten.ts` — `getEigeneOffeneTouren`/`getAlleOffeneTouren`
+  laden diese Felder bereits vollständig; keine Lücke im Datenmodell.
+- `src/components/ui/progress.tsx` — die shadcn/ui-Fortschrittsbalken-
+  Komponente ist bereits installiert (genutzt in der Wissensbasis, PROJ-29).
+
+**Ergebnis:** Es fehlt kein Datenfeld und keine Server-Funktion. PROJ-47 ist
+ausschließlich eine Ableitungs- und Darstellungs-Aufgabe auf bereits
+vorhandenen Daten.
+
+### A) Component Structure (visueller Baum)
+
+```
+TourListe  (bestehend, src/components/fahrer/tour-liste.tsx — unverändert
+            in Struktur, nur ein neuer Aufruf innerhalb von AccordionContent)
+└─ AccordionItem  (pro Tour: ein Fahrer + ein Datum, bestehend, unverändert)
+   └─ AccordionContent  (bestehend, klappt beim Öffnen der Tour auf)
+      ├─ [NEU] TourKpiLeiste  (neue Komponente, nur gerendert wenn diese
+      │        Tour bereits gestartet wurde — sonst entfällt der Block
+      │        komplett, kein Platzhalter)
+      │   ├─ Fortschrittsbalken (shadcn "Progress"): Anteil erledigt/gesamt
+      │   ├─ Text: "X von Y Stopps erledigt" + "Z verbleibend"
+      │   ├─ Zeile "Nächster Stopp": Kundenname
+      │   │        + optional Ankunftszeit (weggelassen, wenn keine
+      │   │        Routenberechnung für diesen Stopp vorliegt)
+      │   └─ Zeile "Voraussichtliches Tourende": Uhrzeit
+      │            (die ganze Zeile entfällt, wenn keine vollständige
+      │            Routenberechnung für die Tour vorliegt)
+      └─ Stopp-Liste  (bestehende <ul> mit den einzelnen Stopps, unverändert)
+```
+
+Für den Admin-Tab "Tourenplanung" entsteht keine zweite Variante: `TourListe`
+wird dort bereits mit denselben Props (inkl. `tourStarts`) gerendert wie im
+Fahrer-Tab "Mir zugewiesen" — die neue KPI-Leiste erscheint dadurch
+automatisch identisch und rein lesend an beiden Stellen, ohne eigene
+Verzweigung.
+
+### B) Data Model (Klartext)
+
+Es entsteht **kein neues gespeichertes Datenfeld** — die KPI-Leiste zeigt
+ausschließlich Werte, die aus den bereits geladenen Tour-Daten im Browser
+abgeleitet werden, bei jedem Öffnen/Aufklappen neu berechnet:
+
+- **Erledigte Anzahl** — Anzahl der Stopps einer Tour mit Status "erledigt".
+- **Gesamtanzahl** — Anzahl aller Stopps dieser Tour.
+- **Verbleibende Anzahl** — Gesamtanzahl minus erledigte Anzahl.
+- **Fortschritt in Prozent** — erledigte Anzahl geteilt durch Gesamtanzahl,
+  als Balken-Füllstand.
+- **Nächster Stopp** — Kundenname des ersten noch nicht erledigten Stopps
+  (in der bereits vorhandenen, korrekten Reihenfolge) sowie, falls für diesen
+  Stopp eine Ankunftszeit berechnet wurde, diese Ankunftszeit. Ohne
+  Ankunftszeit: nur der Name, kein Platzhalter.
+- **Voraussichtliches Tourende** — die berechnete Ankunftszeit des letzten
+  noch nicht erledigten Stopps der Tour (inklusive der darin bereits
+  enthaltenen Verweilzeit), sofern für die gesamte Tour eine vollständige
+  Routenberechnung vorliegt. Ohne vollständige Berechnung: dieser Wert fehlt
+  komplett, keine Zeile, kein Platzhalter.
+
+**Quelle aller Werte:** ausschließlich das bereits im Browser vorhandene
+`Tour`-Objekt (mit seiner `fahrten`-Liste) aus
+`getEigeneOffeneTouren`/`getAlleOffeneTouren`. Kein zusätzlicher Abruf, keine
+neue Tabelle, keine neue Spalte, kein Caching über die aktuelle Seitenansicht
+hinaus. Aktualisierung geschieht ausschließlich dadurch, dass die Seite nach
+einer Aktion (Tour starten, Stopp erledigt, Routen-Neuberechnung) über das
+bestehende `revalidatePath`-Muster neu geladen wird — dann werden auch die
+KPI-Werte automatisch aus den frisch geladenen Daten neu abgeleitet.
+
+### C) Tech Decisions (Begründung für PM)
+
+- **Berechnung und Darstellung werden bewusst getrennt:** Eine kleine, reine
+  Rechenfunktion ermittelt die Zahlen/Texte; eine separate, kleine
+  Anzeige-Komponente zeigt sie an. Vorteil: Die Rechenlogik (was ist "der
+  nächste Stopp", wann fehlt die Ankunftszeit) lässt sich automatisiert
+  testen, ohne die komplette Oberfläche zu simulieren — das senkt das Risiko
+  falscher Zahlen bei künftigen Änderungen.
+- **Kein neuer Datenabruf:** Die Leiste "kostet" nichts an zusätzlicher
+  Ladezeit oder Serverlast, weil sie ausschließlich mit Daten arbeitet, die
+  die Seite für die Stopp-Liste sowieso schon geladen hat.
+- **Wiederverwendung des bestehenden Fortschrittsbalken-Bausteins:** Statt
+  einen eigenen Balken zu bauen, wird ein bereits im Projekt vorhandener,
+  geprüfter UI-Baustein verwendet (gleiche Familie wie Button/Badge) — das
+  spart Aufwand und sorgt für ein einheitliches Erscheinungsbild.
+- **Kein separater Verwaltungs-Modus:** Weil Fahrer und Admin dieselbe Liste
+  mit denselben Daten sehen, gibt es keinen Grund für zwei getrennte
+  Bau-Varianten der Leiste — das hält den Wartungsaufwand niedrig und
+  schließt aus, dass beide Ansichten mit der Zeit auseinanderlaufen.
+
+### D) Dependencies
+
+Keine neuen Pakete. Es wird ausschließlich die bereits im Projekt
+installierte shadcn/ui-Komponente "Progress" verwendet (bereits genutzt in
+der Wissensbasis, PROJ-29); alle übrigen Bausteine (Text, Badge) sind
+ebenfalls bereits vorhanden.
 
 ## QA Test Results
 _To be added by /qa_
