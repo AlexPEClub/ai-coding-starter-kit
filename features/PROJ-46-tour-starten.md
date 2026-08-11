@@ -9,7 +9,7 @@
 
 ## Dependencies
 - Requires: PROJ-21 (Fahrer — Tourenliste) — Basis-UI (`tour-liste.tsx`, Accordion-Gruppierung nach Fahrer+Datum)
-- Requires: PROJ-42 (Routenberechnung) — liefert `berechnete_ankunftszeit` pro Stopp
+- Requires: PROJ-42 (Routenberechnung) — liefert `berechnete_ankunftszeit` pro Stopp; seit Refine 2026-08-11 nutzt "Tour starten" außerdem die dort ergänzte Fähigkeit, mit einem optionalen Startpunkt/-zeit statt Depot/09:00 zu rechnen
 - Requires: PROJ-44 (Stopp-Detail-Modal) — liefert bestehende Erledigt-Aktion (`abgeschlossen_am`), Navi-Aktion, Bestätigungsdialog-Muster
 
 ## User Stories
@@ -18,6 +18,8 @@
 - Als Fahrer möchte ich beim Abschließen eines Stopps sehen, ob ich pünktlich oder verspätet war, damit ich meine eigene Performance einschätzen kann.
 - Als Verwaltung möchte ich sehen können, wann ein Fahrer seine Tour gestartet hat, damit ich einen besseren Überblick über den Tagesablauf habe (rein lesend).
 - Als Product-Owner/Verwaltung möchte ich, dass Start- und Ist-Zeiten in der Datenbank vorgehalten werden, damit sie später im Dashboard (PROJ-7) ausgewertet werden können.
+- **(Neu, 2026-08-11)** Als Fahrer möchte ich, dass der "Tour starten"-Button optisch klar als positive, einladende Aktion hervorsticht (Grün + Pfeil), damit er sich vom Rest der Oberfläche abhebt und ich ihn beim schnellen Blick aufs Tablet sofort erkenne.
+- **(Neu, 2026-08-11)** Als Fahrer möchte ich, dass beim Start meiner Tour sofort eine vollständige, aktuelle Routen-Neuberechnung ausgehend von meinem tatsächlichen Standort läuft, damit Reihenfolge und Ankunftszeiten von Anfang an realistisch sind statt auf der morgens fix angenommenen Depot/09:00-Schätzung zu basieren.
 
 ## Out of Scope
 - Status "problem" (dritter DB-Enum-Wert `problem`) — eigener Folge-Baustein, neue PROJ-ID.
@@ -25,10 +27,10 @@
 - Separater "Angekommen"-Klick/-Status (Enum-Wert `unterwegs`/`angekommen` wird durch dieses Feature nicht gesetzt) — die bestehende "Erledigt"-Aktion übernimmt die Rolle des Ist-Zeitstempels.
 - Admin/Verwaltung-Schreibzugriff bzw. Korrekturmöglichkeit für den Start-Zeitstempel — reine Leserechte für Admin/Verwaltung in diesem Feature.
 - Undo/Zurücknehmen von "Tour starten" — kein Undo, analog zum bestehenden "Erledigt"-Verhalten (PROJ-44).
-- Geolocation-Erfassung beim Start (kein `start_lat`/`start_lon`, anders als bei `abschluss_lat`/`abschluss_lon` in PROJ-44/PROJ-21) — nur Zeitstempel.
+- ~~Geolocation-Erfassung beim Start (kein `start_lat`/`start_lon`... — nur Zeitstempel)~~ — **überholt, 2026-08-11:** Der Geräte-Standort wird jetzt beim Start-Klick erfasst, aber ausschließlich als *ephemerer* Parameter für den einmaligen Neuberechnungs-Aufruf (siehe neue Acceptance Criteria unten) — es gibt weiterhin **kein** persistiertes `start_lat`/`start_lon`-Feld auf `tms.tour_starts`. Diese Unterscheidung bleibt bestehen: nur die Nutzung des Standorts ändert sich, nicht das Datenmodell.
 - Benachrichtigungen an andere Rollen beim Tour-Start — Terrain von PROJ-9 (Benachrichtigungen), falls überhaupt gewünscht.
 - Expliziter "Tour komplett abgeschlossen"-Zustand — ergibt sich implizit, wenn alle Stopps der Tour `erledigt` sind.
-- Ein früherer, bereits verworfener Ansatz (Geolocation-basierte Routen-Neuberechnung ab Fahrerstandort via OSRM, eigene Tabelle `driver_tour_runs`) ist explizit kein Vorbild für dieses Feature — der bestehende feste Depot-Startpunkt (PROJ-42) bleibt unverändert.
+- ~~Ein früherer, bereits verworfener Ansatz (Geolocation-basierte Routen-Neuberechnung ab Fahrerstandort via OSRM, eigene Tabelle `driver_tour_runs`) ist explizit kein Vorbild für dieses Feature — der bestehende feste Depot-Startpunkt (PROJ-42) bleibt unverändert.~~ — **überholt, 2026-08-11:** bewusste Kehrtwende, siehe Decision Log. Wichtiger Unterschied zum damals verworfenen Ansatz: keine eigene Tabelle/kein OSRM — die bestehende Geoapify-Engine aus PROJ-42 wird lediglich um einen optionalen, nicht persistierten Startpunkt/-zeit-Parameter erweitert (siehe PROJ-42-Spec).
 
 ## Acceptance Criteria
 
@@ -45,12 +47,21 @@
 - [ ] Angenommen die Rolle Admin/Verwaltung betrachtet die Tourenplanung, wenn eine Tour gestartet wurde, dann sieht sie den Start-Zeitstempel ebenfalls (rein lesend, keine Aktionsmöglichkeit).
 - [ ] Angenommen ein Fahrer hat keine Stopps für einen Tag, wenn die Tourenliste angezeigt wird, dann erscheint kein "Tour starten"-Button (analog zur bestehenden Leer-Zustand-Behandlung).
 
+### Button-Style & Standortbasierte Neuberechnung (Refine 2026-08-11)
+- [ ] Angenommen der "Tour starten"-Button wird angezeigt, wenn er dargestellt wird, dann ist er grün (Warenausgang-Farbe `#2FB344`, wiederverwendet statt neuem Farb-Token) mit einem Pfeil-Icon (`ArrowRight` aus lucide-react), um ihn optisch von anderen Aktions-Buttons abzuheben.
+- [ ] Angenommen der Fahrer bestätigt den Start-Dialog und der Browser liefert den Geräte-Standort, wenn die Bestätigung erfolgt, dann wird — bevor sich der Dialog schließt bzw. der Ladezustand endet — synchron eine vollständige Routen-Neuberechnung (PROJ-42-Engine) ausgelöst, mit dem Geräte-Standort als Startpunkt und dem tatsächlichen Bestätigungs-Zeitpunkt als Startzeit; der bestehende 30s-Cooldown aus PROJ-42 wird dabei bewusst umgangen.
+- [ ] Angenommen der Geräte-Standort ist beim Bestätigen nicht verfügbar (Berechtigung verweigert, GPS aus, Timeout), wenn die Bestätigung trotzdem erfolgt, dann wird ersatzweise das Depot als Startpunkt verwendet (weiterhin mit dem tatsächlichen Bestätigungs-Zeitpunkt als Startzeit statt fix 09:00) — der Tour-Start selbst (Zeitstempel setzen) schlägt in keinem Fall fehl, unabhängig vom Standort-Ergebnis.
+- [ ] Angenommen die Neuberechnung (mit welchem Startpunkt auch immer) schlägt fehl (z. B. Geoapify nicht erreichbar, ungültige Kundenadresse), wenn das passiert, dann wird der Fehler nur protokolliert — der Tour-Start selbst gilt trotzdem als erfolgreich, eine vorherige Berechnung bleibt unverändert stehen (gleiches Prinzip wie die bestehenden PROJ-42-Trigger).
+- [ ] Angenommen ein zweiter Tab/Browser versucht, dieselbe bereits gestartete Tour erneut zu starten (idempotenter Fall, kein echter Erst-Start), wenn das passiert, dann wird **keine** erneute Neuberechnung ausgelöst — nur der tatsächliche Erst-Start pro Fahrer+Tag löst sie aus.
+
 ## Edge Cases
 - Zwei Browser-Tabs/Geräte des gleichen Fahrers: Falls "Tour starten" in einem Tab geklickt wird, muss der zweite Tab nach einem Reload den bereits gesetzten Zeitstempel sehen (kein doppeltes Setzen, keine Race Condition — ein zweiter Klick darf keinen Fehler werfen bzw. der Button wird dann gar nicht mehr angezeigt).
 - Fahrer klickt "Tour starten", aber der Netzwerk-Request schlägt fehl: Fehlermeldung anzeigen, Button bleibt aktiv, kein stiller Fehlschlag.
 - Stopp wird als "Erledigt" markiert, obwohl die Tour (z. B. durch Direktzugriff ohne UI) nicht als gestartet gilt: Server-seitig muss dieser Fall abgefangen werden (keine Erledigt-Aktion ohne vorherigen Start), nicht nur UI-seitig gesperrt.
 - Sehr große Abweichung zwischen Ist- und Plan-Zeit (z. B. Stopp erst Stunden später abgeschlossen): Anzeige muss auch große Abweichungen (z. B. "> 2 Std. später") sinnvoll und ohne UI-Bruch darstellen.
 - Tour ohne jegliche Routenberechnung (keine `berechnete_ankunftszeit` für alle Stopps): "Tour starten" funktioniert trotzdem unabhängig davon — das Start-Gating hängt nicht an einer vorhandenen Routenberechnung.
+- **(Neu, 2026-08-11)** Fahrer reagiert nicht auf den Browser-eigenen Standort-Berechtigungs-Dialog (lässt ihn offen stehen): Der Ladezustand am Button/Dialog muss das sichtbar überbrücken (Timeout im Frontend, z. B. nach wenigen Sekunden auf den Depot-Fallback umschalten), kein unbegrenztes UI-Einfrieren.
+- **(Neu, 2026-08-11)** Fahrer startet die Tour, während gleichzeitig Fahrer/Datum eines Stopps derselben Gruppe über einen anderen PROJ-42-Auslöser geändert wird (Race Condition zwischen zwei Neuberechnungs-Triggern derselben Tourengruppe): letzter Schreibzugriff gewinnt, kein Locking (konsistent mit der bestehenden PROJ-42-Entscheidung) — für MVP akzeptiert.
 
 ## Technical Requirements (optional)
 - Security: Nur die Rolle Fahrer darf `gestartet_am` für die eigene Tour setzen (RLS-Policy, analog zu `markiereFahrtAlsErledigt`). Admin/Verwaltung liest, schreibt nicht.
@@ -58,7 +69,8 @@
 
 ## Open Questions
 - [x] Genaue DB-Modellierung von `gestartet_am` — entschieden in `/architecture`: eigene kleine Tabelle `tms.tour_starts`, keyed by Fahrer+Datum (siehe Tech Design unten). Kein Denormalisieren auf jede Stopp-Zeile.
-- [ ] Exakte Formulierung/Schwellenwerte für die Pünktlichkeits-Anzeige (ab wann "pünktlich" vs. "verspätet", z. B. Toleranzfenster von X Minuten) — bewusst offen gelassen für `/frontend` (reine Text-/Schwellenwert-Feinjustierung, keine Architektur-Auswirkung; die Berechnungsgrundlage selbst — Differenz zweier bestehender Zeitstempel — ist bereits im Tech Design festgelegt).
+- [x] Exakte Formulierung/Schwellenwerte für die Pünktlichkeits-Anzeige (ab wann "pünktlich" vs. "verspätet", z. B. Toleranzfenster von X Minuten) → gelöst in `/frontend` (2026-08-10): 0 Min Toleranz, ab 120 Min vereinfachte Anzeige "> 2 Std. später".
+- [ ] Exakter UX-Wortlaut/Timeout-Dauer für den Standort-Berechtigungs-Ladezustand am Button (z. B. "Standort wird ermittelt…", nach wie vielen Sekunden auf Depot-Fallback umschalten) — bewusst offen gelassen für `/frontend` (reine UX-Feinjustierung, keine Architektur-Auswirkung; die Fallback-Logik selbst ist bereits in den Acceptance Criteria festgelegt).
 
 ## Decision Log
 
@@ -68,11 +80,16 @@
 | Start-Zeitstempel + UI-Gating (Navi/Erledigt gesperrt bis Start), aber ohne Sequenz-Erzwingung zwischen Stopps | Nutzer wollte Freischaltung, aber bestehendes freies Abarbeiten der Stopps (keine Reihenfolge im Code) soll erhalten bleiben — Erzwingung wäre ein eigenständiges, größeres Thema | 2026-08-10 |
 | Kein separater "Angekommen"-Klick/-Status | Nutzer: "ist das gleiche" — die bestehende Erledigt-Aktion liefert bereits einen Ist-Zeitstempel (`abgeschlossen_am`), der für den Pünktlichkeits-Vergleich ausreicht; vermeidet eine zusätzliche Fahrer-Interaktion | 2026-08-10 |
 | Enum-Wert `unterwegs` bleibt ungenutzt; Stopp-Badges (Fällig/Überfällig/Erledigt) bleiben unverändert, Tour-Header zeigt zusätzlich "Gestartet um HH:MM" | Vermeidet Verwässerung der bestehenden Fällig/Überfällig-Logik, die eigenständigen Informationswert hat | 2026-08-10 |
-| Keine Geolocation-Erfassung beim Start | Nutzer bevorzugte Einfachheit gegenüber Konsistenz mit dem bestehenden `abschluss_lat/lon`-Muster; kein klarer Nutzen ohne konkreten Anwendungsfall | 2026-08-10 |
+| ~~Keine Geolocation-Erfassung beim Start~~ — **überholt, siehe Refine-Zeile unten (2026-08-11)** | Nutzer bevorzugte Einfachheit gegenüber Konsistenz mit dem bestehenden `abschluss_lat/lon`-Muster; kein klarer Nutzen ohne konkreten Anwendungsfall | 2026-08-10 |
 | Kein Undo für "Tour starten", aber Bestätigungsdialog vor dem Start | Konsistent zum bestehenden "Erledigt"-Verhalten (kein Undo); Bestätigungsdialog reduziert das Risiko eines versehentlichen Klicks von vornherein | 2026-08-10 |
 | Admin/Verwaltung nur lesend | Schreibzugriff für Admin wäre ein Recovery-Sonderfall, der die automatische Ist-Zeit verfälschen könnte — bewusst für ein späteres Feature vertagt | 2026-08-10 |
 | Status "problem" bewusst außerhalb des Scopes | Würde eigene UX-Überlegungen (Freitext/Kategorien, Benachrichtigungen) erfordern und den Rahmen sprengen — eigenes Folge-Feature | 2026-08-10 |
 | Vergleich Ist-vs-Plan sowohl im UI (Hinweis am Stopp) als auch als Rohdaten in der DB vorgehalten | Rohdaten kosten nichts extra (Zeitstempel ohnehin vorhanden) und sind Grundlage für PROJ-7 (Dashboard); sofortige UI-Anzeige gibt dem Fahrer direktes Feedback | 2026-08-10 |
+| **(Refine)** Kehrtwende: Standortbasierte Neuberechnung beim Tour-Start jetzt doch umgesetzt, entgegen der Entscheidung vom 2026-08-10 | User-Anforderung (2026-08-11): reale Ankunftszeiten sollen ab dem tatsächlichen Fahrer-Standort/-Zeitpunkt starten, nicht mehr nur ab der morgens fix berechneten Depot/09:00-Schätzung. Der frühere Verzicht war eine bewusste MVP-Vereinfachung, keine technische Unmöglichkeit — die parallel in PROJ-42 ergänzte generische Engine-Fähigkeit (optionaler Startpunkt/-zeit) macht die Umsetzung jetzt ohne den damals verworfenen Sonderweg (OSRM, eigene Tabelle) möglich | 2026-08-11 |
+| **(Refine)** Tour-Start-Button: Grün (Warenausgang-Farbe `#2FB344` wiederverwendet) + `ArrowRight`-Icon | Kein eigenständiges "Erfolg/Los"-Grün im Farbsystem vorhanden; Wiederverwendung der bestehenden Stationsfarbe vermeidet einen neuen Theme-Token für einen einzelnen Button | 2026-08-11 |
+| **(Refine)** Neuberechnung bei Tour-Start läuft synchron (Dialog/Ladezustand endet erst nach Abschluss), nicht fire-and-forget | User will "immer eine vollständige Neuberechnung" mit sofort sichtbarem Ergebnis; Tour-Start ist ein seltener, bewusster Klick pro Tag — Geoapify-Latenz (typ. 1–3s) ist dafür akzeptabel, analog zum bestehenden synchronen Muster in der Kartenansicht (PROJ-45) | 2026-08-11 |
+| **(Refine)** Fallback bei fehlendem Geräte-Standort beim Tour-Start: Depot (nicht "keine Neuberechnung") | Es gibt beim Tour-Start noch keinen sinnvolleren Referenzpunkt (kein Stopp bereits erledigt, anders als bei PROJ-44) | 2026-08-11 |
+| **(Refine)** Tour-Start umgeht den bestehenden 30s-Cooldown aus PROJ-42; andere PROJ-42-Auslöser (inkl. Erledigt-Klick aus PROJ-44) bleiben davon unberührt | Passt zum Wort "immer" in der Anforderung; ein Tour-Start pro Fahrer und Tag ist kein Kosten-Risiko | 2026-08-11 |
 
 ### Technical Decisions
 <!-- Added by /architecture -->
