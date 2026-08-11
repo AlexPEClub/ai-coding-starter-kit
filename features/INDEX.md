@@ -46,7 +46,7 @@
 | PROJ-43 | Globale Kundensuche + Umsatz-Caching | 🟢 Approved — 2 Bugs gefixt (High: Filter-Injection; Low: a11y). Mobile-Safari-Check steht noch aus. Details: `features/PROJ-43-globale-kundensuche-umsatz-caching.md` | 2026-08-03 |
 | PROJ-44 | Fahrer — Stopp-Detail-Modal (Ändern / Navi / Erledigt) | ✅ Deployed — Refine 2026-08-11: Erledigt löst jetzt standortbasierte Neuberechnung aus, Mobile-Rounding + Status-Animation ergänzt, Code-Umsetzung steht noch aus. Details: `features/PROJ-44-stopp-detail-modal.md` | 2026-08-11 |
 | PROJ-45 | Fahrer — Tour-Kartenansicht | ✅ Deployed — Refine 2026-08-11: doppeltes Schließen-X wird entfernt + Modal-Animation ergänzt, Code-Umsetzung steht noch aus. Details: `features/PROJ-45-fahrer-tour-kartenansicht.md` | 2026-08-11 |
-| PROJ-46 | Fahrer — Tour starten (Status-Wechsel) | ✅ Deployed — Refine 2026-08-11 QA bestanden: Button-Style (grün+Arrow), Geolocation mit Fallback, Neuberechnung idempotent, alle Tests grün. Details: `features/PROJ-46-tour-starten.md` | 2026-08-11 |
+| PROJ-46 | Fahrer — Tour starten (Status-Wechsel) | ✅ Deployed — Live seit 2026-08-11, Refine erfolgreich: Button-Style (grün+ArrowRight), Geolocation-Erfassung mit Fallback, standortbasierte Routenberechnung idempotent, Playwright-Tests bestanden. Details: `features/PROJ-46-tour-starten.md` | 2026-08-11 |
 | PROJ-47 | Fahrer — Live-KPIs während laufender Tour | ✅ Deployed — Live seit 2026-08-11. Docker-Deploy erfolgreich, Chromium-Smoke-Tests grün (5/5), keine Regressions. Details: `features/PROJ-47-live-kpis-laufende-tour.md` | 2026-08-11 |
 
 ## Architektur-Dokumente
