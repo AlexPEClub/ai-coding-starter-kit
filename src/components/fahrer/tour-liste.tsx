@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Map } from "lucide-react";
+import { CheckCircle2, Map, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -176,14 +176,53 @@ export function TourListe({
   }
 
   // PROJ-46: Tour-Start durchführen
+  // PROJ-46-Refine: Erfasse beim Start den Geräte-Standort, um eine Neuberechnung mit aktuellem Standort auszulösen
   async function handleTourStarten() {
     if (!tourStartBestaetigung?.fahrerId || !tourStartBestaetigung?.datum) return;
 
     setTourStartLaedt(true);
     setTourStartError(null);
 
+    // PROJ-46-Refine: Geolocation-Erfassung mit Timeout (5 Sekunden)
+    let startPunkt: { lat: number; lon: number } | null = null;
+
+    if (navigator.geolocation) {
+      try {
+        // Wrapper für Geolocation mit Timeout
+        const geolocationPromise = new Promise<GeolocationCoordinates | null>((resolve) => {
+          const timeoutId = setTimeout(() => {
+            resolve(null); // Timeout: null zurückgeben, nicht abbrechen
+          }, 5000);
+
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              clearTimeout(timeoutId);
+              resolve(position.coords);
+            },
+            () => {
+              // Fehler (Berechtigung verweigert, GPS aus, etc.): null zurückgeben
+              clearTimeout(timeoutId);
+              resolve(null);
+            }
+          );
+        });
+
+        const coords = await geolocationPromise;
+        if (coords) {
+          startPunkt = { lat: coords.latitude, lon: coords.longitude };
+        }
+      } catch {
+        // Fehler bei Geolocation-API: null, weitermachen mit Fallback
+      }
+    }
+
     try {
-      const result = await tourStarten(tourStartBestaetigung.fahrerId, tourStartBestaetigung.datum);
+      // PROJ-46-Refine: tourStarten wird mit optionalem startPunkt-Parameter aufgerufen
+      const result = await tourStarten(
+        tourStartBestaetigung.fahrerId,
+        tourStartBestaetigung.datum,
+        startPunkt || undefined
+      );
       if (!result.ok) {
         setTourStartError(result.error || "Fehler beim Starten der Tour.");
         setTourStartLaedt(false);
@@ -244,17 +283,19 @@ export function TourListe({
                     }
 
                     // Tour noch nicht gestartet: Button anzeigen
+                    // PROJ-46-Refine: Button-Style grün (#2FB344, Warenausgang-Farbe) + ArrowRight-Icon
                     return (
                       <Button
                         variant="default"
                         size="sm"
-                        className="shrink-0 min-h-[48px]"
+                        className="shrink-0 min-h-[48px] bg-[#2FB344] hover:bg-[#2FB344]/90 text-white"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleOeffneTourStartBestaetigung(tour.fahrerId, tour.datum);
                         }}
                       >
                         Tour starten
+                        <ArrowRight className="h-4 w-4" />
                       </Button>
                     );
                   })()
@@ -376,7 +417,7 @@ export function TourListe({
               onClick={handleTourStarten}
               disabled={tourStartLaedt}
             >
-              {tourStartLaedt ? "Lädt…" : "Tour starten"}
+              {tourStartLaedt ? "Standort wird ermittelt…" : "Tour starten"}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>

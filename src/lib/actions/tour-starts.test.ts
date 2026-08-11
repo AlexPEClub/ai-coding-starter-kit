@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 /**
  * PROJ-46: Tests für Tour-Start-Funktionen (vereinfacht).
  * Fokus auf Auth-Checks und Business-Logic.
+ * PROJ-46-Refine: Tests für standortbasierte Neuberechnung.
  */
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -17,18 +18,29 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => createAdminClientMock(),
 }));
 
+const loeseNeuberechnungAusMock = vi.fn();
+const leseDepotKoordinatenMock = vi.fn();
+vi.mock("@/lib/routing/tour-route", () => ({
+  loeseNeuberechnungAus: loeseNeuberechnungAusMock,
+  leseDepotKoordinaten: leseDepotKoordinatenMock,
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   createAdminClientMock.mockReturnValue({});
+  loeseNeuberechnungAusMock.mockResolvedValue(undefined);
+  leseDepotKoordinatenMock.mockReturnValue(null);
 });
 
-/** Baut einen Mock-AdminClient für die "tour_starts"-Tabelle (Insert-Ignore + Read). */
-function buildMockTourStartsClient(gestartetAm: string) {
+/** Baut einen Mock-AdminClient für die "tour_starts"-Tabelle (Insert-Ignore + Read).
+ * @param insertError - Falls gesetzt, simuliert Insert-Fehler (z.B. UNIQUE-Constraint bei idempotenten Aufrufen)
+ */
+function buildMockTourStartsClient(gestartetAm: string, insertError: Error | null = null) {
   return {
     from: vi.fn((table: string) => {
       if (table === "tour_starts") {
         return {
-          insert: vi.fn().mockResolvedValue({ error: null }),
+          insert: vi.fn().mockResolvedValue({ error: insertError }),
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               eq: vi.fn(() => ({
@@ -110,6 +122,98 @@ describe("tourStarten — PROJ-46", () => {
     const ergebnis = await tourStarten("fahrer-2", "2026-08-10");
 
     expect(ergebnis.ok).toBe(true);
+  });
+
+  // PROJ-46-Refine: Tests für standortbasierte Neuberechnung
+  it("löst Neuberechnung mit übergebenem startPunkt bei echtem Erst-Start aus", async () => {
+    getCurrentProfileMock.mockResolvedValue({ id: "fahrer-1", roles: ["fahrer"] });
+    const mockAdminClient = buildMockTourStartsClient("2026-08-10T06:00:00.000Z", null); // kein Insert-Error = Erst-Start
+    createAdminClientMock.mockReturnValue(mockAdminClient);
+
+    const { tourStarten } = await import("./fahrten");
+    const startPunkt = { lat: 51.5074, lon: -0.1278 };
+    const ergebnis = await tourStarten("fahrer-1", "2026-08-10", startPunkt);
+
+    expect(ergebnis.ok).toBe(true);
+    expect(loeseNeuberechnungAusMock).toHaveBeenCalledWith(
+      mockAdminClient,
+      [{ fahrerId: "fahrer-1", datum: "2026-08-10" }],
+      expect.objectContaining({
+        startPunkt: startPunkt,
+        umgeheCooldown: true,
+      })
+    );
+  });
+
+  it("nutzt Depot als Fallback wenn startPunkt fehlt aber Depot konfiguriert ist", async () => {
+    getCurrentProfileMock.mockResolvedValue({ id: "fahrer-1", roles: ["fahrer"] });
+    const mockAdminClient = buildMockTourStartsClient("2026-08-10T06:00:00.000Z", null);
+    createAdminClientMock.mockReturnValue(mockAdminClient);
+    const depotKoordinaten = { lat: 52.52, lon: 13.405 };
+    leseDepotKoordinatenMock.mockReturnValue(depotKoordinaten);
+
+    const { tourStarten } = await import("./fahrten");
+    const ergebnis = await tourStarten("fahrer-1", "2026-08-10", null); // kein startPunkt
+
+    expect(ergebnis.ok).toBe(true);
+    expect(loeseNeuberechnungAusMock).toHaveBeenCalledWith(
+      mockAdminClient,
+      [{ fahrerId: "fahrer-1", datum: "2026-08-10" }],
+      expect.objectContaining({
+        startPunkt: depotKoordinaten,
+        umgeheCooldown: true,
+      })
+    );
+  });
+
+  it("löst KEINE Neuberechnung aus bei idempotenten Aufruf (Tour war schon gestartet)", async () => {
+    getCurrentProfileMock.mockResolvedValue({ id: "fahrer-1", roles: ["fahrer"] });
+    const mockAdminClient = buildMockTourStartsClient(
+      "2026-08-10T06:00:00.000Z",
+      new Error("UNIQUE constraint violation") // Insert-Fehler = idempotenter Aufruf
+    );
+    createAdminClientMock.mockReturnValue(mockAdminClient);
+
+    const { tourStarten } = await import("./fahrten");
+    const startPunkt = { lat: 51.5074, lon: -0.1278 };
+    const ergebnis = await tourStarten("fahrer-1", "2026-08-10", startPunkt);
+
+    expect(ergebnis.ok).toBe(true);
+    expect(loeseNeuberechnungAusMock).not.toHaveBeenCalled();
+  });
+
+  it("Tour-Start bleibt erfolgreich auch wenn Neuberechnung fehlschlägt", async () => {
+    getCurrentProfileMock.mockResolvedValue({ id: "fahrer-1", roles: ["fahrer"] });
+    const mockAdminClient = buildMockTourStartsClient("2026-08-10T06:00:00.000Z", null);
+    createAdminClientMock.mockReturnValue(mockAdminClient);
+    const startPunkt = { lat: 51.5074, lon: -0.1278 };
+    loeseNeuberechnungAusMock.mockRejectedValue(new Error("Geoapify nicht erreichbar"));
+
+    const { tourStarten } = await import("./fahrten");
+    const ergebnis = await tourStarten("fahrer-1", "2026-08-10", startPunkt);
+
+    // Tour-Start selbst ist erfolgreich, Neuberechnung-Fehler wird ignoriert
+    expect(ergebnis.ok).toBe(true);
+  });
+
+  it("loggt Warnung wenn weder startPunkt noch Depot verfügbar", async () => {
+    getCurrentProfileMock.mockResolvedValue({ id: "fahrer-1", roles: ["fahrer"] });
+    const mockAdminClient = buildMockTourStartsClient("2026-08-10T06:00:00.000Z", null);
+    createAdminClientMock.mockReturnValue(mockAdminClient);
+    leseDepotKoordinatenMock.mockReturnValue(null); // Depot nicht konfiguriert
+
+    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { tourStarten } = await import("./fahrten");
+    const ergebnis = await tourStarten("fahrer-1", "2026-08-10", null);
+
+    expect(ergebnis.ok).toBe(true);
+    expect(loeseNeuberechnungAusMock).not.toHaveBeenCalled();
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Neuberechnung übersprungen")
+    );
+
+    consoleWarnSpy.mockRestore();
   });
 });
 

@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentProfile, type Profile } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { gruppiereZuTouren, type FahrerOption, type RohFahrt, type Tour } from "./fahrten-helpers";
-import { loeseNeuberechnungAus } from "@/lib/routing/tour-route";
+import { loeseNeuberechnungAus, leseDepotKoordinaten } from "@/lib/routing/tour-route";
 
 const NOTIZ_MAX_LAENGE = 500;
 
@@ -579,10 +579,19 @@ export type LadeTourStartsResult =
  * Zeitstempel zurück (kein Fehler, kein doppelter Eintrag).
  *
  * Der Datums-String muss im Format "YYYY-MM-DD" sein (DATE Datentyp in der DB).
+ *
+ * PROJ-46-Refine: Optionaler 3. Parameter `startPunkt` für standortbasierte
+ * Neuberechnung beim Tour-Start. Wenn vorhanden (echtes Geräte-Geolocation),
+ * wird nach dem erfolgreichen ersten Start eine vollständige Neuberechnung
+ * mit diesem Standort ausgelöst (umgeht den 30s-Cooldown). Falls `startPunkt`
+ * fehlt und Neuberechnung gewünscht, wird das Depot als Fallback verwendet.
+ * Neuberechnung läuft nur bei echtem Erst-Start (Insert erfolgreich), nicht
+ * bei idempotenten Wiederaufrufen (Konflikt = Tour war schon gestartet).
  */
 export async function tourStarten(
   fahrerId: string,
-  datum: string
+  datum: string,
+  startPunkt?: { lat: number; lon: number } | null
 ): Promise<TourStartResult> {
   const zugriff = await pruefeFahrerZugriff();
   if (!zugriff.ok) return zugriff;
@@ -595,11 +604,11 @@ export async function tourStarten(
 
   const adminClient = createAdminClient({ schema: "tms" });
 
-  // Idempotenter Insert + Read-Pattern:
+  // Idempotenter Insert + Read-Pattern mit Fehlerauswertung:
   // 1. Versuch den Eintrag einzufügen
-  // 2. Bei UNIQUE-Constraint-Konflikt ignorieren (der Eintrag existiert bereits)
-  // 3. Lese den Eintrag (neu eingefügt oder schon vorhanden)
-  await adminClient
+  // 2. Auswerten: Insert erfolgreich (null) oder UNIQUE-Constraint-Konflikt
+  // 3. Nur bei echtem Erst-Start: Neuberechnung auslösen
+  const { error: insertError } = await adminClient
     .from("tour_starts")
     .insert({
       fahrer_id: fahrerId,
@@ -607,8 +616,12 @@ export async function tourStarten(
       // gestartet_am: wird von der DB mit now() gesetzt
       erstellt_von: profile.id,
     });
-  // Fehler bei Insert ignorieren (könnte UNIQUE-Violation sein, das ist ok)
 
+  // Echtem Erst-Start = kein Insert-Fehler (insertError === null)
+  // Idempotenter Wiederaufruf = UNIQUE-Constraint-Konflikt (insertError !== null)
+  const istEchterErstStart = !insertError;
+
+  // Lese den Eintrag (neu eingefügt oder schon vorhanden)
   const { data: tourStart, error: leseFehler } = await adminClient
     .from("tour_starts")
     .select("gestartet_am")
@@ -619,6 +632,38 @@ export async function tourStarten(
   if (leseFehler || !tourStart) {
     console.error("tourStarten (read after insert) error:", leseFehler);
     return { ok: false, error: "Tour-Start konnte nicht gespeichert werden." };
+  }
+
+  // PROJ-46-Refine: Nur bei echtem Erst-Start Neuberechnung auslösen
+  // (nicht bei idempotenten Wiederaufrufen aus zwei Tabs/Browsern)
+  if (istEchterErstStart) {
+    // Bestimme den Startpunkt: übergeben → Fallback zu Depot → kein Start
+    let neuberechnungsStartPunkt = startPunkt ?? leseDepotKoordinaten() ?? undefined;
+
+    if (neuberechnungsStartPunkt) {
+      try {
+        // Neuberechnung mit aktuellem Standort/Zeit, umgeht den Cooldown
+        // Läuft synchron (Dialog-Ladezustand endet erst danach), aber Fehler werden abgefangen
+        await loeseNeuberechnungAus(adminClient, [{ fahrerId, datum }], {
+          startPunkt: neuberechnungsStartPunkt,
+          startZeit: new Date(),
+          umgeheCooldown: true,
+        });
+      } catch (fehler) {
+        // Neuberechnung ist fehlgeschlagen, aber Tour-Start bleibt erfolgreich
+        // Fehler wird nur protokolliert (loeseNeuberechnungAus wirft normalerweise nie,
+        // aber wenn doch, blockiert es nicht den Tour-Start)
+        console.error(
+          `tourStarten: Neuberechnung fehlgeschlagen für Fahrer ${fahrerId} / ${datum}:`,
+          fehler
+        );
+      }
+    } else {
+      // Weder Standort noch Depot verfügbar: nur loggen, Tour-Start bleibt erfolgreich
+      console.warn(
+        `tourStarten: Neuberechnung übersprungen für Fahrer ${fahrerId} / ${datum} — kein Standort und Depot nicht konfiguriert.`
+      );
+    }
   }
 
   revalidatePath("/fahrer");

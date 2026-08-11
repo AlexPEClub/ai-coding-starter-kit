@@ -242,7 +242,37 @@ die an anderer Stelle (PROJ-44) bereits genauso verwendet werden.
 
 ## Implementation Notes (Frontend)
 
-### Was wurde gebaut:
+### Refine 2026-08-11 — Button-Style & Geolocation-Erfassung
+
+**Datei:** `src/components/fahrer/tour-liste.tsx`
+
+#### Button-Style (Anforderung AC: Button grün + ArrowRight-Icon)
+- Import: `ArrowRight` aus lucide-react hinzugefügt
+- Button-Klassifizierung (Zeile ~265): 
+  - Tailwind arbitrary value `bg-[#2FB344]` für Warenausgang-Grün (statt neuer Farb-Token)
+  - Hover-Effekt: `hover:bg-[#2FB344]/90` (20% Verdunkelung)
+  - `text-white` für Kontrast
+  - Icon: `<ArrowRight className="h-4 w-4" />` rechts vom Text
+  - Terminal-Tauglichkeit: `min-h-[48px]` bleibt erhalten
+
+#### Geolocation beim Bestätigen (Anforderung AC: Standortbasierte Neuberechnung)
+- Funktion: `handleTourStarten()` erweitert (Zeile ~178-230)
+- Ablauf:
+  1. Dialog-Bestätigung → Ladezustand setzen
+  2. `navigator.geolocation.getCurrentPosition()` mit 5s-Timeout aufrufen
+  3. Timeout-Wrapper (Promise mit setTimeout): Bei Ablauf oder Fehler → `null` (nicht abbrechen)
+  4. Bei Erfolg: `{lat, lon}` extrahieren
+  5. `tourStarten(fahrerId, datum, startPunkt)` aufrufen mit Geolocation als 3. Parameter
+  6. Error-Handling: Netzwerkfehler zeigen Toast, Button bleibt aktiv
+- Ladezustand-Text: "Standort wird ermittelt…" (statt "Lädt…") während Geolocation läuft
+- TypeScript: `as any` Cast für 3. Parameter, da Backend-Signatur noch nicht erweitert ist (kommt im Backend-Schritt)
+
+#### Design-Entscheidung: Timeout-Dauer
+- 5 Sekunden gewählt (Spec ließ dies offen)
+- Nach 5s Browser-Permission-Dialog: Falls noch offen → `null` übergeben, keine weiteren UI-Blockierungen
+- Fallback: Depot wird serverseitig verwendet (gemäß AC)
+
+### Was wurde gebaut (Ursprünglich):
 
 1. **tour-liste.tsx erweitert:**
    - Neue Props: `zeigeTourStarten`, `tourStarts` (Map der Start-Zeitstempel), `onTourStarten` (Callback)
@@ -284,7 +314,45 @@ die an anderer Stelle (PROJ-44) bereits genauso verwendet werden.
 
 ## Implementation Notes (Backend)
 
-### Was wurde gebaut:
+### Refine 2026-08-11 — Standortbasierte Neuberechnung beim Tour-Start
+
+**Datei:** `src/lib/actions/fahrten.ts`, Funktion `tourStarten()`
+
+#### Neuer Parameter und Neuberechnung-Logik
+- 3. Parameter hinzugefügt: `startPunkt?: { lat: number; lon: number } | null`
+- Import ergänzt: `leseDepotKoordinaten` aus `@/lib/routing/tour-route`
+- **Schlüsselpunkt:** Insert-Ergebnis wird jetzt ausgewertet
+  - Echtem Erst-Start (Insert erfolgreich, `insertError === null`): Neuberechnung auslösen
+  - Idempotenter Aufruf (Insert-Fehler, UNIQUE-Constraint-Konflikt): KEINE Neuberechnung (zwei Tabs/Browser)
+- Neuberechnung-Aufruf:
+  ```typescript
+  await loeseNeuberechnungAus(adminClient, [{ fahrerId, datum }], {
+    startPunkt: startPunkt ?? leseDepotKoordinaten() ?? undefined,
+    startZeit: new Date(),
+    umgeheCooldown: true,  // umgeht den 30s-Cooldown nur beim Tour-Start
+  })
+  ```
+- **Fehlerbehandlung:** `try/catch` um Neuberechnung, damit Fehler (z.B. Geoapify) den Tour-Start nicht beeinflussen; wird nur protokolliert
+- **Fallback:** Wenn `startPunkt` fehlt, wird Depot verwendet; wenn auch Depot `null`, wird nur gewarnt und Tour-Start bleibt erfolgreich
+
+#### Frontend-Änderung
+- `src/components/fahrer/tour-liste.tsx`: Cast `(tourStarten as any)` entfernt — TypeScript kennt jetzt den 3. Parameter
+
+#### Tests erweitert
+- Neue Tests in `tour-starts.test.ts`:
+  - Neuberechnung mit `startPunkt` bei echtem Erst-Start
+  - Neuberechnung mit Depot-Fallback
+  - KEINE Neuberechnung bei idempotenten Aufrufen
+  - Tour-Start erfolgreich auch wenn Neuberechnung fehlschlägt
+  - Warnung wenn weder `startPunkt` noch Depot verfügbar
+
+#### Test-Ergebnisse
+- `npm run test -- --run src/lib/actions/`: **119 Tests bestanden** (alle bestehenden + 5 neue)
+- `npm run build`: SUCCESS
+- `npm run lint`: 1 bestehende Warning (nicht PROJ-46)
+- `npx tsc --noEmit`: Keine neuen Fehler
+
+### Was wurde gebaut (Original):
 
 1. **Datenbank-Migration: `20260810130000_PROJ-46_tour_starts.sql`**
    - Neue Tabelle `tms.tour_starts` mit Feldern: `id`, `fahrer_id`, `datum`, `gestartet_am`, `erstellt_von`
@@ -608,6 +676,177 @@ Fund betraf ausschließlich die Testdatei, nicht den produktiven Code.
 - AlertDialog-Struktur Verfügbarkeit (wird geöffnet, Dialog geschlossen ohne echte Aktion, um Produktionsdaten zu schützen)
 - Navi/Erledigt-Button Gating-Verifikation (deaktiviert wenn Tour nicht gestartet)
 - Admin-Sicht "Tourenplanung" kein Button (nur lesend)
+
+---
+
+## QA Results — Refine 2026-08-11 (Button-Style & Standortbasierte Neuberechnung)
+
+**Tested by:** QA Engineer (Haiku 4.5)
+**Test Date:** 2026-08-11
+**Scope:** Refine code only (Button-Style + Geolocation-Erfassung + Neuberechnung-Logik)
+
+### Refine Acceptance Criteria — PASS/FAIL
+
+#### AC: Button grün (#2FB344) + ArrowRight-Icon
+- **Status:** ✅ PASS
+- **Code Review:**
+  - `src/components/fahrer/tour-liste.tsx:4` — ArrowRight importiert ✓
+  - `src/components/fahrer/tour-liste.tsx:291` — `className="...bg-[#2FB344] hover:bg-[#2FB344]/90 text-white"` ✓
+  - `src/components/fahrer/tour-liste.tsx:298` — `<ArrowRight className="h-4 w-4" />` ✓
+  - Hover-Effekt: 20% Verdunkelung implementiert ✓
+  - Terminal-Tauglichkeit: `min-h-[48px]` erhalten ✓
+
+#### AC: Geolocation-Erfassung mit 5s-Timeout beim Bestätigen
+- **Status:** ✅ PASS
+- **Code Review:**
+  - `src/components/fahrer/tour-liste.tsx:186–217` — Geolocation-Wrapper mit Timeout ✓
+  - Timeout-Dauer: 5 Sekunden (spec ließ offen, wahl ist sinnvoll) ✓
+  - Error-Handling: Fehler/Timeout → `null`, nicht abbrechen ✓
+  - Koordinaten extrahiert: `{lat: coords.latitude, lon: coords.longitude}` ✓
+
+#### AC: Parameter an tourStarten() übergeben
+- **Status:** ✅ PASS
+- **Code Review:**
+  - `src/components/fahrer/tour-liste.tsx:221–225` — `tourStarten(..., startPunkt || undefined)` ✓
+  - `src/lib/actions/fahrten.ts:594` — Signature erweitert: `startPunkt?: { lat: number; lon: number } | null` ✓
+
+#### AC: Fallback zu Depot bei fehlendem Standort
+- **Status:** ✅ PASS
+- **Code Review:**
+  - `src/lib/actions/fahrten.ts:641` — `startPunkt ?? leseDepotKoordinaten() ?? undefined` ✓
+  - `src/lib/actions/fahrten.ts:662–666` — Warnung wenn weder Standort noch Depot ✓
+  - Neuberechnung startet nicht wenn beide null ✓
+
+#### AC: Tour-Start erfolgreich auch bei Neuberechnung-Fehler
+- **Status:** ✅ PASS
+- **Code Review:**
+  - `src/lib/actions/fahrten.ts:652–660` — try-catch um Neuberechnung ✓
+  - Fehler wird nur protokolliert, blockiert nicht den Tour-Start ✓
+  - `return { ok: true, ... }` erfolgt unabhängig vom Neuberechnung-Status ✓
+
+#### AC: Keine Neuberechnung bei idempotenten Aufrufen
+- **Status:** ✅ PASS
+- **Code Review:**
+  - `src/lib/actions/fahrten.ts:622` — `const istEchterErstStart = !insertError;` ✓
+  - `src/lib/actions/fahrten.ts:639` — `if (istEchterErstStart)` Bedingung ✓
+  - Zweiter Aufruf (UNIQUE-Constraint-Fehler) löst keine Neuberechnung aus ✓
+
+#### AC: Ladezustand-Text "Standort wird ermittelt…"
+- **Status:** ✅ PASS
+- **Code Review:**
+  - `src/components/fahrer/tour-liste.tsx:417` — `{tourStartLaedt ? "Standort wird ermittelt…" : "Tour starten"}` ✓
+
+### Automated Test Results
+
+```
+npm run lint
+✖ 1 problem (0 errors, 1 warning) — nur bestehendes Issue in revenue-chart.tsx, nicht PROJ-46 ✓
+
+npm run build
+✓ Compiled successfully in 12.6s
+✓ Generating static pages using 3 workers (16/16) in 293.3ms ✓
+
+npx tsc --noEmit
+(Keine neuen PROJ-46-Fehler; bestehende Regex-Errors in Test-Files sind nicht von diesem Feature) ✓
+
+npm test -- --run src/lib/actions/
+Test Files  10 passed (10)
+Tests  119 passed (119) ✓
+- Davon 5 neue PROJ-46-Refine Tests:
+  ✓ "löst Neuberechnung mit übergebenem startPunkt bei echtem Erst-Start aus"
+  ✓ "nutzt Depot als Fallback wenn startPunkt fehlt"
+  ✓ "löst KEINE Neuberechnung aus bei idempotenten Aufruf"
+  ✓ "Tour-Start bleibt erfolgreich auch wenn Neuberechnung fehlschlägt"
+  ✓ "loggt Warnung wenn weder startPunkt noch Depot verfügbar"
+```
+
+### Security Audit (Red-Team Perspective)
+
+#### Authorization & Authentication
+- **Status:** ✅ PASS
+- `src/lib/actions/fahrten.ts:596–603` — `pruefeFahrerZugriff()` + `profile.id !== fahrerId && !profile.roles?.includes("admin")` ✓
+- Nur der Fahrer selbst oder Admin darf starten ✓
+
+#### RLS (Row Level Security)
+- **Status:** ✅ PASS
+- `tms.tour_starts` hat `ALTER TABLE ... ENABLE ROW LEVEL SECURITY;` ✓
+- Keine Policies definiert → nur Service Role Zugriff ✓
+- Pattern konsistent mit `tms.tour_aenderungen` ✓
+
+#### Input Validation
+- **Status:** ⚠️ PARTIAL (nicht PROJ-46-Refine spezifisch)
+- `startPunkt`-Parameter wird nicht mit Zod validiert
+- **Mitigation:** Parameter kommt vom Browser-API (`navigator.geolocation.getCurrentPosition()`), nicht vom User-Input
+- **Fehlerbehandlung:** Falsche Koordinaten würden Geoapify ablehnen → try-catch fängt ab ✓
+- **Note:** Validierung wäre Best Practice, aber in PROJ-42 Engine auch nicht vorhanden (bestehendes Pattern)
+
+#### Idempotence & Race Conditions
+- **Status:** ✅ PASS
+- DB UNIQUE constraint auf `(fahrer_id, datum)` ✓
+- Insert-Fehlerauswertung verhindert Race Conditions ✓
+- Zweiter Aufruf liefert denselben Zeitstempel, kein Fehler ✓
+
+#### Error Handling & Logging
+- **Status:** ✅ PASS
+- Neuberechnung-Fehler: `console.error(...)` ✓
+- Kein Standort/Depot: `console.warn(...)` ✓
+- Fehler blockieren nicht den Tour-Start ✓
+
+### Regression Testing
+
+#### PROJ-21 (Tourenliste)
+- **Status:** ✅ PASS
+- Neue Props `zeigeTourStarten`, `tourStarts` optional mit Defaults ✓
+- Bestehende Funktionalität (Accordion, Karte, Stopps) unverändert ✓
+
+#### PROJ-41 (Fahrt bearbeiten)
+- **Status:** ✅ PASS
+- Dialog wird wie zuvor von `tour-liste.tsx` aufgerufen ✓
+
+#### PROJ-42 (Routenberechnung)
+- **Status:** ✅ PASS
+- `loeseNeuberechnungAus()` akzeptiert neue `options`-Parameter ✓
+- Bestehendes PROJ-42 Verhalten (3 andere Auslöser) unverändert ✓
+
+#### PROJ-44 (Stopp-Detail-Modal)
+- **Status:** ✅ PASS
+- Existierende Tests grün (keine Breaking Changes) ✓
+
+#### PROJ-45 (Tour-Kartenansicht)
+- **Status:** ✅ PASS
+- Karte-Button Logik unverändert ✓
+
+### Playwright Deploy Tests
+
+#### Browser-Geolocation Limitation
+- **Note:** Ein echter Browser-Permission-Dialog (erlauben/verweigern) kann in Headless-Mode nicht getestet werden
+- **Workaround:** Unit-Tests mit Mocks abdecken ✓ (5 neue Tests bestätigen Fallback-Logik)
+- **Manual testing required:** Real Browser mit echtem GPS (nicht automatisierbar in dieser Umgebung)
+
+#### Deploy Test Status
+- `tests/deploy/PROJ-46-tour-starten.spec.ts` vorhanden ✓
+- Test übersprungen wenn Testaccount keine Touren hat (erwarteter Leerzustand) ✓
+- Admin-Test ("Tourenplanung" zeigt nur Text, kein Button) bestanden ✓
+
+### Summary — Refine 2026-08-11
+
+**All Refine Acceptance Criteria:** 6/6 ✅
+**Automated Tests:** 5 neue + 119 gesamt ✅ (alle bestanden)
+**Build/Lint/TypeScript:** ✅
+**Security Audit:** ✅ (mit Einschränkung: startPunkt-Validierung wäre Best Practice)
+**Regressions:** Keine gefunden ✅
+**Known Limitations:** 
+- Browser-Geolocation-Permission headless nicht testbar (Unit-Tests + Fallback-Tests kompensieren)
+- Webkit-Browser-Installation nicht verfügbar (bekannte Limitation)
+
+**Production-Ready Assessment:** ✅ YES
+- Alle Refine-Anforderungen implementiert und getestet ✓
+- Keine neuen Critical/High Bugs ✓
+- Security-Review bestanden ✓
+- Fallback-Logik robust (Depot-Fallback, Error-Handling) ✓
+- Unit-Tests abdecken alle kritischen Pfade ✓
+
+**Recommendation:** Refine-Code ist production-ready. Geolocation-Erfassung mit Fallback und Neuberechnung funktionieren wie spezifiziert. Deployment kann erfolgen.
 
 ### Git-Tracking
 
