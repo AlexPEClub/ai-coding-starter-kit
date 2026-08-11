@@ -2,7 +2,7 @@
 
 ## Status: ✅ Deployed — Refine-Bugfix live seit 2026-08-08 (Marker-SVG-Encoding, route_geometry, Name-Labels, Fallback-Linie)
 **Created:** 2026-08-05
-**Last Updated:** 2026-08-08 (Refine-Redeploy: SVG-Encoding + route_geometry Fixes, Git-Tag v1.45.2-PROJ-45)
+**Last Updated:** 2026-08-11 (Refine: doppeltes Schließen-X entfernen, Modal-Enter/Exit-Animation)
 **Initial Deployment:** 2026-08-08 (with critical button-nesting bug)
 **Bugfix Deployment:** 2026-08-08 (Commit d31acd3, tag v1.45.1-PROJ-45, live-verified)
 **Refine-Bugfix Deployment:** 2026-08-08 (Commit 10a2a41, tag v1.45.2-PROJ-45, Marker + route_geometry + Labels + Fallback fixes)
@@ -21,6 +21,8 @@
 - Als Fahrer möchte ich von der Karte direkt einen Stopp antippen können und dessen Details (Navi, Erledigt) öffnen, damit ich nicht zwischen Karte und Liste wechseln muss.
 - Als Admin möchte ich mir auf der Karte auch die Touren anderer Fahrer ansehen können (Tab "Tourenplanung"), damit ich den geplanten Verlauf einer Tour prüfen kann.
 - Als Fahrer möchte ich eine klare Meldung sehen, wenn die Karte gerade nicht angezeigt werden kann (z. B. wegen Netzproblemen), damit ich weiß, dass es kein Bedienfehler ist und ich es erneut versuchen kann.
+- **(Neu, 2026-08-11)** Als Fahrer möchte ich nur einen einzigen, eindeutigen Schließen-Button auf der Kartenansicht sehen, damit ich nicht irritiert bin, welches der beiden "X" tatsächlich funktioniert.
+- **(Neu, 2026-08-11)** Als Fahrer möchte ich, dass sich die Kartenansicht beim Öffnen/Schließen weich einblendet statt abrupt zu erscheinen, damit sich die Bedienung moderner und weniger ruckartig anfühlt.
 
 ## Out of Scope
 - Offline-Fähigkeit der Karte (Kartenkacheln-Caching, Nutzung ohne Internetverbindung) — bewusst nicht im MVP, da deutlich größerer Scope
@@ -45,6 +47,10 @@
 - [ ] Angenommen die Kartenansicht ist geöffnet, wenn der Fahrer sie schließt (z. B. über einen Schließen-Button), dann kehrt er zur Tourenliste zurück, ohne dass sich am Zustand der Tour etwas geändert hat
 - [ ] Angenommen die Kartenansicht ist offen, wenn der Fahrer auf die Marker schaut, dann ist der Name jedes Stopps dauerhaft als Label neben dem Marker sichtbar, ohne dass er den Marker antippen muss (Refine 2026-08-08)
 - [ ] Angenommen für eine Tour konnte keine echte Straßenroute ermittelt werden (z. B. weil der Kartenanbieter keine Geometrie liefert), wenn die Karte geöffnet wird, dann werden die Stopps trotzdem durch eine gerade Verbindungslinie in der berechneten Reihenfolge verbunden, statt ganz ohne Linie dargestellt zu werden (Refine 2026-08-08)
+
+### Ein Schließen-Button & Animation (Refine 2026-08-11)
+- [ ] Angenommen die Kartenansicht ist geöffnet, dann ist genau ein Schließen-Symbol ("X") sichtbar (nicht zwei) — der zusätzliche, manuell im Header eingebaute Button wird entfernt, das automatische Schließen-Symbol des Dialog-Bausteins bleibt die einzige Schließen-Option.
+- [ ] Angenommen die Kartenansicht wird geöffnet oder geschlossen, dann läuft ein kurzer, weicher Übergang (Ein-/Ausblenden) statt eines abrupten Erscheinens/Verschwindens.
 
 ## Edge Cases
 - Tour mit nur einem Stopp: Karte zeigt Depot + 1 nummerierten Marker + Route dazwischen — kein Sonderfall.
@@ -81,6 +87,8 @@
 | Rollen-Sichtbarkeit des Buttons = bestehende Fahrer/Admin-Beschränkung von `/fahrer` (keine neue Rollenlogik) | `/fahrer` ist bereits auf Rollen `fahrer` und `admin` beschränkt (`src/app/(app)/fahrer/page.tsx`); keine Notwendigkeit für ein neues Rollen-Gate | 2026-08-05 |
 | Name-Label dauerhaft sichtbar neben jedem Marker statt nur bei Tap | User-Entscheidung im Refine 2026-08-08: Übersicht auf einen Blick ist wichtiger als eine visuell ruhigere Karte, auch bei ~25 Stopps wird das akzeptiert | 2026-08-08 |
 | Fallback: gerade Verbindungslinie zwischen den Stopps, wenn keine echte Straßenroute ermittelt werden kann | User-Entscheidung im Refine 2026-08-08: eine (gestrichelte) Gerade ist besser als gar keine Linie — der grobe Verlauf soll immer erkennbar sein, auch wenn der Kartenanbieter ausnahmsweise keine Geometrie liefert | 2026-08-08 |
+| **(Refine)** Manuellen zweiten Schließen-Button im `DialogHeader` entfernen, nur das automatische shadcn-Schließen-Symbol behalten | User meldete zwei sichtbare "X" beim Öffnen der Karte; Root Cause: `tour-karte-modal.tsx` fügt zusätzlich zum automatischen `DialogPrimitive.Close` (aus der shadcn-Basis `dialog.tsx`) einen eigenen `<Button><X/></Button>` im Header ein. Die anderen beiden Fahrer-Modals (PROJ-44, PROJ-41) haben dieses Problem nicht, da sie kein eigenes zweites X einbauen | 2026-08-11 |
+| **(Refine)** Modal-Enter/Exit-Animation ergänzen (framer-motion, nur Opacity/leichter Translate) | Deckt den generellen Design-Wunsch nach "mehr Animationen" für die Fahrer-Oberfläche ab, ohne die bestehende Radix/shadcn-Öffnungslogik zu ersetzen | 2026-08-11 |
 
 ### Technical Decisions
 <!-- Added by /architecture -->
