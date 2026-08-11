@@ -2,7 +2,7 @@
 
 ## Status: Deployed
 **Created:** 2026-08-01
-**Last Updated:** 2026-08-02
+**Last Updated:** 2026-08-11 (Refine: Mobile-Rounding-Konsistenz)
 
 > Folge-Baustein zu PROJ-21 (Fahrer — Tourenliste, nur Anzeige, bereits deployed).
 > Dort waren Stopps innerhalb einer Tour bewusst rein informativ — Bearbeiten war
@@ -28,6 +28,10 @@
 - Als Fahrer/Admin möchte ich sehen, wer wann was an einem Stopp geändert hat,
   damit ich nachvollziehen kann, warum sich etwas geändert hat, ohne extra
   nachfragen zu müssen.
+- **(Neu, 2026-08-11)** Als Fahrer möchte ich, dass der Bearbeiten-Dialog auf
+  dem Smartphone genauso gut aussieht wie auf dem Desktop (runde Ecken,
+  passende Abstände), damit die Bedienung am Terminal/Tablet nicht "kaputt"
+  wirkt.
 
 ## Out of Scope
 - **Status ändern** (Geplant/Unterwegs/Angekommen/Problem) — weiterhin eigener
@@ -110,6 +114,9 @@
   den ein Kollege zuletzt geändert hat, wenn der Verlauf angezeigt wird, dann
   sieht er dieselben Einträge wie ein Admin (keine Einschränkung).
 
+### Mobile-Styling (Refine 2026-08-11)
+- [ ] Angenommen der Bearbeiten-Dialog wird auf einem schmalen Bildschirm (Mobile) angezeigt, dann hat er dieselben runden Ecken (`rounded-2xl`) wie auf Desktop und angepasste Innenabstände für kleine Displays — kein visueller Bruch zwischen Mobile und Desktop.
+
 ## Edge Cases
 - **Gleichzeitiges Bearbeiten:** Zwei Nutzer bearbeiten denselben Stopp
   gleichzeitig — kein Konflikt-Hinweis, letzter Speicherstand gewinnt
@@ -159,6 +166,7 @@
 | Verlauf für Fahrer + Admin gleichermaßen sichtbar | Konsistent mit der bestehenden Transparenz-Philosophie der Seite | 2026-08-01 |
 | Verlauf protokolliert nur tatsächlich geänderte Felder mit altem+neuem Wert, kein Komplett-Schnappschuss aller Felder je Speicherung | Vermeidet Rauschen im Verlauf — nur relevante Änderungen sind sichtbar | 2026-08-01 |
 | Letzter Speicherstand gewinnt bei gleichzeitigem Bearbeiten, kein Konflikt-Warnhinweis | User-Entscheidung — bei 5–10 Fahrern und seltenen gleichzeitigen Bearbeitungen ist das Risiko vernachlässigbar, der Verlauf macht Änderungen im Nachhinein nachvollziehbar | 2026-08-01 |
+| **(Refine)** Dialog bekommt konsistente `rounded-2xl`-Rundung auch auf Mobile (statt `sm:rounded-lg` aus der shadcn-Basis) | Entspricht der Design-System-Vorgabe (`docs/design-system.md`, Radien-Regel) und der bereits so umgesetzten Kartenansicht (PROJ-45) — Inkonsistenz zwischen den Fahrer-Modalen wird behoben | 2026-08-11 |
 
 ### Technical Decisions
 <!-- Added by /architecture -->
