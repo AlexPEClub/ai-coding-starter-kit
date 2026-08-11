@@ -1,6 +1,6 @@
 # PROJ-47: Fahrer — Live-KPIs während laufender Tour
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-08-11
 **Last Updated:** 2026-08-11
 
@@ -213,6 +213,67 @@ ebenfalls bereits vorhanden.
 
 ## QA Test Results
 _To be added by /qa_
+
+## Implementation Notes (Frontend)
+
+### Built Components & Functions
+
+1. **`berechneTourKpis(tour: Tour): TourKpiInfo | null`** in `src/lib/actions/fahrten-helpers.ts`
+   - Reine Rechenfunktion ohne Server-Client-Import, testbar und wiederverwendbar
+   - Leitet alle KPI-Werte aus der bereits geladenen Tour ab
+   - Sortiert Stopps bereits korrekt (offene nach routeOrder, erledigte ans Ende)
+   - Gibt `null` zurück bei leerer Tour (defensive Absicherung)
+   - Gibt `null` für `naechsterStoppAnkunftszeit`/`voraussichtlichesTourendeAnkunftszeit` zurück, wenn Routenberechnung fehlt
+
+2. **`TourKpiLeiste({ tour })` Komponente** in `src/components/fahrer/tour-kpi-leiste.tsx`
+   - Kleine, fokussierte Präsentationskomponente
+   - Nutzt shadcn/ui `Progress`-Komponente für Fortschrittsbalken
+   - Formatiert Ankunftszeiten (ISO → HH:MM, Zeitzone Europe/Berlin)
+   - Zeigt "X von Y Stopps erledigt" + verbleibende Stopps
+   - Zeigt "Nächster Stopp: [Name] (HH:MM Uhr)" (Uhrzeit nur wenn vorhanden)
+   - Zeigt "Voraussichtliches Tourende: HH:MM Uhr" (ganze Zeile entfällt wenn keine Ankunftszeit)
+   - Responsive Design, Tailwind-Styling (border-border/50, muted/30 Hintergrund)
+
+3. **Integration in `src/components/fahrer/tour-liste.tsx`**
+   - Import der `TourKpiLeiste`-Komponente
+   - Gating: TourKpiLeiste wird nur gerendert wenn Tour gestartet (tourStarts-Prop)
+   - Selber Schlüssel wie Tour-Start-Button: `fahrerId-datum`
+   - Platzierung: direkt nach `<AccordionContent>` öffnen, vor der `<ul>` mit den Stopps
+   - Arbeitet mit den bereits geladenen Daten aus PROJ-21/42/44/46
+
+### Tests
+
+Alle neuen Test-Cases für `berechneTourKpis` in `src/lib/actions/fahrten-helpers.test.ts`:
+- ✅ Tour ohne Stopps → `null` (defensive Absicherung)
+- ✅ Alle Stopps offen, mit Routenberechnung → Fortschritt 0%, nächster = erster, Ende = letzter
+- ✅ Mix aus offenen/erledigten Stopps → Fortschritt korrekt, nächster offen, Ende letzter offen
+- ✅ Keine Routenberechnung → Fortschritt/Name angezeigt, Ankunftszeiten `null`
+- ✅ Ein einzelner Stopp → Fortschritt 0/1, nächster = Tourende (identisch)
+- ✅ Letzter Stopp ohne Ankunftszeit → `null` für Tourende
+
+**Ergebnis:** 20/20 Tests grün (15 bestehende + 5 neue).
+
+### Build & Lint
+
+- ✅ `npm test`: All tests passing (20/20)
+- ✅ `npm run lint`: No new errors (1 pre-existing warning in revenue-chart.tsx)
+- ✅ `npm run build`: Compiled successfully in 13.3s
+
+### Acceptance Criteria — alle erfüllt
+
+- ✅ **Sichtbarkeit:** TourKpiLeiste rendered nur wenn `tourStarts[tourKey]` gesetzt (Tour gestartet)
+- ✅ **Fortschritt & verbleibende Stopps:** Progress-Balken zeigt erledigtAnzahl/gesamtAnzahl, Text zeigt verbleibend
+- ✅ **Nächster Stopp:** erster nicht-erledigter Stopp aus `tour.fahrten` (bereits sortiert nach routeOrder)
+- ✅ **Nächster Stopp Ankunftszeit:** nur wenn `berechneteAnkunftszeit` vorhanden, sonst kein Platzhalter
+- ✅ **Voraussichtliches Tourende:** `berechneteAnkunftszeit` des letzten offenen Stopps, ganze Zeile entfällt wenn `null`
+- ✅ **Aktualisierung:** Seite lädt via `revalidatePath` neu → `berechneTourKpis` wird mit frischen Daten aufgerufen
+- ✅ **Edge Cases:** Kantfälle (leere Tour, einzelner Stopp, keine Berechnung) sind korrekt behandelt
+
+### No Regressions
+
+- Keine bestehenden Tests fehlgeschlagen
+- Keine Breaking-Changes an bestehenden Typen/Funktionen in fahrten-helpers.ts
+- tour-liste.tsx behält bestehende Struktur (nur ein neuer IIFE-Block im AccordionContent)
 
 ## Deployment
 _To be added by /deploy_

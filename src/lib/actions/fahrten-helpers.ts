@@ -190,3 +190,67 @@ export function berechneFahrtBadge(
     variant: STATUS_VARIANT[status] ?? "secondary",
   };
 }
+
+/**
+ * PROJ-47: KPI-Werte einer laufenden Tour.
+ * Leitet alle Werte rein aus der bereits geladenen Tour ab.
+ */
+export interface TourKpiInfo {
+  /** Anzahl erledigter Stopps. */
+  erledigtAnzahl: number;
+  /** Gesamtanzahl Stopps. */
+  gesamtAnzahl: number;
+  /** Verbleibende Stopps (gesamt - erledigt). */
+  verbleibendeAnzahl: number;
+  /** Fortschritt in Prozent (0-100). */
+  fortschrittProzent: number;
+  /** Name des nächsten offenen Stopps, null wenn alle erledigt. */
+  naechsterStoppName: string | null;
+  /** Ankunftszeit des nächsten offenen Stopps (ISO), null ohne Berechnung oder alle erledigt. */
+  naechsterStoppAnkunftszeit: string | null;
+  /** Ankunftszeit des letzten offenen Stopps = voraussichtliches Tourende (ISO), null ohne vollständige Berechnung. */
+  voraussichtlichesTourendeAnkunftszeit: string | null;
+}
+
+/**
+ * PROJ-47: Berechnet Live-KPIs aus einer geladenen Tour.
+ * Gibt null zurück, wenn die Tour keine Stopps hat (Kantfall, defensiv).
+ *
+ * Setzt voraus, dass tour.fahrten bereits von gruppiereZuTouren() sortiert ist:
+ * - offene Stopps nach routeOrder
+ * - erledigte Stopps ans Ende
+ */
+export function berechneTourKpis(tour: Tour): TourKpiInfo | null {
+  if (!tour.fahrten || tour.fahrten.length === 0) {
+    return null;
+  }
+
+  const gesamtAnzahl = tour.fahrten.length;
+  const erledigteFahrten = tour.fahrten.filter((f) => f.status === "erledigt");
+  const erledigtAnzahl = erledigteFahrten.length;
+  const verbleibendeAnzahl = gesamtAnzahl - erledigtAnzahl;
+  const fortschrittProzent = Math.round((erledigtAnzahl / gesamtAnzahl) * 100);
+
+  // Nächster offener Stopp = erster Eintrag mit Status !== "erledigt"
+  const naechsterStopp = tour.fahrten.find((f) => f.status !== "erledigt") ?? null;
+
+  // Letzter offener Stopp = letzter Eintrag mit Status !== "erledigt"
+  // (tour.fahrten ist sortiert, erledigte Stopps ans Ende, daher einfach rückwärts von oben)
+  let letzterOffenerStopp: Fahrt | null = null;
+  for (let i = tour.fahrten.length - 1; i >= 0; i--) {
+    if (tour.fahrten[i].status !== "erledigt") {
+      letzterOffenerStopp = tour.fahrten[i];
+      break;
+    }
+  }
+
+  return {
+    erledigtAnzahl,
+    gesamtAnzahl,
+    verbleibendeAnzahl,
+    fortschrittProzent,
+    naechsterStoppName: naechsterStopp?.kunde.name ?? null,
+    naechsterStoppAnkunftszeit: naechsterStopp?.berechneteAnkunftszeit ?? null,
+    voraussichtlichesTourendeAnkunftszeit: letzterOffenerStopp?.berechneteAnkunftszeit ?? null,
+  };
+}

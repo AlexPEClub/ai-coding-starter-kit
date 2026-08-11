@@ -30,6 +30,7 @@ import {
   type StoppDetailModalZiel,
 } from "@/components/fahrer/stopp-detail-modal";
 import { TourKarteModal } from "@/components/fahrer/tour-karte-modal";
+import { TourKpiLeiste } from "@/components/fahrer/tour-kpi-leiste";
 
 export function formatDatum(datum: string | null): string {
   if (!datum) return "Ohne Datum";
@@ -276,6 +277,12 @@ export function TourListe({
                 </Button>
               </div>
               <AccordionContent>
+                {/* PROJ-47: KPI-Leiste, nur sichtbar wenn Tour bereits gestartet wurde */}
+                {(() => {
+                  const tourKey = `${tour.fahrerId ?? "ohne-fahrer"}-${tour.datum ?? "ohne-datum"}`;
+                  const tourGestartet = !!tourStarts?.[tourKey];
+                  return tourGestartet && <TourKpiLeiste tour={tour} />;
+                })()}
                 <ul className="space-y-2">
                   {tour.fahrten.map((fahrt) => {
                     const adresse = formatAdresse(fahrt.kunde);

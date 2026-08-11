@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { berechneFahrtBadge, gruppiereZuTouren, type RohFahrt } from "./fahrten-helpers";
+import { berechneFahrtBadge, berechneTourKpis, gruppiereZuTouren, type RohFahrt, type Tour } from "./fahrten-helpers";
 
 function fahrt(overrides: Partial<RohFahrt>): RohFahrt {
   return {
@@ -241,5 +241,233 @@ describe("berechneFahrtBadge", () => {
       label: "Problem",
       variant: "destructive",
     });
+  });
+});
+
+describe("berechneTourKpis", () => {
+  // PROJ-47: KPI-Berechnung für laufende Touren
+
+  it("gibt null zurück, wenn die Tour keine Stopps hat", () => {
+    const tour: Tour = {
+      datum: "2026-08-05",
+      fahrerId: "fahrer-1",
+      fahrerName: "Max Mustermann",
+      fahrten: [],
+      gesamtDistanzMeter: null,
+      gesamtDauerSekunden: null,
+    };
+    expect(berechneTourKpis(tour)).toBeNull();
+  });
+
+  it("berechnet korrekt für eine Tour mit nur offenen Stopps", () => {
+    const tour: Tour = {
+      datum: "2026-08-05",
+      fahrerId: "fahrer-1",
+      fahrerName: "Max Mustermann",
+      fahrten: [
+        {
+          id: "a",
+          status: "geplant",
+          geplantesAbholdatum: "2026-08-05",
+          notiz: null,
+          kunde: { name: "Kunde A", strasse: null, plz: null, ort: null },
+          routeOrder: 1,
+          berechneteAnkunftszeit: "2026-08-05T08:00:00.000Z",
+        },
+        {
+          id: "b",
+          status: "geplant",
+          geplantesAbholdatum: "2026-08-05",
+          notiz: null,
+          kunde: { name: "Kunde B", strasse: null, plz: null, ort: null },
+          routeOrder: 2,
+          berechneteAnkunftszeit: "2026-08-05T09:00:00.000Z",
+        },
+        {
+          id: "c",
+          status: "unterwegs",
+          geplantesAbholdatum: "2026-08-05",
+          notiz: null,
+          kunde: { name: "Kunde C", strasse: null, plz: null, ort: null },
+          routeOrder: 3,
+          berechneteAnkunftszeit: "2026-08-05T10:00:00.000Z",
+        },
+      ],
+      gesamtDistanzMeter: 5000,
+      gesamtDauerSekunden: 900,
+    };
+
+    const kpi = berechneTourKpis(tour);
+    expect(kpi).not.toBeNull();
+    if (kpi) {
+      expect(kpi.erledigtAnzahl).toBe(0);
+      expect(kpi.gesamtAnzahl).toBe(3);
+      expect(kpi.verbleibendeAnzahl).toBe(3);
+      expect(kpi.fortschrittProzent).toBe(0);
+      expect(kpi.naechsterStoppName).toBe("Kunde A");
+      expect(kpi.naechsterStoppAnkunftszeit).toBe("2026-08-05T08:00:00.000Z");
+      expect(kpi.voraussichtlichesTourendeAnkunftszeit).toBe("2026-08-05T10:00:00.000Z");
+    }
+  });
+
+  it("berechnet korrekt für eine Tour mit offenen und erledigten Stopps", () => {
+    const tour: Tour = {
+      datum: "2026-08-05",
+      fahrerId: "fahrer-1",
+      fahrerName: "Max Mustermann",
+      fahrten: [
+        {
+          id: "a",
+          status: "unterwegs",
+          geplantesAbholdatum: "2026-08-05",
+          notiz: null,
+          kunde: { name: "Kunde A", strasse: null, plz: null, ort: null },
+          routeOrder: 2,
+          berechneteAnkunftszeit: "2026-08-05T09:30:00.000Z",
+        },
+        {
+          id: "b",
+          status: "geplant",
+          geplantesAbholdatum: "2026-08-05",
+          notiz: null,
+          kunde: { name: "Kunde B", strasse: null, plz: null, ort: null },
+          routeOrder: 3,
+          berechneteAnkunftszeit: "2026-08-05T10:30:00.000Z",
+        },
+        {
+          id: "erledigt",
+          status: "erledigt",
+          geplantesAbholdatum: "2026-08-05",
+          notiz: null,
+          kunde: { name: "Kunde C", strasse: null, plz: null, ort: null },
+          routeOrder: null,
+          berechneteAnkunftszeit: "2026-08-05T08:00:00.000Z",
+        },
+      ],
+      gesamtDistanzMeter: 5000,
+      gesamtDauerSekunden: 900,
+    };
+
+    const kpi = berechneTourKpis(tour);
+    expect(kpi).not.toBeNull();
+    if (kpi) {
+      expect(kpi.erledigtAnzahl).toBe(1);
+      expect(kpi.gesamtAnzahl).toBe(3);
+      expect(kpi.verbleibendeAnzahl).toBe(2);
+      expect(kpi.fortschrittProzent).toBe(33);
+      expect(kpi.naechsterStoppName).toBe("Kunde A");
+      expect(kpi.naechsterStoppAnkunftszeit).toBe("2026-08-05T09:30:00.000Z");
+      expect(kpi.voraussichtlichesTourendeAnkunftszeit).toBe("2026-08-05T10:30:00.000Z");
+    }
+  });
+
+  it("zeigt keine Ankunftszeiten, wenn die Tour keine Routenberechnung hat", () => {
+    const tour: Tour = {
+      datum: "2026-08-05",
+      fahrerId: "fahrer-1",
+      fahrerName: "Max Mustermann",
+      fahrten: [
+        {
+          id: "a",
+          status: "geplant",
+          geplantesAbholdatum: "2026-08-05",
+          notiz: null,
+          kunde: { name: "Kunde A", strasse: null, plz: null, ort: null },
+          routeOrder: null,
+          berechneteAnkunftszeit: null,
+        },
+        {
+          id: "b",
+          status: "geplant",
+          geplantesAbholdatum: "2026-08-05",
+          notiz: null,
+          kunde: { name: "Kunde B", strasse: null, plz: null, ort: null },
+          routeOrder: null,
+          berechneteAnkunftszeit: null,
+        },
+      ],
+      gesamtDistanzMeter: null,
+      gesamtDauerSekunden: null,
+    };
+
+    const kpi = berechneTourKpis(tour);
+    expect(kpi).not.toBeNull();
+    if (kpi) {
+      expect(kpi.erledigtAnzahl).toBe(0);
+      expect(kpi.gesamtAnzahl).toBe(2);
+      expect(kpi.naechsterStoppName).toBe("Kunde A");
+      expect(kpi.naechsterStoppAnkunftszeit).toBeNull();
+      expect(kpi.voraussichtlichesTourendeAnkunftszeit).toBeNull();
+    }
+  });
+
+  it("behandelt einen einzelnen Stopp korrekt", () => {
+    const tour: Tour = {
+      datum: "2026-08-05",
+      fahrerId: "fahrer-1",
+      fahrerName: "Max Mustermann",
+      fahrten: [
+        {
+          id: "a",
+          status: "geplant",
+          geplantesAbholdatum: "2026-08-05",
+          notiz: null,
+          kunde: { name: "Kunde A", strasse: null, plz: null, ort: null },
+          routeOrder: 1,
+          berechneteAnkunftszeit: "2026-08-05T08:00:00.000Z",
+        },
+      ],
+      gesamtDistanzMeter: null,
+      gesamtDauerSekunden: null,
+    };
+
+    const kpi = berechneTourKpis(tour);
+    expect(kpi).not.toBeNull();
+    if (kpi) {
+      expect(kpi.erledigtAnzahl).toBe(0);
+      expect(kpi.gesamtAnzahl).toBe(1);
+      expect(kpi.verbleibendeAnzahl).toBe(1);
+      expect(kpi.fortschrittProzent).toBe(0);
+      expect(kpi.naechsterStoppName).toBe("Kunde A");
+      expect(kpi.voraussichtlichesTourendeAnkunftszeit).toBe("2026-08-05T08:00:00.000Z");
+    }
+  });
+
+  it("gibt null für voraussichtlichesTourendeAnkunftszeit zurück, wenn letzter offener Stopp keine Ankunftszeit hat", () => {
+    const tour: Tour = {
+      datum: "2026-08-05",
+      fahrerId: "fahrer-1",
+      fahrerName: "Max Mustermann",
+      fahrten: [
+        {
+          id: "a",
+          status: "geplant",
+          geplantesAbholdatum: "2026-08-05",
+          notiz: null,
+          kunde: { name: "Kunde A", strasse: null, plz: null, ort: null },
+          routeOrder: 1,
+          berechneteAnkunftszeit: "2026-08-05T08:00:00.000Z",
+        },
+        {
+          id: "b",
+          status: "geplant",
+          geplantesAbholdatum: "2026-08-05",
+          notiz: null,
+          kunde: { name: "Kunde B", strasse: null, plz: null, ort: null },
+          routeOrder: 2,
+          berechneteAnkunftszeit: null,
+        },
+      ],
+      gesamtDistanzMeter: null,
+      gesamtDauerSekunden: null,
+    };
+
+    const kpi = berechneTourKpis(tour);
+    expect(kpi).not.toBeNull();
+    if (kpi) {
+      expect(kpi.naechsterStoppName).toBe("Kunde A");
+      expect(kpi.naechsterStoppAnkunftszeit).toBe("2026-08-05T08:00:00.000Z");
+      expect(kpi.voraussichtlichesTourendeAnkunftszeit).toBeNull();
+    }
   });
 });
