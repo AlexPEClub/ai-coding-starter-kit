@@ -909,3 +909,17 @@ von Stopp zu Stopp unterschiedliche Werte (z. B. 458 m/39 s bis 95.115 m/
 Die Engine-Erweiterung ist production-ready. Nächste Schritte:
 1. Deployment des Refine per `./scripts/deploy.sh PROJ-42`
 2. In PROJ-46 und PROJ-44: Live-Verifikation, dass die neuen optionalen Parameter mit echten Werten (Geräte-Standort, aktueller Zeitpunkt) die Routenberechnung korrekt triggern
+
+## Deployment (Refine 2026-08-11)
+
+**Deployed:** 2026-08-11 zu https://tms.gudel-werkzeuge.de (`./scripts/deploy.sh PROJ-42`)
+
+- **Pre-Checks:** Lint ✅ (1 pre-existing warning in revenue-chart.tsx, keine neuen Fehler), Build ✅ erfolgreich
+- **Docker-Deploy:** Image erfolgreich gebaut, Container läuft (3 Min. uptime)
+- **Verifikation:** 
+  - Live-URL HTTP 200 ✓ (Login-Seite vollständig gerendert)
+  - Chromium-Smoke-Tests: 6/6 bestanden ✓ (Login erreichbar, TMS 2.0 Fingerabdruck, Login-Form)
+  - Webkit/Mobile Safari: Bekannte dev-host-Limitation (identisch PROJ-11/21/29/41/44), nicht Code-related
+- **Git:** Commit `705a6d8` ("feat(PROJ-42): Add optional startpoint/starttime..."), Tag `v1.42.1-PROJ-42` erstellt
+- **Impact:** Reine Engine-Erweiterung, backward-compatible, kein aktiver Aufrufer mit echten Werten (folgen später in PROJ-46/PROJ-44)
+- **Nächste Schritte:** PROJ-46 (Tour starten) und PROJ-44 (Stopp erledigt) triggern die neuen Parameter mit echtem Geräte-Standort/Zeitpunkt live
