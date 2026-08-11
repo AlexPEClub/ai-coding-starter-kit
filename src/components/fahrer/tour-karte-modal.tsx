@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { AlertCircle, X, Loader2 } from "lucide-react";
+import { motion } from "framer-motion";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -127,25 +128,21 @@ export function TourKarteModal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl p-0">
-        <div className="flex flex-col">
-          {/* Header */}
+        {/* PROJ-45-Refine: motion.div-Wrapper für Enter/Exit-Animation */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 8 }}
+          transition={{ duration: 0.15, ease: "easeInOut" }}
+          className="flex flex-col"
+        >
+          {/* Header — PROJ-45-Refine: Manuellen Schließen-Button entfernt, nur das automatische DialogPrimitive.Close bleibt */}
           <DialogHeader className="border-b border-border px-4 py-3">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <DialogTitle>Karte</DialogTitle>
-                <DialogDescription>
-                  {tourDatum ? new Date(tourDatum).toLocaleDateString("de-DE") : "Tour"}
-                </DialogDescription>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleClose}
-                className="h-8 w-8"
-                aria-label="Karte schließen"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+            <div>
+              <DialogTitle>Karte</DialogTitle>
+              <DialogDescription>
+                {tourDatum ? new Date(tourDatum).toLocaleDateString("de-DE") : "Tour"}
+              </DialogDescription>
             </div>
           </DialogHeader>
 
@@ -187,7 +184,7 @@ export function TourKarteModal({
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
       </DialogContent>
     </Dialog>
   );
